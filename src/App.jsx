@@ -19,49 +19,45 @@ export default function App() {
     }).format(v || 0);
   }
 
-  async function importExcel(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+ async function importExcel(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    const buffer = await file.arrayBuffer();
-    const wb = XLSX.read(buffer, { type: "array" });
+  const buffer = await file.arrayBuffer();
+  const wb = XLSX.read(buffer, { type: "array" });
 
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const json = XLSX.utils.sheet_to_json(ws, { defval: "" });
+  const candidateSheets = [
+    wb.Sheets["ProjectInputSheet"],
+    wb.Sheets["ProjectInputSheet_ITA"],
+    wb.Sheets[wb.SheetNames[0]]
+  ].filter(Boolean);
 
-    const parsed = json.map((r, i) => ({
-      id: i + 1,
-      area:
-        r.Area ||
-        r.area ||
-        r.Zone ||
-        r.street ||
-        r.Street ||
-        `Line ${i + 1}`,
+  let bestRows = [];
 
-      qty: Number(
-        r.Qty ||
-          r.qty ||
-          r.Quantity ||
-          r.quantity ||
-          r.Points ||
-          1
-      ),
+  for (const ws of candidateSheets) {
+    const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
-      oldWatt: Number(
-        r.Watt ||
-          r.watt ||
-          r.ExistingWatt ||
-          r.Power ||
-          r.W ||
-          100
-      )
-    }));
+    const parsed = matrix
+      .slice(14)
+      .map((r, i) => ({
+        id: Date.now() + i,
+        area: r[1] || `Line ${i + 1}`,
+        qty: Number(r[3] || 0),
+        oldWatt: Number(r[6] || 0)
+      }))
+      .filter(r => r.qty > 0 && r.oldWatt > 0);
 
-    setRows(parsed);
-    setClient(file.name.replace(".xlsx", "").replace(".xls", ""));
+    if (parsed.length > bestRows.length) {
+      bestRows = parsed;
+    }
   }
 
+  if (bestRows.length) {
+    setRows(bestRows);
+    setClient(file.name.replace(".xlsx", "").replace(".xls", ""));
+  } else {
+    alert("No valid VIMALUX audit rows found. Check quantity in column D and wattage in column G.");
+  }
   const calc = useMemo(() => {
     const totalLamps = rows.reduce((a, b) => a + b.qty, 0);
 
