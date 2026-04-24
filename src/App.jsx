@@ -19,50 +19,57 @@ export default function App() {
     }).format(v || 0);
   }
 
- async function importExcel(e) {
-  const file = e.target.files?.[0];
-  if (!file) return;
+  async function importExcel(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const buffer = await file.arrayBuffer();
-  const wb = XLSX.read(buffer, { type: "array" });
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: "array" });
 
-  const candidateSheets = [
-    wb.Sheets["ProjectInputSheet"],
-    wb.Sheets["ProjectInputSheet_ITA"],
-    wb.Sheets[wb.SheetNames[0]]
-  ].filter(Boolean);
+    const candidateSheets = [
+      wb.Sheets["ProjectInputSheet"],
+      wb.Sheets["ProjectInputSheet_ITA"],
+      wb.Sheets[wb.SheetNames[0]]
+    ].filter(Boolean);
 
-  let bestRows = [];
+    let bestRows = [];
 
-  for (const ws of candidateSheets) {
-    const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+    for (const ws of candidateSheets) {
+      const matrix = XLSX.utils.sheet_to_json(ws, {
+        header: 1,
+        defval: ""
+      });
 
-    const parsed = matrix
-      .slice(14)
-      .map((r, i) => ({
-        id: Date.now() + i,
-        area: r[1] || `Line ${i + 1}`,
-        qty: Number(r[3] || 0),
-        oldWatt: Number(r[6] || 0)
-      }))
-      .filter(r => r.qty > 0 && r.oldWatt > 0);
+      const parsed = matrix
+        .slice(14)
+        .map((r, i) => ({
+          id: Date.now() + i,
+          area: r[1] || `Line ${i + 1}`,
+          qty: Number(r[3] || 0),
+          oldWatt: Number(r[6] || 0)
+        }))
+        .filter((r) => r.qty > 0 && r.oldWatt > 0);
 
-    if (parsed.length > bestRows.length) {
-      bestRows = parsed;
+      if (parsed.length > bestRows.length) {
+        bestRows = parsed;
+      }
+    }
+
+    if (bestRows.length) {
+      setRows(bestRows);
+      setClient(
+        file.name.replace(".xlsx", "").replace(".xls", "")
+      );
+    } else {
+      alert("No valid rows found in Excel file.");
     }
   }
 
-  if (bestRows.length) {
-    setRows(bestRows);
-    setClient(file.name.replace(".xlsx", "").replace(".xls", ""));
-  } else {
-    alert("No valid VIMALUX audit rows found. Check quantity in column D and wattage in column G.");
-  }
   const calc = useMemo(() => {
     const totalLamps = rows.reduce((a, b) => a + b.qty, 0);
 
     const existingKwh = rows.reduce(
-      (a, b) => a + b.qty * b.oldWatt * 4200 / 1000,
+      (a, b) => a + (b.qty * b.oldWatt * 4200) / 1000,
       0
     );
 
@@ -71,7 +78,8 @@ export default function App() {
 
     const annualSaving = (existingKwh - smartKwh) * 0.27;
     const capex = totalLamps * 195;
-    const payback = capex / annualSaving;
+    const payback =
+      annualSaving > 0 ? capex / annualSaving : 0;
 
     return {
       totalLamps,
@@ -110,8 +118,13 @@ export default function App() {
         padding: 28
       }}
     >
-      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 28 }}>
-        {/* Sidebar */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "260px 1fr",
+          gap: 28
+        }}
+      >
         <div>
           <div
             style={{
@@ -139,8 +152,10 @@ export default function App() {
                 padding: "18px 22px",
                 marginBottom: 12,
                 borderRadius: 18,
-                background: i === 4 ? "#08162d" : "transparent",
-                color: i === 4 ? "white" : "#08162d",
+                background:
+                  i === 4 ? "#08162d" : "transparent",
+                color:
+                  i === 4 ? "white" : "#08162d",
                 fontWeight: 800,
                 fontSize: 18
               }}
@@ -150,7 +165,6 @@ export default function App() {
           ))}
         </div>
 
-        {/* Main */}
         <div>
           <div
             style={{
@@ -161,8 +175,13 @@ export default function App() {
               marginBottom: 26
             }}
           >
-            <div style={{ letterSpacing: 3, fontSize: 18 }}>
-              VIMALUX LIGHTING AI PORTAL · VERSION 6B
+            <div
+              style={{
+                letterSpacing: 3,
+                fontSize: 18
+              }}
+            >
+              VIMALUX LIGHTING AI PORTAL · VERSION 6C
             </div>
 
             <div
@@ -175,8 +194,14 @@ export default function App() {
               Closing Machine
             </div>
 
-            <div style={{ fontSize: 22, marginTop: 12 }}>
-              Native Excel import of real client audit sheets.
+            <div
+              style={{
+                fontSize: 22,
+                marginTop: 12
+              }}
+            >
+              Native Excel import of real client audit
+              sheets.
             </div>
 
             <div style={{ marginTop: 28 }}>
@@ -197,7 +222,8 @@ export default function App() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(3,1fr)",
+              gridTemplateColumns:
+                "repeat(3,1fr)",
               gap: 22
             }}
           >
@@ -207,42 +233,76 @@ export default function App() {
             </div>
 
             <div style={box}>
-              <div style={label}>Total lamps</div>
-              <div style={value}>{num(calc.totalLamps)}</div>
-            </div>
-
-            <div style={box}>
-              <div style={label}>Estimated CAPEX</div>
-              <div style={value}>{eur(calc.capex)}</div>
-            </div>
-
-            <div style={box}>
-              <div style={label}>Existing consumption</div>
-              <div style={value}>{num(calc.existingKwh)} kWh</div>
-            </div>
-
-            <div style={box}>
-              <div style={label}>Smart consumption</div>
-              <div style={value}>{num(calc.smartKwh)} kWh</div>
-            </div>
-
-            <div style={box}>
-              <div style={label}>Annual saving</div>
-              <div style={value}>{eur(calc.annualSaving)}</div>
-            </div>
-
-            <div style={box}>
-              <div style={label}>Simple payback</div>
+              <div style={label}>
+                Total lamps
+              </div>
               <div style={value}>
-                {isFinite(calc.payback)
-                  ? calc.payback.toFixed(1) + " years"
+                {num(calc.totalLamps)}
+              </div>
+            </div>
+
+            <div style={box}>
+              <div style={label}>
+                Estimated CAPEX
+              </div>
+              <div style={value}>
+                {eur(calc.capex)}
+              </div>
+            </div>
+
+            <div style={box}>
+              <div style={label}>
+                Existing consumption
+              </div>
+              <div style={value}>
+                {num(calc.existingKwh)} kWh
+              </div>
+            </div>
+
+            <div style={box}>
+              <div style={label}>
+                Smart consumption
+              </div>
+              <div style={value}>
+                {num(calc.smartKwh)} kWh
+              </div>
+            </div>
+
+            <div style={box}>
+              <div style={label}>
+                Annual saving
+              </div>
+              <div style={value}>
+                {eur(calc.annualSaving)}
+              </div>
+            </div>
+
+            <div style={box}>
+              <div style={label}>
+                Simple payback
+              </div>
+              <div style={value}>
+                {calc.payback
+                  ? calc.payback.toFixed(1) +
+                    " years"
                   : "-"}
               </div>
             </div>
           </div>
 
-          <div style={{ ...box, marginTop: 24 }}>
-            <div style={{ fontSize: 30, fontWeight: 900, marginBottom: 14 }}>
+          <div
+            style={{
+              ...box,
+              marginTop: 24
+            }}
+          >
+            <div
+              style={{
+                fontSize: 30,
+                fontWeight: 900,
+                marginBottom: 14
+              }}
+            >
               Imported rows preview
             </div>
 
@@ -251,9 +311,11 @@ export default function App() {
                 key={r.id}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "2fr 1fr 1fr",
+                  gridTemplateColumns:
+                    "2fr 1fr 1fr",
                   padding: "10px 0",
-                  borderBottom: "1px solid #dde3ea"
+                  borderBottom:
+                    "1px solid #dde3ea"
                 }}
               >
                 <div>{r.area}</div>
@@ -263,7 +325,11 @@ export default function App() {
             ))}
 
             {rows.length === 0 && (
-              <div style={{ color: "#6c7b92" }}>
+              <div
+                style={{
+                  color: "#6c7b92"
+                }}
+              >
                 Upload client Excel file now.
               </div>
             )}
