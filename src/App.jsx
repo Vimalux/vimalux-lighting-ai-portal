@@ -8,17 +8,11 @@ const products = [
 ];
 
 function eur(v) {
-  return new Intl.NumberFormat("en-IE", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0
-  }).format(v || 0);
+  return new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v || 0);
 }
 
 function num(v) {
-  return new Intl.NumberFormat("en-IE", {
-    maximumFractionDigits: 0
-  }).format(v || 0);
+  return new Intl.NumberFormat("en-IE", { maximumFractionDigits: 0 }).format(v || 0);
 }
 
 function recommendProduct(oldWatt) {
@@ -29,7 +23,7 @@ function recommendProduct(oldWatt) {
 }
 
 export default function App() {
-  const [page, setPage] = useState("calculator");
+  const [page, setPage] = useState("revenue");
   const [lang, setLang] = useState("EN");
 
   const [input, setInput] = useState({
@@ -43,7 +37,12 @@ export default function App() {
     softwareCost: 6,
     powerAidCost: 3,
     years: 15,
-    investorMultiple: 8
+    investorMultiple: 8,
+    projectYears: 15,
+    municipalityRating: "A",
+    receivablesAssignment: "Yes",
+    currentLedEfficacy: 130,
+    newLedEfficacy: 170
   });
 
   const [lead, setLead] = useState({
@@ -51,6 +50,9 @@ export default function App() {
     company: "",
     email: "",
     phone: "",
+    country: "Italy",
+    lampsOwned: "",
+    interest: "Smart upgrade",
     message: ""
   });
 
@@ -67,12 +69,9 @@ export default function App() {
     const smartKwh = ledOnlyKwh * (1 - Number(input.smartExtraSaving) / 100);
 
     const beforeEnergyCost = beforeKwh * energy;
-    const ledEnergyCost = ledOnlyKwh * energy;
     const smartEnergyCost = smartKwh * energy;
 
-    const energySavingLedOnly = beforeEnergyCost - ledEnergyCost;
     const energySavingSmart = beforeEnergyCost - smartEnergyCost;
-
     const maintenanceSaving = lamps * Number(input.maintenanceCost) * 0.75;
     const softwareOpex = lamps * (Number(input.softwareCost) + Number(input.powerAidCost));
 
@@ -83,14 +82,20 @@ export default function App() {
     const investorValue = annualNetSaving * Number(input.investorMultiple);
     const co2Saving = (beforeKwh - smartKwh) * 0.35 / 1000;
 
+    const smartUpgradeSavingPct =
+      ((Number(input.newLedEfficacy) / Number(input.currentLedEfficacy) - 1) * 100) +
+      Number(input.smartExtraSaving);
+
+    const financingFee = capex * 0.03;
+    const advisoryFee = capex * 0.015;
+    const recurringSaas = lamps * Number(input.softwareCost);
+
+    const annualRevenuePotential = recurringSaas + advisoryFee / 3 + financingFee / 3;
+
     return {
       beforeKwh,
       ledOnlyKwh,
       smartKwh,
-      beforeEnergyCost,
-      ledEnergyCost,
-      smartEnergyCost,
-      energySavingLedOnly,
       energySavingSmart,
       maintenanceSaving,
       softwareOpex,
@@ -99,50 +104,39 @@ export default function App() {
       payback,
       valuePeriod,
       investorValue,
-      co2Saving
+      co2Saving,
+      smartUpgradeSavingPct,
+      financingFee,
+      advisoryFee,
+      recurringSaas,
+      annualRevenuePotential
     };
   }, [input, selectedProduct]);
 
   const t = lang === "IT" ? {
-    title: "Motore Smart LED VIMALUX",
-    subtitle: "Calcolo ROI, proposta commerciale, dashboard investitore e matching prodotto.",
+    title: "VIMALUX Revenue Machine",
+    subtitle: "Lead generation, ROI, proposta, finanziamento e dashboard investitore.",
+    revenue: "Revenue",
     calculator: "Calcolatore",
     proposal: "Proposta",
+    financing: "Finanza",
+    smartUpgrade: "Smart Upgrade",
     investor: "Investitore",
-    catalogue: "Catalogo",
-    leads: "Lead",
-    print: "Stampa / PDF",
-    municipality: "Comune / Cliente",
-    lamps: "Numero lampade",
-    oldWatt: "Watt attuali",
-    hours: "Ore annue",
-    energyPrice: "Prezzo energia €/kWh",
-    smartSaving: "Extra saving Smart %",
-    years: "Anni analisi"
+    leads: "Lead"
   } : {
-    title: "VIMALUX Smart LED Engine",
-    subtitle: "ROI calculation, proposal generator, investor dashboard and product matching.",
+    title: "VIMALUX Revenue Machine",
+    subtitle: "Lead generation, ROI, proposal, financing and investor dashboard.",
+    revenue: "Revenue",
     calculator: "Calculator",
     proposal: "Proposal",
+    financing: "Financing",
+    smartUpgrade: "Smart Upgrade",
     investor: "Investor",
-    catalogue: "Catalogue",
-    leads: "Leads",
-    print: "Print / PDF",
-    municipality: "Municipality / Client",
-    lamps: "Number of lamps",
-    oldWatt: "Existing wattage",
-    hours: "Annual burning hours",
-    energyPrice: "Energy price €/kWh",
-    smartSaving: "Smart extra saving %",
-    years: "Analysis years"
+    leads: "Leads"
   };
 
   function update(field, value) {
     setInput(prev => ({ ...prev, [field]: value }));
-  }
-
-  function saveLead() {
-    alert("Lead saved in demo. Next step: connect this to Airtable, Supabase or HubSpot.");
   }
 
   function exportCsv() {
@@ -154,27 +148,35 @@ export default function App() {
       ["CAPEX", Math.round(result.capex)],
       ["Annual net saving", Math.round(result.annualNetSaving)],
       ["Payback", result.payback.toFixed(1)],
-      ["15Y net value", Math.round(result.valuePeriod)]
+      ["Investor value proxy", Math.round(result.investorValue)],
+      ["Recurring SaaS annual", Math.round(result.recurringSaas)],
+      ["Financing fee proxy", Math.round(result.financingFee)]
     ];
     const csv = rows.map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "vimalux-roi-analysis.csv";
+    a.download = "vimalux-revenue-analysis.csv";
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function saveLead() {
+    alert("Lead captured in demo. Next step: connect this form to Airtable, HubSpot, Supabase or email automation.");
   }
 
   return (
     <div style={styles.app}>
       <aside style={styles.sidebar}>
         <div style={styles.logo}>VIMALUX</div>
-        <button style={navStyle(page === "calculator")} onClick={() => setPage("calculator")}>{t.calculator}</button>
-        <button style={navStyle(page === "proposal")} onClick={() => setPage("proposal")}>{t.proposal}</button>
-        <button style={navStyle(page === "investor")} onClick={() => setPage("investor")}>{t.investor}</button>
-        <button style={navStyle(page === "catalogue")} onClick={() => setPage("catalogue")}>{t.catalogue}</button>
-        <button style={navStyle(page === "leads")} onClick={() => setPage("leads")}>{t.leads}</button>
+        <Nav label={t.revenue} id="revenue" page={page} setPage={setPage} />
+        <Nav label={t.calculator} id="calculator" page={page} setPage={setPage} />
+        <Nav label={t.proposal} id="proposal" page={page} setPage={setPage} />
+        <Nav label={t.financing} id="financing" page={page} setPage={setPage} />
+        <Nav label={t.smartUpgrade} id="smartUpgrade" page={page} setPage={setPage} />
+        <Nav label={t.investor} id="investor" page={page} setPage={setPage} />
+        <Nav label={t.leads} id="leads" page={page} setPage={setPage} />
 
         <div style={{ marginTop: 30 }}>
           <button style={styles.smallBtn} onClick={() => setLang("EN")}>EN</button>
@@ -185,13 +187,13 @@ export default function App() {
       <main style={styles.main}>
         <section style={styles.hero}>
           <div>
-            <div style={styles.eyebrow}>VIMALUX LIGHTING AI PORTAL · VERSION 4</div>
+            <div style={styles.eyebrow}>VIMALUX LIGHTING AI PORTAL · VERSION 5A</div>
             <h1 style={styles.h1}>{t.title}</h1>
             <p style={styles.subtitle}>{t.subtitle}</p>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button style={styles.whiteBtn} onClick={exportCsv}>Export CSV</button>
-            <button style={styles.whiteBtn} onClick={() => window.print()}>{t.print}</button>
+            <button style={styles.whiteBtn} onClick={() => window.print()}>Print / PDF</button>
           </div>
         </section>
 
@@ -200,33 +202,55 @@ export default function App() {
           <Kpi title="Estimated CAPEX" value={eur(result.capex)} />
           <Kpi title="Annual net saving" value={eur(result.annualNetSaving)} />
           <Kpi title="Simple payback" value={`${result.payback.toFixed(1)} years`} />
-          <Kpi title={`${input.years}Y net value`} value={eur(result.valuePeriod)} />
-          <Kpi title="CO₂ saving/year" value={`${num(result.co2Saving)} t`} />
+          <Kpi title="Recurring SaaS/year" value={eur(result.recurringSaas)} />
+          <Kpi title="VIMALUX annual potential" value={eur(result.annualRevenuePotential)} />
         </section>
+
+        {page === "revenue" && (
+          <section style={styles.grid2}>
+            <Card title="Revenue Engine">
+              <div style={styles.kpiGridSmall}>
+                <Kpi title="Product CAPEX" value={eur(result.capex)} />
+                <Kpi title="Financing fee proxy" value={eur(result.financingFee)} />
+                <Kpi title="Advisory fee proxy" value={eur(result.advisoryFee)} />
+                <Kpi title="SaaS annual revenue" value={eur(result.recurringSaas)} />
+              </div>
+              <p style={styles.note}>
+                Version 5A turns the calculator into a commercial funnel: product sale, SaaS recurring revenue, financing fee and advisory fee.
+              </p>
+            </Card>
+
+            <Card title="Lead qualification">
+              <div style={styles.formGrid}>
+                <TextInput label="Company / Municipality" value={lead.company} onChange={v => setLead({ ...lead, company: v })} />
+                <TextInput label="Email" value={lead.email} onChange={v => setLead({ ...lead, email: v })} />
+                <SelectInput label="Interest type" value={lead.interest} onChange={v => setLead({ ...lead, interest: v })} options={["Buy products", "Smart upgrade", "Financing", "Acquisition", "Become partner"]} />
+                <TextInput label="Lamps owned" value={lead.lampsOwned} onChange={v => setLead({ ...lead, lampsOwned: v })} />
+              </div>
+              <button style={styles.darkBtn} onClick={saveLead}>Capture lead</button>
+            </Card>
+          </section>
+        )}
 
         {page === "calculator" && (
           <section style={styles.grid2}>
             <Card title="Live ROI Calculator">
               <div style={styles.formGrid}>
-                <TextInput label={t.municipality} value={input.municipality} onChange={v => update("municipality", v)} />
-                <NumberInput label={t.lamps} value={input.lamps} onChange={v => update("lamps", v)} />
-                <NumberInput label={t.oldWatt} value={input.oldWatt} onChange={v => update("oldWatt", v)} />
-                <NumberInput label={t.hours} value={input.hours} onChange={v => update("hours", v)} />
-                <NumberInput label={t.energyPrice} value={input.energyPrice} step="0.01" onChange={v => update("energyPrice", v)} />
-                <NumberInput label={t.smartSaving} value={input.smartExtraSaving} onChange={v => update("smartExtraSaving", v)} />
+                <TextInput label="Municipality / Client" value={input.municipality} onChange={v => update("municipality", v)} />
+                <NumberInput label="Number of lamps" value={input.lamps} onChange={v => update("lamps", v)} />
+                <NumberInput label="Existing wattage" value={input.oldWatt} onChange={v => update("oldWatt", v)} />
+                <NumberInput label="Annual burning hours" value={input.hours} onChange={v => update("hours", v)} />
+                <NumberInput label="Energy price €/kWh" value={input.energyPrice} step="0.01" onChange={v => update("energyPrice", v)} />
+                <NumberInput label="Smart extra saving %" value={input.smartExtraSaving} onChange={v => update("smartExtraSaving", v)} />
                 <NumberInput label="Software €/lamp/year" value={input.softwareCost} onChange={v => update("softwareCost", v)} />
                 <NumberInput label="PowerAiD €/lamp/year" value={input.powerAidCost} onChange={v => update("powerAidCost", v)} />
-                <NumberInput label={t.years} value={input.years} onChange={v => update("years", v)} />
               </div>
             </Card>
 
-            <Card title="Existing vs LED-only vs Smart LED">
-              <Compare label="Current system" value={result.beforeKwh} max={result.beforeKwh} />
+            <Card title="Consumption comparison">
+              <Compare label="Existing system" value={result.beforeKwh} max={result.beforeKwh} />
               <Compare label="LED-only" value={result.ledOnlyKwh} max={result.beforeKwh} />
               <Compare label="Smart LED" value={result.smartKwh} max={result.beforeKwh} />
-              <p style={styles.muted}>
-                Smart LED adds CMS control, adaptive dimming logic and recurring software revenue potential.
-              </p>
             </Card>
           </section>
         )}
@@ -237,59 +261,91 @@ export default function App() {
               VIMALUX proposes to replace approximately <b>{num(input.lamps)}</b> existing luminaires currently estimated at <b>{input.oldWatt}W</b> with <b>{selectedProduct.name}</b>.
             </p>
             <p style={styles.largeText}>
-              The estimated investment is <b>{eur(result.capex)}</b>, generating an annual net saving of approximately <b>{eur(result.annualNetSaving)}</b> and a simple payback of <b>{result.payback.toFixed(1)} years</b>.
+              Estimated CAPEX: <b>{eur(result.capex)}</b>. Annual net saving: <b>{eur(result.annualNetSaving)}</b>. Simple payback: <b>{result.payback.toFixed(1)} years</b>.
+            </p>
+            <p style={styles.largeText}>
+              The project can be structured as direct purchase, ESCO upgrade, leasing, or investor-backed receivables assignment depending on municipal credit profile and contract duration.
             </p>
             <p style={styles.note}>
-              This proposal is preliminary and non-binding. Final values depend on technical audit, lighting design, municipal credit quality, contract duration and receivables assignment structure.
+              Preliminary and non-binding. Final values depend on technical audit, lighting design, contract structure, installation conditions and credit approval.
             </p>
             <button style={styles.darkBtn} onClick={() => window.print()}>Generate PDF / Print</button>
           </Card>
         )}
 
-        {page === "investor" && (
+        {page === "financing" && (
           <section style={styles.grid2}>
-            <Card title="Investor Metrics">
-              <Kpi title="Annual net cashflow" value={eur(result.annualNetSaving)} />
-              <Kpi title="Portfolio value proxy" value={eur(result.investorValue)} />
-              <Kpi title={`${input.years}Y net value`} value={eur(result.valuePeriod)} />
+            <Card title="Financing Engine">
+              <div style={styles.formGrid}>
+                <NumberInput label="Contract years" value={input.projectYears} onChange={v => update("projectYears", v)} />
+                <SelectInput label="Municipality rating" value={input.municipalityRating} onChange={v => update("municipalityRating", v)} options={["A", "B", "C", "Unknown"]} />
+                <SelectInput label="Receivables assignment" value={input.receivablesAssignment} onChange={v => update("receivablesAssignment", v)} options={["Yes", "No", "To be evaluated"]} />
+              </div>
+              <p style={styles.largeText}>
+                Financing-ready value proxy: <b>{eur(result.investorValue)}</b>
+              </p>
+              <p style={styles.note}>
+                Best structure: SPV / ESCO model with irrevocable assignment of future receivables where legally and commercially feasible.
+              </p>
             </Card>
 
-            <Card title="Investor Assumptions">
-              <NumberInput label="Cashflow multiple" value={input.investorMultiple} step="0.5" onChange={v => update("investorMultiple", v)} />
-              <p style={styles.muted}>
-                This module can later be expanded to IRR, DSCR, receivables sale, SPV structure and portfolio roll-up.
+            <Card title="Commercial angle">
+              <Kpi title="Financing fee proxy" value={eur(result.financingFee)} />
+              <Kpi title="Advisory fee proxy" value={eur(result.advisoryFee)} />
+            </Card>
+          </section>
+        )}
+
+        {page === "smartUpgrade" && (
+          <section style={styles.grid2}>
+            <Card title="Smart Upgrade Engine">
+              <div style={styles.formGrid}>
+                <NumberInput label="Current LED efficacy lm/W" value={input.currentLedEfficacy} onChange={v => update("currentLedEfficacy", v)} />
+                <NumberInput label="New LED efficacy lm/W" value={input.newLedEfficacy} onChange={v => update("newLedEfficacy", v)} />
+                <NumberInput label="Smart dimming saving %" value={input.smartExtraSaving} onChange={v => update("smartExtraSaving", v)} />
+              </div>
+              <Kpi title="Estimated upgrade potential" value={`${result.smartUpgradeSavingPct.toFixed(1)}%`} />
+              <p style={styles.note}>
+                Use this module for municipalities already upgraded to LED but without CMS, CLO, adaptive dimming or DATEK-style smart control.
+              </p>
+            </Card>
+
+            <Card title="DATEK / CMS sales argument">
+              <p style={styles.largeText}>
+                Smart upgrade is not only energy saving. It creates a digital lighting infrastructure with monitoring, fault detection, adaptive control and recurring software revenue.
               </p>
             </Card>
           </section>
         )}
 
-        {page === "catalogue" && (
-          <Card title="Smart LED Product Catalogue">
-            <div style={styles.productGrid}>
-              {products.map(p => (
-                <div key={p.id} style={styles.productCard}>
-                  <h3>{p.name}</h3>
-                  <p style={styles.muted}>{p.category}</p>
-                  <p><b>{p.watt}W</b></p>
-                  <p>{p.tags}</p>
-                  <p>Unit: <b>{eur(p.price)}</b> · Install: <b>{eur(p.install)}</b></p>
-                </div>
-              ))}
+        {page === "investor" && (
+          <Card title="Investor Dashboard">
+            <div style={styles.kpiGridSmall}>
+              <Kpi title="Annual net cashflow" value={eur(result.annualNetSaving)} />
+              <Kpi title="Portfolio value proxy" value={eur(result.investorValue)} />
+              <Kpi title={`${input.years}Y net value`} value={eur(result.valuePeriod)} />
+              <Kpi title="CO₂ saving/year" value={`${num(result.co2Saving)} t`} />
             </div>
+            <p style={styles.note}>
+              Next version should add IRR, DSCR, debt sizing, receivables purchase price, SPV waterfall and portfolio roll-up.
+            </p>
           </Card>
         )}
 
         {page === "leads" && (
-          <Card title="Lead Capture">
+          <Card title="Lead Capture Pro">
             <div style={styles.formGrid}>
               <TextInput label="Name" value={lead.name} onChange={v => setLead({ ...lead, name: v })} />
               <TextInput label="Company / Municipality" value={lead.company} onChange={v => setLead({ ...lead, company: v })} />
               <TextInput label="Email" value={lead.email} onChange={v => setLead({ ...lead, email: v })} />
               <TextInput label="Phone" value={lead.phone} onChange={v => setLead({ ...lead, phone: v })} />
+              <TextInput label="Country" value={lead.country} onChange={v => setLead({ ...lead, country: v })} />
+              <TextInput label="Lamps owned" value={lead.lampsOwned} onChange={v => setLead({ ...lead, lampsOwned: v })} />
+              <SelectInput label="Interest type" value={lead.interest} onChange={v => setLead({ ...lead, interest: v })} options={["Buy products", "Smart upgrade", "Financing", "Acquisition", "Become partner"]} />
             </div>
             <label style={styles.label}>
               Message
-              <textarea style={{ ...styles.input, minHeight: 100 }} value={lead.message} onChange={e => setLead({ ...lead, message: e.target.value })} />
+              <textarea style={{ ...styles.input, minHeight: 110 }} value={lead.message} onChange={e => setLead({ ...lead, message: e.target.value })} />
             </label>
             <br />
             <button style={styles.darkBtn} onClick={saveLead}>Save lead</button>
@@ -298,6 +354,10 @@ export default function App() {
       </main>
     </div>
   );
+}
+
+function Nav({ label, id, page, setPage }) {
+  return <button style={navStyle(page === id)} onClick={() => setPage(id)}>{label}</button>;
 }
 
 function navStyle(active) {
@@ -351,6 +411,17 @@ function TextInput({ label, value, onChange }) {
   );
 }
 
+function SelectInput({ label, value, onChange, options }) {
+  return (
+    <label style={styles.label}>
+      {label}
+      <select style={styles.input} value={value} onChange={e => onChange(e.target.value)}>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </label>
+  );
+}
+
 function Compare({ label, value, max }) {
   const width = Math.max(5, (value / max) * 100);
   return (
@@ -379,16 +450,15 @@ const styles = {
   darkBtn: { background: "#0f172a", color: "white", border: 0, borderRadius: 14, padding: "13px 18px", fontWeight: 900, cursor: "pointer" },
   smallBtn: { background: "#0f172a", color: "white", border: 0, borderRadius: 10, padding: "8px 12px", marginRight: 8, cursor: "pointer" },
   kpiGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 },
+  kpiGridSmall: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, margin: "18px 0" },
   kpi: { background: "white", borderRadius: 22, padding: 24, boxShadow: "0 8px 24px rgba(15,23,42,.06)", marginBottom: 16 },
   kpiTitle: { color: "#64748b", fontSize: 14 },
-  kpiValue: { fontSize: 30, fontWeight: 900, marginTop: 10 },
+  kpiValue: { fontSize: 28, fontWeight: 900, marginTop: 10 },
   grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 },
   card: { background: "white", borderRadius: 24, padding: 24, boxShadow: "0 8px 24px rgba(15,23,42,.06)", marginBottom: 24 },
   formGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 20 },
   label: { display: "flex", flexDirection: "column", gap: 8, fontSize: 13, fontWeight: 800, color: "#475569" },
   input: { width: "100%", padding: "12px 13px", border: "1px solid #cbd5e1", borderRadius: 12, fontSize: 14 },
-  productGrid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 },
-  productCard: { border: "1px solid #e2e8f0", borderRadius: 18, padding: 18 },
   muted: { color: "#64748b", lineHeight: 1.5 },
   largeText: { fontSize: 18, color: "#334155", lineHeight: 1.6 },
   note: { background: "#f1f5f9", borderRadius: 18, padding: 16, color: "#475569", lineHeight: 1.5 }
