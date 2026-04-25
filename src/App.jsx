@@ -34,22 +34,23 @@ function num(v) {
 }
 
 export default function App() {
-  const [page, setPage] = useState("import");
+  const [page, setPage] = useState("products");
   const [client, setClient] = useState("Comune Demo");
-  const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem("vml_products_v8") || "null") || defaultProducts);
-  const [assumptions, setAssumptions] = useState(() => JSON.parse(localStorage.getItem("vml_assumptions_v8") || "null") || defaultAssumptions);
-  const [rows, setRows] = useState(() => JSON.parse(localStorage.getItem("vml_rows_v8") || "null") || demoRows);
+  const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem("vml_products_v8b") || "null") || defaultProducts);
+  const [assumptions, setAssumptions] = useState(() => JSON.parse(localStorage.getItem("vml_assumptions_v8b") || "null") || defaultAssumptions);
+  const [rows, setRows] = useState(() => JSON.parse(localStorage.getItem("vml_rows_v8b") || "null") || demoRows);
 
-  useEffect(() => localStorage.setItem("vml_products_v8", JSON.stringify(products)), [products]);
-  useEffect(() => localStorage.setItem("vml_assumptions_v8", JSON.stringify(assumptions)), [assumptions]);
-  useEffect(() => localStorage.setItem("vml_rows_v8", JSON.stringify(rows)), [rows]);
+  useEffect(() => localStorage.setItem("vml_products_v8b", JSON.stringify(products)), [products]);
+  useEffect(() => localStorage.setItem("vml_assumptions_v8b", JSON.stringify(assumptions)), [assumptions]);
+  useEffect(() => localStorage.setItem("vml_rows_v8b", JSON.stringify(rows)), [rows]);
 
   function recommendProduct(watt) {
+    const sorted = [...products].sort((a, b) => Number(a.watt) - Number(b.watt));
     const w = Number(watt);
-    if (w >= 180) return products.find(p => p.id === "main90") || products[2];
-    if (w >= 120) return products.find(p => p.id === "street60") || products[1];
-    if (w >= 70) return products.find(p => p.id === "urban45") || products[0];
-    return products.find(p => p.id === "decor35") || products[3];
+    if (w >= 180) return products.find(p => p.id === "main90") || sorted[sorted.length - 1];
+    if (w >= 120) return products.find(p => p.id === "street60") || sorted.find(p => p.watt >= 60) || sorted[0];
+    if (w >= 70) return products.find(p => p.id === "urban45") || sorted.find(p => p.watt >= 45) || sorted[0];
+    return products.find(p => p.id === "decor35") || sorted[0];
   }
 
   const analysed = useMemo(() => {
@@ -142,6 +143,45 @@ export default function App() {
     setProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
   }
 
+  function addProduct() {
+    const newProduct = {
+      id: `product_${Date.now()}`,
+      name: "New Smart LED Product",
+      watt: 60,
+      lumen: 10000,
+      buyPrice: 100,
+      sellPrice: 150,
+      install: 45,
+      category: "New Category",
+      zhaga: "Yes",
+      d4i: "Yes"
+    };
+    setProducts(prev => [...prev, newProduct]);
+  }
+
+  function duplicateProduct(product) {
+    const copy = {
+      ...product,
+      id: `product_${Date.now()}`,
+      name: `${product.name} Copy`
+    };
+    setProducts(prev => [...prev, copy]);
+  }
+
+  function deleteProduct(id) {
+    if (products.length <= 1) {
+      alert("You must keep at least one product.");
+      return;
+    }
+    setProducts(prev => prev.filter(p => p.id !== id));
+  }
+
+  function resetCatalogue() {
+    if (confirm("Reset product catalogue to default VIMALUX products?")) {
+      setProducts(defaultProducts);
+    }
+  }
+
   function updateRow(id, field, value) {
     setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
   }
@@ -167,7 +207,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "vimalux_version8_analysis.csv";
+    a.download = "vimalux_version8b_analysis.csv";
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -193,9 +233,9 @@ export default function App() {
       <main style={styles.main}>
         <section style={styles.hero}>
           <div>
-            <div style={styles.eyebrow}>VIMALUX LIGHTING AI PORTAL · VERSION 8A</div>
+            <div style={styles.eyebrow}>VIMALUX LIGHTING AI PORTAL · VERSION 8B</div>
             <h1 style={styles.h1}>Commercial Closing Engine</h1>
-            <p style={styles.subtitle}>Excel audit import, product pricing, dynamic ROI, margin, SaaS revenue, proposal and investor metrics.</p>
+            <p style={styles.subtitle}>Excel audit import, editable product catalogue, pricing control, ROI, margin, SaaS revenue and investor metrics.</p>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button style={styles.whiteBtn} onClick={exportAnalysis}>Export Analysis</button>
@@ -229,9 +269,10 @@ export default function App() {
 
             <Card title="Commercial engine status">
               <Kpi title="Inventory rows" value={rows.length} />
+              <Kpi title="Products in catalogue" value={products.length} />
               <Kpi title="Current annual SaaS" value={eur(totals.saas)} />
               <Kpi title="Investor value proxy" value={eur(totals.investorValue)} />
-              <p style={styles.note}>Upload audit sheet first. Then adjust product prices and assumptions before generating proposal.</p>
+              <p style={styles.note}>Upload audit sheet first. Then adjust product catalogue and assumptions before generating proposal.</p>
             </Card>
           </section>
         )}
@@ -286,11 +327,16 @@ export default function App() {
 
         {page === "products" && (
           <Card title="Product catalogue and pricing control">
+            <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
+              <button style={styles.darkBtn} onClick={addProduct}>+ Add product</button>
+              <button style={styles.darkBtn} onClick={resetCatalogue}>Reset catalogue</button>
+            </div>
+
             <div style={{ overflowX: "auto" }}>
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    {["Name", "Category", "Watt", "Lumen", "Buy €", "Sell €", "Install €", "Zhaga", "D4i"].map(h => (
+                    {["Name", "Category", "Watt", "Lumen", "Buy €", "Sell €", "Install €", "Zhaga", "D4i", "Actions"].map(h => (
                       <th key={h} style={styles.th}>{h}</th>
                     ))}
                   </tr>
@@ -307,12 +353,19 @@ export default function App() {
                       <td style={styles.td}><input style={styles.input} type="number" value={p.install} onChange={e => updateProduct(p.id, "install", Number(e.target.value))} /></td>
                       <td style={styles.td}><input style={styles.input} value={p.zhaga} onChange={e => updateProduct(p.id, "zhaga", e.target.value)} /></td>
                       <td style={styles.td}><input style={styles.input} value={p.d4i} onChange={e => updateProduct(p.id, "d4i", e.target.value)} /></td>
+                      <td style={styles.td}>
+                        <button style={styles.smallBtn} onClick={() => duplicateProduct(p)}>Duplicate</button>
+                        <button style={styles.deleteBtn} onClick={() => deleteProduct(p.id)}>Delete</button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p style={styles.note}>Product catalogue is saved locally in browser. Production version should store this in Supabase/Airtable.</p>
+
+            <p style={styles.note}>
+              Product catalogue is saved locally in browser. Version 9 should move this to Supabase/Airtable so multiple users share the same catalogue.
+            </p>
           </Card>
         )}
 
@@ -430,6 +483,8 @@ const styles = {
   subtitle: { color: "#dbeafe", fontSize: 18 },
   whiteBtn: { background: "white", color: "#0f172a", border: 0, borderRadius: 14, padding: "13px 18px", fontWeight: 900, cursor: "pointer" },
   darkBtn: { background: "#0f172a", color: "white", border: 0, borderRadius: 14, padding: "13px 18px", fontWeight: 900, cursor: "pointer" },
+  smallBtn: { background: "#0f172a", color: "white", border: 0, borderRadius: 10, padding: "8px 10px", fontWeight: 800, cursor: "pointer", marginRight: 6 },
+  deleteBtn: { background: "#dc2626", color: "white", border: 0, borderRadius: 10, padding: "8px 10px", fontWeight: 800, cursor: "pointer" },
   kpiGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 },
   kpiGridSmall: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, margin: "18px 0" },
   kpi: { background: "white", borderRadius: 22, padding: 24, boxShadow: "0 8px 24px rgba(15,23,42,.06)", marginBottom: 16 },
@@ -441,7 +496,7 @@ const styles = {
   label: { display: "flex", flexDirection: "column", gap: 8, fontSize: 13, fontWeight: 800, color: "#475569" },
   input: { width: "100%", padding: "12px 13px", border: "1px solid #cbd5e1", borderRadius: 12, fontSize: 14 },
   uploadBox: { display: "flex", flexDirection: "column", gap: 10, alignItems: "center", justifyContent: "center", border: "2px dashed #cbd5e1", borderRadius: 20, padding: 40, cursor: "pointer", background: "#f8fafc" },
-  table: { width: "100%", borderCollapse: "collapse", minWidth: 1200 },
+  table: { width: "100%", borderCollapse: "collapse", minWidth: 1400 },
   th: { textAlign: "left", padding: 10, color: "#64748b", fontSize: 12, borderBottom: "1px solid #e2e8f0" },
   td: { padding: 8, borderBottom: "1px solid #e2e8f0", verticalAlign: "middle" },
   note: { background: "#f1f5f9", borderRadius: 18, padding: 16, color: "#475569", lineHeight: 1.5 },
