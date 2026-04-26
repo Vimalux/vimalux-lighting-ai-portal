@@ -2,10 +2,10 @@ import React, { useMemo, useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 
 const defaultProducts = [
-  { id: "urban45", name: "VIMALUX Urban 45W Smart", watt: 45, lumen: 7650, buyPrice: 95, sellPrice: 135, install: 45, category: "Urban", zhaga: "Yes", d4i: "Yes" },
-  { id: "street60", name: "VIMALUX Street Pro 60W Smart", watt: 60, lumen: 10200, buyPrice: 110, sellPrice: 150, install: 45, category: "Street", zhaga: "Yes", d4i: "Yes" },
-  { id: "main90", name: "VIMALUX Main Road 90W Smart", watt: 90, lumen: 15300, buyPrice: 140, sellPrice: 185, install: 50, category: "Main Road", zhaga: "Yes", d4i: "Yes" },
-  { id: "decor35", name: "VIMALUX Decorative Retrofit 35W Smart", watt: 35, lumen: 5600, buyPrice: 85, sellPrice: 120, install: 50, category: "Decorative", zhaga: "Optional", d4i: "Yes" }
+  { id: "urban45", name: "VIMALUX Urban 45W Smart", watt: 45, lumen: 7650, sellPrice: 135, install: 45, category: "Urban", zhaga: "Yes", d4i: "Yes" },
+  { id: "street60", name: "VIMALUX Street Pro 60W Smart", watt: 60, lumen: 10200, sellPrice: 150, install: 45, category: "Street", zhaga: "Yes", d4i: "Yes" },
+  { id: "main90", name: "VIMALUX Main Road 90W Smart", watt: 90, lumen: 15300, sellPrice: 185, install: 50, category: "Main Road", zhaga: "Yes", d4i: "Yes" },
+  { id: "decor35", name: "VIMALUX Decorative Retrofit 35W Smart", watt: 35, lumen: 5600, sellPrice: 120, install: 50, category: "Decorative", zhaga: "Optional", d4i: "Yes" }
 ];
 
 const defaultAssumptions = {
@@ -16,7 +16,6 @@ const defaultAssumptions = {
   softwareCost: 6,
   powerAidCost: 3,
   years: 15,
-  investorMultiple: 8,
   co2Factor: 0.35
 };
 
@@ -27,46 +26,44 @@ const demoRows = [
 
 const labels = {
   EN: {
-    version: "VIMALUX LIGHTING AI PORTAL · VERSION 8C",
-    title: "Commercial Closing Engine",
-    subtitle: "Excel audit import, editable product catalogue, pricing control, ROI, margin, SaaS revenue and investor metrics.",
+    version: "VIMALUX LIGHTING AI PORTAL · VERSION 8D",
+    title: "Customer ROI Engine",
+    subtitle: "Customer-facing ROI, savings, payback, CO₂ reduction and Smart LED product recommendation.",
     importExcel: "Import Excel",
-    dashboard: "Dashboard",
+    dashboard: "Customer Dashboard",
     inventory: "Inventory",
     products: "Products / Prices",
     assumptions: "Assumptions",
     proposal: "Proposal",
-    investor: "Investor",
     export: "Export Analysis",
     print: "Print / PDF",
     client: "Client",
     totalLamps: "Total lamps",
-    salesCapex: "Sales CAPEX",
-    margin: "Gross margin proxy",
-    netSaving: "Annual net saving",
-    payback: "Payback",
+    projectCapex: "Total project CAPEX",
+    annualNetSaving: "Annual net saving",
+    payback: "Simple payback",
+    roi: "Customer ROI/year",
+    netBenefit: "15Y net benefit",
+    co2: "CO₂ saving/year",
     uploadTitle: "Upload VIMALUX audit sheet",
     uploadMain: "Click to upload Excel audit sheet",
     uploadInfo1: "Reads ProjectInputSheet / ProjectInputSheet_ITA.",
     uploadInfo2: "Uses Location B, Type C, Qty D, Watt G, Hours I.",
     loadDemo: "Load demo",
     editPrices: "Edit product prices",
-    status: "Commercial engine status",
+    status: "Customer business case",
     inventoryRows: "Inventory rows",
     catalogueProducts: "Products in catalogue",
-    currentSaas: "Current annual SaaS",
-    investorProxy: "Investor value proxy",
-    statusNote: "Upload audit sheet first. Then adjust product catalogue and assumptions before generating proposal.",
+    uploadNote: "Upload audit sheet first. Then adjust product prices and assumptions before generating proposal.",
     energyComparison: "Energy comparison",
     existingSystem: "Existing system",
     smartSystem: "Smart LED system",
-    valueCreation: "Value creation",
+    valueCreation: "Customer value creation",
     energySavingYear: "Energy saving/year",
     maintenanceSavingYear: "Maintenance saving/year",
-    opexYear: "Software + PowerAiD OPEX/year",
-    recurringSaas: "Recurring SaaS/year",
+    serviceOpexYear: "Smart service cost/year",
     inventoryTitle: "Imported inventory and automatic product matching",
-    productTitle: "Product catalogue and pricing control",
+    productTitle: "Product catalogue and customer pricing",
     addProduct: "+ Add product",
     resetCatalogue: "Reset catalogue",
     clearLocal: "Clear local data",
@@ -74,55 +71,51 @@ const labels = {
     delete: "Delete",
     resetDone: "Catalogue reset to default products.",
     clearDone: "Local browser data cleared.",
-    catalogueNote: "Product catalogue is saved locally in browser. Version 9 should move this to Supabase/Airtable so multiple users share the same catalogue.",
-    assumptionsTitle: "Assumptions control center",
-    proposalSummary: "Proposal summary for",
+    catalogueNote: "Only customer-facing sales prices are shown. Internal purchase prices and margins are intentionally excluded.",
+    assumptionsTitle: "Customer assumptions control center",
+    proposalSummary: "Customer proposal summary for",
     preliminary: "Preliminary and non-binding. Final offer depends on technical audit, lighting design, product confirmation, installation conditions, contract structure and financing approval.",
-    investorTitle: "Investor dashboard",
-    nextInvestor: "Next version should add IRR, DSCR, debt sizing, receivables assignment and SPV waterfall.",
     noRows: "No valid VIMALUX audit rows found. Check quantity in column D and wattage in column G."
   },
   IT: {
-    version: "VIMALUX LIGHTING AI PORTAL · VERSIONE 8C",
-    title: "Motore Commerciale di Chiusura",
-    subtitle: "Import Excel audit, catalogo prodotti modificabile, controllo prezzi, ROI, margine, ricavi SaaS e metriche investitore.",
+    version: "VIMALUX LIGHTING AI PORTAL · VERSIONE 8D",
+    title: "Motore ROI Cliente",
+    subtitle: "ROI cliente, risparmi, payback, riduzione CO₂ e raccomandazione prodotto Smart LED.",
     importExcel: "Importa Excel",
-    dashboard: "Dashboard",
+    dashboard: "Dashboard Cliente",
     inventory: "Inventario",
     products: "Prodotti / Prezzi",
     assumptions: "Assunzioni",
     proposal: "Proposta",
-    investor: "Investitore",
     export: "Esporta Analisi",
     print: "Stampa / PDF",
     client: "Cliente",
     totalLamps: "Totale lampade",
-    salesCapex: "CAPEX vendita",
-    margin: "Margine lordo proxy",
-    netSaving: "Risparmio netto annuo",
-    payback: "Payback",
+    projectCapex: "CAPEX totale progetto",
+    annualNetSaving: "Risparmio netto annuo",
+    payback: "Payback semplice",
+    roi: "ROI cliente/anno",
+    netBenefit: "Beneficio netto 15 anni",
+    co2: "Risparmio CO₂/anno",
     uploadTitle: "Carica audit sheet VIMALUX",
     uploadMain: "Clicca per caricare Excel audit sheet",
     uploadInfo1: "Legge ProjectInputSheet / ProjectInputSheet_ITA.",
     uploadInfo2: "Usa Località B, Tipo C, Quantità D, Watt G, Ore I.",
     loadDemo: "Carica demo",
     editPrices: "Modifica prezzi prodotti",
-    status: "Stato motore commerciale",
+    status: "Business case cliente",
     inventoryRows: "Righe inventario",
     catalogueProducts: "Prodotti in catalogo",
-    currentSaas: "SaaS annuo corrente",
-    investorProxy: "Valore investitore proxy",
-    statusNote: "Carica prima l’audit sheet. Poi modifica catalogo prodotti e assunzioni prima di generare la proposta.",
+    uploadNote: "Carica prima l’audit sheet. Poi modifica prezzi prodotti e assunzioni prima di generare la proposta.",
     energyComparison: "Confronto energia",
     existingSystem: "Sistema esistente",
     smartSystem: "Sistema Smart LED",
-    valueCreation: "Creazione valore",
+    valueCreation: "Creazione valore cliente",
     energySavingYear: "Risparmio energia/anno",
     maintenanceSavingYear: "Risparmio manutenzione/anno",
-    opexYear: "OPEX Software + PowerAiD/anno",
-    recurringSaas: "SaaS ricorrente/anno",
+    serviceOpexYear: "Costo servizio Smart/anno",
     inventoryTitle: "Inventario importato e matching automatico prodotto",
-    productTitle: "Catalogo prodotti e controllo prezzi",
+    productTitle: "Catalogo prodotti e prezzi cliente",
     addProduct: "+ Aggiungi prodotto",
     resetCatalogue: "Reset catalogo",
     clearLocal: "Cancella dati locali",
@@ -130,12 +123,10 @@ const labels = {
     delete: "Elimina",
     resetDone: "Catalogo ripristinato ai prodotti default.",
     clearDone: "Dati locali browser cancellati.",
-    catalogueNote: "Il catalogo prodotti è salvato localmente nel browser. La Versione 9 dovrebbe usare Supabase/Airtable per condividere il catalogo tra più utenti.",
-    assumptionsTitle: "Centro controllo assunzioni",
-    proposalSummary: "Sintesi proposta per",
+    catalogueNote: "Sono mostrati solo i prezzi di vendita al cliente. Prezzi di acquisto e margini interni sono esclusi intenzionalmente.",
+    assumptionsTitle: "Centro controllo assunzioni cliente",
+    proposalSummary: "Sintesi proposta cliente per",
     preliminary: "Preliminare e non vincolante. Offerta finale soggetta ad audit tecnico, lighting design, conferma prodotto, condizioni installative, struttura contrattuale e approvazione finanziaria.",
-    investorTitle: "Dashboard investitore",
-    nextInvestor: "La prossima versione dovrebbe includere IRR, DSCR, dimensionamento debito, cessione crediti e waterfall SPV.",
     noRows: "Nessuna riga audit VIMALUX valida trovata. Verificare quantità in colonna D e wattaggio in colonna G."
   }
 };
@@ -149,20 +140,20 @@ function num(v) {
 }
 
 export default function App() {
-  const [lang, setLang] = useState(() => localStorage.getItem("vml_lang_v8c") || "EN");
+  const [lang, setLang] = useState(() => localStorage.getItem("vml_lang_v8d") || "EN");
   const t = labels[lang];
 
-  const [page, setPage] = useState("products");
+  const [page, setPage] = useState("dashboard");
   const [client, setClient] = useState("Comune Demo");
   const [statusMsg, setStatusMsg] = useState("");
-  const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem("vml_products_v8c") || "null") || defaultProducts);
-  const [assumptions, setAssumptions] = useState(() => JSON.parse(localStorage.getItem("vml_assumptions_v8c") || "null") || defaultAssumptions);
-  const [rows, setRows] = useState(() => JSON.parse(localStorage.getItem("vml_rows_v8c") || "null") || demoRows);
+  const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem("vml_products_v8d") || "null") || defaultProducts);
+  const [assumptions, setAssumptions] = useState(() => JSON.parse(localStorage.getItem("vml_assumptions_v8d") || "null") || defaultAssumptions);
+  const [rows, setRows] = useState(() => JSON.parse(localStorage.getItem("vml_rows_v8d") || "null") || demoRows);
 
-  useEffect(() => localStorage.setItem("vml_lang_v8c", lang), [lang]);
-  useEffect(() => localStorage.setItem("vml_products_v8c", JSON.stringify(products)), [products]);
-  useEffect(() => localStorage.setItem("vml_assumptions_v8c", JSON.stringify(assumptions)), [assumptions]);
-  useEffect(() => localStorage.setItem("vml_rows_v8c", JSON.stringify(rows)), [rows]);
+  useEffect(() => localStorage.setItem("vml_lang_v8d", lang), [lang]);
+  useEffect(() => localStorage.setItem("vml_products_v8d", JSON.stringify(products)), [products]);
+  useEffect(() => localStorage.setItem("vml_assumptions_v8d", JSON.stringify(assumptions)), [assumptions]);
+  useEffect(() => localStorage.setItem("vml_rows_v8d", JSON.stringify(rows)), [rows]);
 
   function flash(message) {
     setStatusMsg(message);
@@ -184,18 +175,32 @@ export default function App() {
       const beforeKwh = Number(row.existingWatt) * Number(row.qty) * Number(row.hours) / 1000;
       const ledKwh = Number(product.watt) * Number(row.qty) * Number(row.hours) / 1000;
       const smartKwh = ledKwh * (1 - Number(assumptions.smartExtraSaving) / 100);
+
       const energySaving = (beforeKwh - smartKwh) * Number(assumptions.energyPrice);
       const maintenanceSaving = Number(row.qty) * Number(assumptions.maintenanceCost) * Number(assumptions.maintenanceReduction) / 100;
-      const opex = Number(row.qty) * (Number(assumptions.softwareCost) + Number(assumptions.powerAidCost));
-      const netSaving = energySaving + maintenanceSaving - opex;
-      const salesCapex = Number(row.qty) * (Number(product.sellPrice) + Number(product.install));
-      const buyCapex = Number(row.qty) * (Number(product.buyPrice) + Number(product.install));
-      const margin = salesCapex - buyCapex;
-      const payback = netSaving > 0 ? salesCapex / netSaving : 0;
-      const co2 = (beforeKwh - smartKwh) * Number(assumptions.co2Factor) / 1000;
-      const saas = Number(row.qty) * Number(assumptions.softwareCost);
+      const smartServiceCost = Number(row.qty) * (Number(assumptions.softwareCost) + Number(assumptions.powerAidCost));
 
-      return { ...row, product, beforeKwh, ledKwh, smartKwh, energySaving, maintenanceSaving, opex, netSaving, salesCapex, buyCapex, margin, payback, co2, saas };
+      const annualNetSaving = energySaving + maintenanceSaving - smartServiceCost;
+      const customerCapex = Number(row.qty) * (Number(product.sellPrice) + Number(product.install));
+      const payback = annualNetSaving > 0 ? customerCapex / annualNetSaving : 0;
+      const roi = customerCapex > 0 ? annualNetSaving / customerCapex : 0;
+      const co2 = (beforeKwh - smartKwh) * Number(assumptions.co2Factor) / 1000;
+
+      return {
+        ...row,
+        product,
+        beforeKwh,
+        ledKwh,
+        smartKwh,
+        energySaving,
+        maintenanceSaving,
+        smartServiceCost,
+        annualNetSaving,
+        customerCapex,
+        payback,
+        roi,
+        co2
+      };
     });
   }, [rows, products, assumptions]);
 
@@ -204,21 +209,28 @@ export default function App() {
       a.qty += Number(r.qty);
       a.beforeKwh += r.beforeKwh;
       a.smartKwh += r.smartKwh;
-      a.salesCapex += r.salesCapex;
-      a.buyCapex += r.buyCapex;
-      a.margin += r.margin;
-      a.netSaving += r.netSaving;
+      a.customerCapex += r.customerCapex;
+      a.annualNetSaving += r.annualNetSaving;
       a.energySaving += r.energySaving;
       a.maintenanceSaving += r.maintenanceSaving;
-      a.opex += r.opex;
+      a.smartServiceCost += r.smartServiceCost;
       a.co2 += r.co2;
-      a.saas += r.saas;
       return a;
-    }, { qty: 0, beforeKwh: 0, smartKwh: 0, salesCapex: 0, buyCapex: 0, margin: 0, netSaving: 0, energySaving: 0, maintenanceSaving: 0, opex: 0, co2: 0, saas: 0 });
+    }, {
+      qty: 0,
+      beforeKwh: 0,
+      smartKwh: 0,
+      customerCapex: 0,
+      annualNetSaving: 0,
+      energySaving: 0,
+      maintenanceSaving: 0,
+      smartServiceCost: 0,
+      co2: 0
+    });
 
-    t.payback = t.netSaving > 0 ? t.salesCapex / t.netSaving : 0;
-    t.periodValue = t.netSaving * Number(assumptions.years) - t.salesCapex;
-    t.investorValue = t.netSaving * Number(assumptions.investorMultiple);
+    t.payback = t.annualNetSaving > 0 ? t.customerCapex / t.annualNetSaving : 0;
+    t.roi = t.customerCapex > 0 ? t.annualNetSaving / t.customerCapex : 0;
+    t.netBenefit = t.annualNetSaving * Number(assumptions.years) - t.customerCapex;
     return t;
   }, [analysed, assumptions]);
 
@@ -269,28 +281,25 @@ export default function App() {
   }
 
   function addProduct() {
-    const newProduct = {
+    setProducts(prev => [...prev, {
       id: `product_${Date.now()}`,
       name: "New Smart LED Product",
       watt: 60,
       lumen: 10000,
-      buyPrice: 100,
       sellPrice: 150,
       install: 45,
       category: "New Category",
       zhaga: "Yes",
       d4i: "Yes"
-    };
-    setProducts(prev => [...prev, newProduct]);
+    }]);
   }
 
   function duplicateProduct(product) {
-    const copy = {
+    setProducts(prev => [...prev, {
       ...product,
       id: `product_${Date.now()}`,
       name: `${product.name} Copy`
-    };
-    setProducts(prev => [...prev, copy]);
+    }]);
   }
 
   function deleteProduct(id) {
@@ -307,9 +316,9 @@ export default function App() {
   }
 
   function clearLocalData() {
-    localStorage.removeItem("vml_products_v8c");
-    localStorage.removeItem("vml_assumptions_v8c");
-    localStorage.removeItem("vml_rows_v8c");
+    localStorage.removeItem("vml_products_v8d");
+    localStorage.removeItem("vml_assumptions_v8d");
+    localStorage.removeItem("vml_rows_v8d");
     setProducts(defaultProducts);
     setAssumptions(defaultAssumptions);
     setRows(demoRows);
@@ -322,7 +331,7 @@ export default function App() {
   }
 
   function exportAnalysis() {
-    const header = "area,existingType,existingWatt,qty,hours,recommendedProduct,newWatt,salesCapex,margin,annualNetSaving,payback,co2";
+    const header = "area,existingType,existingWatt,qty,hours,recommendedProduct,newWatt,totalCustomerCapex,annualNetSaving,payback,customerRoi,co2";
     const body = analysed.map(r => [
       r.area,
       r.existingType,
@@ -331,10 +340,10 @@ export default function App() {
       r.hours,
       r.product.name,
       r.product.watt,
-      Math.round(r.salesCapex),
-      Math.round(r.margin),
-      Math.round(r.netSaving),
+      Math.round(r.customerCapex),
+      Math.round(r.annualNetSaving),
       r.payback.toFixed(1),
+      (r.roi * 100).toFixed(1) + "%",
       r.co2.toFixed(1)
     ].join(",")).join("\n");
 
@@ -342,7 +351,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "vimalux_version8c_analysis.csv";
+    a.download = "vimalux_customer_roi_analysis.csv";
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -368,7 +377,6 @@ export default function App() {
         <Nav label={t.products} id="products" page={page} setPage={setPage} />
         <Nav label={t.assumptions} id="assumptions" page={page} setPage={setPage} />
         <Nav label={t.proposal} id="proposal" page={page} setPage={setPage} />
-        <Nav label={t.investor} id="investor" page={page} setPage={setPage} />
       </aside>
 
       <main style={styles.main}>
@@ -389,10 +397,10 @@ export default function App() {
         <section style={styles.kpiGrid}>
           <Kpi title={t.client} value={client} />
           <Kpi title={t.totalLamps} value={num(totals.qty)} />
-          <Kpi title={t.salesCapex} value={eur(totals.salesCapex)} />
-          <Kpi title={t.margin} value={eur(totals.margin)} />
-          <Kpi title={t.netSaving} value={eur(totals.netSaving)} />
+          <Kpi title={t.projectCapex} value={eur(totals.customerCapex)} />
+          <Kpi title={t.annualNetSaving} value={eur(totals.annualNetSaving)} />
           <Kpi title={t.payback} value={`${totals.payback.toFixed(1)} years`} />
+          <Kpi title={t.roi} value={`${(totals.roi * 100).toFixed(1)}%`} />
         </section>
 
         {page === "import" && (
@@ -413,9 +421,9 @@ export default function App() {
             <Card title={t.status}>
               <Kpi title={t.inventoryRows} value={rows.length} />
               <Kpi title={t.catalogueProducts} value={products.length} />
-              <Kpi title={t.currentSaas} value={eur(totals.saas)} />
-              <Kpi title={t.investorProxy} value={eur(totals.investorValue)} />
-              <p style={styles.note}>{t.statusNote}</p>
+              <Kpi title={t.netBenefit} value={eur(totals.netBenefit)} />
+              <Kpi title={t.co2} value={`${num(totals.co2)} t`} />
+              <p style={styles.note}>{t.uploadNote}</p>
             </Card>
           </section>
         )}
@@ -427,11 +435,13 @@ export default function App() {
               <Compare label={t.smartSystem} value={totals.smartKwh} max={totals.beforeKwh} />
               <p style={styles.note}>Energy price: {assumptions.energyPrice} €/kWh. Smart extra saving: {assumptions.smartExtraSaving}%.</p>
             </Card>
+
             <Card title={t.valueCreation}>
               <Kpi title={t.energySavingYear} value={eur(totals.energySaving)} />
               <Kpi title={t.maintenanceSavingYear} value={eur(totals.maintenanceSaving)} />
-              <Kpi title={t.opexYear} value={eur(totals.opex)} />
-              <Kpi title={t.recurringSaas} value={eur(totals.saas)} />
+              <Kpi title={t.serviceOpexYear} value={eur(totals.smartServiceCost)} />
+              <Kpi title={t.netBenefit} value={eur(totals.netBenefit)} />
+              <Kpi title={t.co2} value={`${num(totals.co2)} t`} />
             </Card>
           </section>
         )}
@@ -442,7 +452,7 @@ export default function App() {
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    {["Area", "Existing type", "Old W", "Qty", "Hours", "Recommended", "New W", "Sales CAPEX", "Margin", "Net saving"].map(h => (
+                    {["Area", "Existing type", "Old W", "Qty", "Hours", "Recommended", "New W", "Customer CAPEX", "Net saving", "Payback"].map(h => (
                       <th key={h} style={styles.th}>{h}</th>
                     ))}
                   </tr>
@@ -457,9 +467,9 @@ export default function App() {
                       <td style={styles.td}><input style={styles.input} type="number" value={r.hours} onChange={e => updateRow(r.id, "hours", Number(e.target.value))} /></td>
                       <td style={styles.td}>{r.product.name}</td>
                       <td style={styles.td}>{r.product.watt}W</td>
-                      <td style={styles.td}>{eur(r.salesCapex)}</td>
-                      <td style={styles.td}>{eur(r.margin)}</td>
-                      <td style={styles.td}><b>{eur(r.netSaving)}</b></td>
+                      <td style={styles.td}>{eur(r.customerCapex)}</td>
+                      <td style={styles.td}><b>{eur(r.annualNetSaving)}</b></td>
+                      <td style={styles.td}>{r.payback.toFixed(1)}y</td>
                     </tr>
                   ))}
                 </tbody>
@@ -480,7 +490,7 @@ export default function App() {
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    {["Name", "Category", "Watt", "Lumen", "Buy €", "Sell €", "Install €", "Zhaga", "D4i", "Actions"].map(h => (
+                    {["Name", "Category", "Watt", "Lumen", "Sell €", "Install €", "Zhaga", "D4i", "Actions"].map(h => (
                       <th key={h} style={styles.th}>{h}</th>
                     ))}
                   </tr>
@@ -492,7 +502,6 @@ export default function App() {
                       <td style={styles.td}><input style={styles.input} value={p.category} onChange={e => updateProduct(p.id, "category", e.target.value)} /></td>
                       <td style={styles.td}><input style={styles.input} type="number" value={p.watt} onChange={e => updateProduct(p.id, "watt", Number(e.target.value))} /></td>
                       <td style={styles.td}><input style={styles.input} type="number" value={p.lumen} onChange={e => updateProduct(p.id, "lumen", Number(e.target.value))} /></td>
-                      <td style={styles.td}><input style={styles.input} type="number" value={p.buyPrice} onChange={e => updateProduct(p.id, "buyPrice", Number(e.target.value))} /></td>
                       <td style={styles.td}><input style={styles.input} type="number" value={p.sellPrice} onChange={e => updateProduct(p.id, "sellPrice", Number(e.target.value))} /></td>
                       <td style={styles.td}><input style={styles.input} type="number" value={p.install} onChange={e => updateProduct(p.id, "install", Number(e.target.value))} /></td>
                       <td style={styles.td}><input style={styles.input} value={p.zhaga} onChange={e => updateProduct(p.id, "zhaga", e.target.value)} /></td>
@@ -524,28 +533,16 @@ export default function App() {
         {page === "proposal" && (
           <Card title={`${t.proposalSummary} ${client}`}>
             <p style={styles.largeText}>
-              VIMALUX has analysed <b>{num(totals.qty)}</b> luminaires. The proposed Smart LED upgrade has an estimated sales CAPEX of <b>{eur(totals.salesCapex)}</b>.
+              VIMALUX has analysed <b>{num(totals.qty)}</b> luminaires. The proposed Smart LED upgrade has an estimated total customer CAPEX of <b>{eur(totals.customerCapex)}</b>.
             </p>
             <p style={styles.largeText}>
-              Estimated annual net saving is <b>{eur(totals.netSaving)}</b>, with a simple payback of <b>{totals.payback.toFixed(1)} years</b>.
+              Estimated annual net saving is <b>{eur(totals.annualNetSaving)}</b>, equal to a customer ROI of <b>{(totals.roi * 100).toFixed(1)}%</b> per year and a simple payback of <b>{totals.payback.toFixed(1)} years</b>.
             </p>
             <p style={styles.largeText}>
-              VIMALUX gross margin proxy is <b>{eur(totals.margin)}</b>, with recurring SaaS potential of <b>{eur(totals.saas)}</b> per year.
+              Over <b>{assumptions.years}</b> years, the estimated net customer benefit is <b>{eur(totals.netBenefit)}</b>, with an annual CO₂ reduction of <b>{num(totals.co2)} t</b>.
             </p>
             <p style={styles.note}>{t.preliminary}</p>
             <button style={styles.darkBtn} onClick={() => window.print()}>{t.print}</button>
-          </Card>
-        )}
-
-        {page === "investor" && (
-          <Card title={t.investorTitle}>
-            <div style={styles.kpiGridSmall}>
-              <Kpi title="Annual net cashflow" value={eur(totals.netSaving)} />
-              <Kpi title={t.investorProxy} value={eur(totals.investorValue)} />
-              <Kpi title={`${assumptions.years}Y net value`} value={eur(totals.periodValue)} />
-              <Kpi title="CO₂ saving/year" value={`${num(totals.co2)} t`} />
-            </div>
-            <p style={styles.note}>{t.nextInvestor}</p>
           </Card>
         )}
       </main>
@@ -631,7 +628,6 @@ const styles = {
   deleteBtn: { background: "#dc2626", color: "white", border: 0, borderRadius: 10, padding: "8px 10px", fontWeight: 800, cursor: "pointer" },
   status: { background: "#dcfce7", color: "#166534", padding: 14, borderRadius: 14, fontWeight: 900, marginBottom: 18 },
   kpiGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 },
-  kpiGridSmall: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, margin: "18px 0" },
   kpi: { background: "white", borderRadius: 22, padding: 24, boxShadow: "0 8px 24px rgba(15,23,42,.06)", marginBottom: 16 },
   kpiTitle: { color: "#64748b", fontSize: 14 },
   kpiValue: { fontSize: 28, fontWeight: 900, marginTop: 10 },
@@ -641,7 +637,7 @@ const styles = {
   label: { display: "flex", flexDirection: "column", gap: 8, fontSize: 13, fontWeight: 800, color: "#475569" },
   input: { width: "100%", padding: "12px 13px", border: "1px solid #cbd5e1", borderRadius: 12, fontSize: 14 },
   uploadBox: { display: "flex", flexDirection: "column", gap: 10, alignItems: "center", justifyContent: "center", border: "2px dashed #cbd5e1", borderRadius: 20, padding: 40, cursor: "pointer", background: "#f8fafc" },
-  table: { width: "100%", borderCollapse: "collapse", minWidth: 1400 },
+  table: { width: "100%", borderCollapse: "collapse", minWidth: 1300 },
   th: { textAlign: "left", padding: 10, color: "#64748b", fontSize: 12, borderBottom: "1px solid #e2e8f0" },
   td: { padding: 8, borderBottom: "1px solid #e2e8f0", verticalAlign: "middle" },
   note: { background: "#f1f5f9", borderRadius: 18, padding: 16, color: "#475569", lineHeight: 1.5 },
