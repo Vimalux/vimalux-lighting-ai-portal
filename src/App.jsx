@@ -24,14 +24,14 @@ const demoRows = [
 ];
 
 const packs = {
-  led: { fee: 0, smart: 0, power: 0 },
-  smart: { fee: 6, smart: 1, power: 0 },
-  premium: { fee: 9, smart: 1, power: 1 }
+  led: { fee: 0 },
+  smart: { fee: 6 },
+  premium: { fee: 9 }
 };
 
 const labels = {
   EN: {
-    version: "VIMALUX LIGHTING AI PORTAL · VERSION 9B",
+    version: "VIMALUX LIGHTING AI PORTAL · VERSION 9C",
     title: "Customer ROI Closing Engine",
     subtitle: "Customer-facing LED vs Smart vs Smart + PowerAiD ROI comparison.",
     importExcel: "Import Excel",
@@ -89,7 +89,7 @@ const labels = {
     noRows: "No valid VIMALUX audit rows found. Check quantity in column D and wattage in column G."
   },
   IT: {
-    version: "VIMALUX LIGHTING AI PORTAL · VERSIONE 9B",
+    version: "VIMALUX LIGHTING AI PORTAL · VERSIONE 9C",
     title: "Motore ROI Cliente",
     subtitle: "Confronto ROI cliente tra LED, Smart e Smart + PowerAiD.",
     importExcel: "Importa Excel",
@@ -157,22 +157,22 @@ function num(v) {
 }
 
 export default function App() {
-  const [lang, setLang] = useState(() => localStorage.getItem("vml_lang_v9b") || "EN");
+  const [lang, setLang] = useState(() => localStorage.getItem("vml_lang_v9c") || "EN");
   const t = labels[lang];
 
   const [page, setPage] = useState("dashboard");
-  const [packageType, setPackageType] = useState(() => localStorage.getItem("vml_package_v9b") || "premium");
+  const [packageType, setPackageType] = useState(() => localStorage.getItem("vml_package_v9c") || "premium");
   const [client, setClient] = useState("Comune Demo");
   const [statusMsg, setStatusMsg] = useState("");
-  const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem("vml_products_v9b") || "null") || defaultProducts);
-  const [assumptions, setAssumptions] = useState(() => JSON.parse(localStorage.getItem("vml_assumptions_v9b") || "null") || defaultAssumptions);
-  const [rows, setRows] = useState(() => JSON.parse(localStorage.getItem("vml_rows_v9b") || "null") || demoRows);
+  const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem("vml_products_v9c") || "null") || defaultProducts);
+  const [assumptions, setAssumptions] = useState(() => JSON.parse(localStorage.getItem("vml_assumptions_v9c") || "null") || defaultAssumptions);
+  const [rows, setRows] = useState(() => JSON.parse(localStorage.getItem("vml_rows_v9c") || "null") || demoRows);
 
-  useEffect(() => localStorage.setItem("vml_lang_v9b", lang), [lang]);
-  useEffect(() => localStorage.setItem("vml_package_v9b", packageType), [packageType]);
-  useEffect(() => localStorage.setItem("vml_products_v9b", JSON.stringify(products)), [products]);
-  useEffect(() => localStorage.setItem("vml_assumptions_v9b", JSON.stringify(assumptions)), [assumptions]);
-  useEffect(() => localStorage.setItem("vml_rows_v9b", JSON.stringify(rows)), [rows]);
+  useEffect(() => localStorage.setItem("vml_lang_v9c", lang), [lang]);
+  useEffect(() => localStorage.setItem("vml_package_v9c", packageType), [packageType]);
+  useEffect(() => localStorage.setItem("vml_products_v9c", JSON.stringify(products)), [products]);
+  useEffect(() => localStorage.setItem("vml_assumptions_v9c", JSON.stringify(assumptions)), [assumptions]);
+  useEffect(() => localStorage.setItem("vml_rows_v9c", JSON.stringify(rows)), [rows]);
 
   function flash(message) {
     setStatusMsg(message);
@@ -352,10 +352,10 @@ export default function App() {
   }
 
   function clearLocalData() {
-    localStorage.removeItem("vml_products_v9b");
-    localStorage.removeItem("vml_assumptions_v9b");
-    localStorage.removeItem("vml_rows_v9b");
-    localStorage.removeItem("vml_package_v9b");
+    localStorage.removeItem("vml_products_v9c");
+    localStorage.removeItem("vml_assumptions_v9c");
+    localStorage.removeItem("vml_rows_v9c");
+    localStorage.removeItem("vml_package_v9c");
     setProducts(defaultProducts);
     setAssumptions(defaultAssumptions);
     setRows(demoRows);
@@ -391,7 +391,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "vimalux_customer_roi_v9b.csv";
+    a.download = "vimalux_customer_roi_v9c.csv";
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -467,7 +467,7 @@ export default function App() {
             <Card title={t.status}>
               <Kpi title={t.inventoryRows} value={rows.length} />
               <Kpi title={t.catalogueProducts} value={products.length} />
-              <Kpi title={t.netBenefit} value={eur(totals.netBenefit)} />
+              <Kpi title={`${assumptions.years}Y ${t.netBenefit}`} value={eur(totals.netBenefit)} />
               <Kpi title={t.co2} value={`${num(totals.co2)} t`} />
               <p style={styles.note}>{t.uploadNote}</p>
             </Card>
@@ -480,7 +480,7 @@ export default function App() {
               <Compare label={t.existingSystem} value={totals.beforeKwh} max={totals.beforeKwh} />
               <Compare label={t.newSystem} value={totals.finalKwh} max={totals.beforeKwh} />
               <p style={styles.note}>
-                Energy price: {assumptions.energyPrice} €/kWh. Package fee: €{packageFee(packageType)}/lamp/year. Extra saving: {extraSavingPct(packageType)}%.
+                Energy price: {assumptions.energyPrice} €/kWh. Extra saving: {extraSavingPct(packageType)}%.
               </p>
             </Card>
 
@@ -588,7 +588,7 @@ export default function App() {
               Total customer CAPEX is <b>{eur(totals.customerCapex)}</b>. Estimated annual net saving is <b>{eur(totals.annualNetSaving)}</b>, equal to a customer ROI of <b>{(totals.roi * 100).toFixed(1)}%</b> per year and a simple payback of <b>{totals.payback.toFixed(1)} years</b>.
             </p>
             <p style={styles.largeText}>
-              Annual service fee is <b>{eur(totals.serviceFee)}</b>. Over <b>{assumptions.years}</b> years, estimated net customer benefit is <b>{eur(totals.netBenefit)}</b>, with annual CO₂ reduction of <b>{num(totals.co2)} t</b>.
+              Over <b>{assumptions.years}</b> years, estimated net customer benefit is <b>{eur(totals.netBenefit)}</b>, with annual CO₂ reduction of <b>{num(totals.co2)} t</b>.
             </p>
             <p style={styles.note}>{t.preliminary}</p>
             <button style={styles.darkBtn} onClick={() => window.print()}>{t.print}</button>
@@ -628,9 +628,9 @@ function PackageSelector({ t, packageType, setPackageType }) {
     <section style={styles.card}>
       <h2 style={{ marginTop: 0 }}>{t.package}</h2>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <button style={b("led")} onClick={() => setPackageType("led")}>{t.ledOnly} · €0/lamp/year</button>
-        <button style={b("smart")} onClick={() => setPackageType("smart")}>{t.smart} · €6/lamp/year</button>
-        <button style={b("premium")} onClick={() => setPackageType("premium")}>{t.premium} · €9/lamp/year</button>
+        <button style={b("led")} onClick={() => setPackageType("led")}>{t.ledOnly}</button>
+        <button style={b("smart")} onClick={() => setPackageType("smart")}>{t.smart}</button>
+        <button style={b("premium")} onClick={() => setPackageType("premium")}>{t.premium}</button>
       </div>
     </section>
   );
