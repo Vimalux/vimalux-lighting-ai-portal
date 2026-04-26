@@ -25,6 +25,121 @@ const demoRows = [
   { id: 2, area: "Urban roads", existingType: "HPS 120W", existingWatt: 120, qty: 500, hours: 4200 }
 ];
 
+const labels = {
+  EN: {
+    version: "VIMALUX LIGHTING AI PORTAL · VERSION 8C",
+    title: "Commercial Closing Engine",
+    subtitle: "Excel audit import, editable product catalogue, pricing control, ROI, margin, SaaS revenue and investor metrics.",
+    importExcel: "Import Excel",
+    dashboard: "Dashboard",
+    inventory: "Inventory",
+    products: "Products / Prices",
+    assumptions: "Assumptions",
+    proposal: "Proposal",
+    investor: "Investor",
+    export: "Export Analysis",
+    print: "Print / PDF",
+    client: "Client",
+    totalLamps: "Total lamps",
+    salesCapex: "Sales CAPEX",
+    margin: "Gross margin proxy",
+    netSaving: "Annual net saving",
+    payback: "Payback",
+    uploadTitle: "Upload VIMALUX audit sheet",
+    uploadMain: "Click to upload Excel audit sheet",
+    uploadInfo1: "Reads ProjectInputSheet / ProjectInputSheet_ITA.",
+    uploadInfo2: "Uses Location B, Type C, Qty D, Watt G, Hours I.",
+    loadDemo: "Load demo",
+    editPrices: "Edit product prices",
+    status: "Commercial engine status",
+    inventoryRows: "Inventory rows",
+    catalogueProducts: "Products in catalogue",
+    currentSaas: "Current annual SaaS",
+    investorProxy: "Investor value proxy",
+    statusNote: "Upload audit sheet first. Then adjust product catalogue and assumptions before generating proposal.",
+    energyComparison: "Energy comparison",
+    existingSystem: "Existing system",
+    smartSystem: "Smart LED system",
+    valueCreation: "Value creation",
+    energySavingYear: "Energy saving/year",
+    maintenanceSavingYear: "Maintenance saving/year",
+    opexYear: "Software + PowerAiD OPEX/year",
+    recurringSaas: "Recurring SaaS/year",
+    inventoryTitle: "Imported inventory and automatic product matching",
+    productTitle: "Product catalogue and pricing control",
+    addProduct: "+ Add product",
+    resetCatalogue: "Reset catalogue",
+    clearLocal: "Clear local data",
+    duplicate: "Duplicate",
+    delete: "Delete",
+    resetDone: "Catalogue reset to default products.",
+    clearDone: "Local browser data cleared.",
+    catalogueNote: "Product catalogue is saved locally in browser. Version 9 should move this to Supabase/Airtable so multiple users share the same catalogue.",
+    assumptionsTitle: "Assumptions control center",
+    proposalSummary: "Proposal summary for",
+    preliminary: "Preliminary and non-binding. Final offer depends on technical audit, lighting design, product confirmation, installation conditions, contract structure and financing approval.",
+    investorTitle: "Investor dashboard",
+    nextInvestor: "Next version should add IRR, DSCR, debt sizing, receivables assignment and SPV waterfall.",
+    noRows: "No valid VIMALUX audit rows found. Check quantity in column D and wattage in column G."
+  },
+  IT: {
+    version: "VIMALUX LIGHTING AI PORTAL · VERSIONE 8C",
+    title: "Motore Commerciale di Chiusura",
+    subtitle: "Import Excel audit, catalogo prodotti modificabile, controllo prezzi, ROI, margine, ricavi SaaS e metriche investitore.",
+    importExcel: "Importa Excel",
+    dashboard: "Dashboard",
+    inventory: "Inventario",
+    products: "Prodotti / Prezzi",
+    assumptions: "Assunzioni",
+    proposal: "Proposta",
+    investor: "Investitore",
+    export: "Esporta Analisi",
+    print: "Stampa / PDF",
+    client: "Cliente",
+    totalLamps: "Totale lampade",
+    salesCapex: "CAPEX vendita",
+    margin: "Margine lordo proxy",
+    netSaving: "Risparmio netto annuo",
+    payback: "Payback",
+    uploadTitle: "Carica audit sheet VIMALUX",
+    uploadMain: "Clicca per caricare Excel audit sheet",
+    uploadInfo1: "Legge ProjectInputSheet / ProjectInputSheet_ITA.",
+    uploadInfo2: "Usa Località B, Tipo C, Quantità D, Watt G, Ore I.",
+    loadDemo: "Carica demo",
+    editPrices: "Modifica prezzi prodotti",
+    status: "Stato motore commerciale",
+    inventoryRows: "Righe inventario",
+    catalogueProducts: "Prodotti in catalogo",
+    currentSaas: "SaaS annuo corrente",
+    investorProxy: "Valore investitore proxy",
+    statusNote: "Carica prima l’audit sheet. Poi modifica catalogo prodotti e assunzioni prima di generare la proposta.",
+    energyComparison: "Confronto energia",
+    existingSystem: "Sistema esistente",
+    smartSystem: "Sistema Smart LED",
+    valueCreation: "Creazione valore",
+    energySavingYear: "Risparmio energia/anno",
+    maintenanceSavingYear: "Risparmio manutenzione/anno",
+    opexYear: "OPEX Software + PowerAiD/anno",
+    recurringSaas: "SaaS ricorrente/anno",
+    inventoryTitle: "Inventario importato e matching automatico prodotto",
+    productTitle: "Catalogo prodotti e controllo prezzi",
+    addProduct: "+ Aggiungi prodotto",
+    resetCatalogue: "Reset catalogo",
+    clearLocal: "Cancella dati locali",
+    duplicate: "Duplica",
+    delete: "Elimina",
+    resetDone: "Catalogo ripristinato ai prodotti default.",
+    clearDone: "Dati locali browser cancellati.",
+    catalogueNote: "Il catalogo prodotti è salvato localmente nel browser. La Versione 9 dovrebbe usare Supabase/Airtable per condividere il catalogo tra più utenti.",
+    assumptionsTitle: "Centro controllo assunzioni",
+    proposalSummary: "Sintesi proposta per",
+    preliminary: "Preliminare e non vincolante. Offerta finale soggetta ad audit tecnico, lighting design, conferma prodotto, condizioni installative, struttura contrattuale e approvazione finanziaria.",
+    investorTitle: "Dashboard investitore",
+    nextInvestor: "La prossima versione dovrebbe includere IRR, DSCR, dimensionamento debito, cessione crediti e waterfall SPV.",
+    noRows: "Nessuna riga audit VIMALUX valida trovata. Verificare quantità in colonna D e wattaggio in colonna G."
+  }
+};
+
 function eur(v) {
   return new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v || 0);
 }
@@ -34,15 +149,25 @@ function num(v) {
 }
 
 export default function App() {
+  const [lang, setLang] = useState(() => localStorage.getItem("vml_lang_v8c") || "EN");
+  const t = labels[lang];
+
   const [page, setPage] = useState("products");
   const [client, setClient] = useState("Comune Demo");
-  const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem("vml_products_v8b") || "null") || defaultProducts);
-  const [assumptions, setAssumptions] = useState(() => JSON.parse(localStorage.getItem("vml_assumptions_v8b") || "null") || defaultAssumptions);
-  const [rows, setRows] = useState(() => JSON.parse(localStorage.getItem("vml_rows_v8b") || "null") || demoRows);
+  const [statusMsg, setStatusMsg] = useState("");
+  const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem("vml_products_v8c") || "null") || defaultProducts);
+  const [assumptions, setAssumptions] = useState(() => JSON.parse(localStorage.getItem("vml_assumptions_v8c") || "null") || defaultAssumptions);
+  const [rows, setRows] = useState(() => JSON.parse(localStorage.getItem("vml_rows_v8c") || "null") || demoRows);
 
-  useEffect(() => localStorage.setItem("vml_products_v8b", JSON.stringify(products)), [products]);
-  useEffect(() => localStorage.setItem("vml_assumptions_v8b", JSON.stringify(assumptions)), [assumptions]);
-  useEffect(() => localStorage.setItem("vml_rows_v8b", JSON.stringify(rows)), [rows]);
+  useEffect(() => localStorage.setItem("vml_lang_v8c", lang), [lang]);
+  useEffect(() => localStorage.setItem("vml_products_v8c", JSON.stringify(products)), [products]);
+  useEffect(() => localStorage.setItem("vml_assumptions_v8c", JSON.stringify(assumptions)), [assumptions]);
+  useEffect(() => localStorage.setItem("vml_rows_v8c", JSON.stringify(rows)), [rows]);
+
+  function flash(message) {
+    setStatusMsg(message);
+    setTimeout(() => setStatusMsg(""), 2500);
+  }
 
   function recommendProduct(watt) {
     const sorted = [...products].sort((a, b) => Number(a.watt) - Number(b.watt));
@@ -135,7 +260,7 @@ export default function App() {
       setClient(file.name.replace(".xlsx", "").replace(".xls", ""));
       setPage("dashboard");
     } else {
-      alert("No valid VIMALUX audit rows found. Check quantity in column D and wattage in column G.");
+      alert(t.noRows);
     }
   }
 
@@ -177,9 +302,19 @@ export default function App() {
   }
 
   function resetCatalogue() {
-    if (confirm("Reset product catalogue to default VIMALUX products?")) {
-      setProducts(defaultProducts);
-    }
+    setProducts(defaultProducts);
+    flash(t.resetDone);
+  }
+
+  function clearLocalData() {
+    localStorage.removeItem("vml_products_v8c");
+    localStorage.removeItem("vml_assumptions_v8c");
+    localStorage.removeItem("vml_rows_v8c");
+    setProducts(defaultProducts);
+    setAssumptions(defaultAssumptions);
+    setRows(demoRows);
+    setClient("Comune Demo");
+    flash(t.clearDone);
   }
 
   function updateRow(id, field, value) {
@@ -207,7 +342,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "vimalux_version8b_analysis.csv";
+    a.download = "vimalux_version8c_analysis.csv";
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -221,80 +356,88 @@ export default function App() {
     <div style={styles.app}>
       <aside style={styles.sidebar}>
         <div style={styles.logo}>VIMALUX</div>
-        <Nav label="Import Excel" id="import" page={page} setPage={setPage} />
-        <Nav label="Dashboard" id="dashboard" page={page} setPage={setPage} />
-        <Nav label="Inventory" id="inventory" page={page} setPage={setPage} />
-        <Nav label="Products / Prices" id="products" page={page} setPage={setPage} />
-        <Nav label="Assumptions" id="assumptions" page={page} setPage={setPage} />
-        <Nav label="Proposal" id="proposal" page={page} setPage={setPage} />
-        <Nav label="Investor" id="investor" page={page} setPage={setPage} />
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 22 }}>
+          <button style={lang === "EN" ? styles.langActive : styles.langBtn} onClick={() => setLang("EN")}>EN</button>
+          <button style={lang === "IT" ? styles.langActive : styles.langBtn} onClick={() => setLang("IT")}>IT</button>
+        </div>
+
+        <Nav label={t.importExcel} id="import" page={page} setPage={setPage} />
+        <Nav label={t.dashboard} id="dashboard" page={page} setPage={setPage} />
+        <Nav label={t.inventory} id="inventory" page={page} setPage={setPage} />
+        <Nav label={t.products} id="products" page={page} setPage={setPage} />
+        <Nav label={t.assumptions} id="assumptions" page={page} setPage={setPage} />
+        <Nav label={t.proposal} id="proposal" page={page} setPage={setPage} />
+        <Nav label={t.investor} id="investor" page={page} setPage={setPage} />
       </aside>
 
       <main style={styles.main}>
         <section style={styles.hero}>
           <div>
-            <div style={styles.eyebrow}>VIMALUX LIGHTING AI PORTAL · VERSION 8B</div>
-            <h1 style={styles.h1}>Commercial Closing Engine</h1>
-            <p style={styles.subtitle}>Excel audit import, editable product catalogue, pricing control, ROI, margin, SaaS revenue and investor metrics.</p>
+            <div style={styles.eyebrow}>{t.version}</div>
+            <h1 style={styles.h1}>{t.title}</h1>
+            <p style={styles.subtitle}>{t.subtitle}</p>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
-            <button style={styles.whiteBtn} onClick={exportAnalysis}>Export Analysis</button>
-            <button style={styles.whiteBtn} onClick={() => window.print()}>Print / PDF</button>
+            <button style={styles.whiteBtn} onClick={exportAnalysis}>{t.export}</button>
+            <button style={styles.whiteBtn} onClick={() => window.print()}>{t.print}</button>
           </div>
         </section>
 
+        {statusMsg && <div style={styles.status}>{statusMsg}</div>}
+
         <section style={styles.kpiGrid}>
-          <Kpi title="Client" value={client} />
-          <Kpi title="Total lamps" value={num(totals.qty)} />
-          <Kpi title="Sales CAPEX" value={eur(totals.salesCapex)} />
-          <Kpi title="Gross margin proxy" value={eur(totals.margin)} />
-          <Kpi title="Annual net saving" value={eur(totals.netSaving)} />
-          <Kpi title="Payback" value={`${totals.payback.toFixed(1)} years`} />
+          <Kpi title={t.client} value={client} />
+          <Kpi title={t.totalLamps} value={num(totals.qty)} />
+          <Kpi title={t.salesCapex} value={eur(totals.salesCapex)} />
+          <Kpi title={t.margin} value={eur(totals.margin)} />
+          <Kpi title={t.netSaving} value={eur(totals.netSaving)} />
+          <Kpi title={t.payback} value={`${totals.payback.toFixed(1)} years`} />
         </section>
 
         {page === "import" && (
           <section style={styles.grid2}>
-            <Card title="Upload VIMALUX audit sheet">
+            <Card title={t.uploadTitle}>
               <label style={styles.uploadBox}>
                 <input type="file" accept=".xlsx,.xls" onChange={importExcel} style={{ display: "none" }} />
-                <b>Click to upload Excel audit sheet</b>
-                <span>Reads ProjectInputSheet / ProjectInputSheet_ITA.</span>
-                <span>Uses Location B, Type C, Qty D, Watt G, Hours I.</span>
+                <b>{t.uploadMain}</b>
+                <span>{t.uploadInfo1}</span>
+                <span>{t.uploadInfo2}</span>
               </label>
               <div style={{ marginTop: 18, display: "flex", gap: 10 }}>
-                <button style={styles.darkBtn} onClick={resetDemo}>Load demo</button>
-                <button style={styles.darkBtn} onClick={() => setPage("products")}>Edit product prices</button>
+                <button style={styles.darkBtn} onClick={resetDemo}>{t.loadDemo}</button>
+                <button style={styles.darkBtn} onClick={() => setPage("products")}>{t.editPrices}</button>
               </div>
             </Card>
 
-            <Card title="Commercial engine status">
-              <Kpi title="Inventory rows" value={rows.length} />
-              <Kpi title="Products in catalogue" value={products.length} />
-              <Kpi title="Current annual SaaS" value={eur(totals.saas)} />
-              <Kpi title="Investor value proxy" value={eur(totals.investorValue)} />
-              <p style={styles.note}>Upload audit sheet first. Then adjust product catalogue and assumptions before generating proposal.</p>
+            <Card title={t.status}>
+              <Kpi title={t.inventoryRows} value={rows.length} />
+              <Kpi title={t.catalogueProducts} value={products.length} />
+              <Kpi title={t.currentSaas} value={eur(totals.saas)} />
+              <Kpi title={t.investorProxy} value={eur(totals.investorValue)} />
+              <p style={styles.note}>{t.statusNote}</p>
             </Card>
           </section>
         )}
 
         {page === "dashboard" && (
           <section style={styles.grid2}>
-            <Card title="Energy comparison">
-              <Compare label="Existing system" value={totals.beforeKwh} max={totals.beforeKwh} />
-              <Compare label="Smart LED system" value={totals.smartKwh} max={totals.beforeKwh} />
+            <Card title={t.energyComparison}>
+              <Compare label={t.existingSystem} value={totals.beforeKwh} max={totals.beforeKwh} />
+              <Compare label={t.smartSystem} value={totals.smartKwh} max={totals.beforeKwh} />
               <p style={styles.note}>Energy price: {assumptions.energyPrice} €/kWh. Smart extra saving: {assumptions.smartExtraSaving}%.</p>
             </Card>
-            <Card title="Value creation">
-              <Kpi title="Energy saving/year" value={eur(totals.energySaving)} />
-              <Kpi title="Maintenance saving/year" value={eur(totals.maintenanceSaving)} />
-              <Kpi title="Software + PowerAiD OPEX/year" value={eur(totals.opex)} />
-              <Kpi title="Recurring SaaS/year" value={eur(totals.saas)} />
+            <Card title={t.valueCreation}>
+              <Kpi title={t.energySavingYear} value={eur(totals.energySaving)} />
+              <Kpi title={t.maintenanceSavingYear} value={eur(totals.maintenanceSaving)} />
+              <Kpi title={t.opexYear} value={eur(totals.opex)} />
+              <Kpi title={t.recurringSaas} value={eur(totals.saas)} />
             </Card>
           </section>
         )}
 
         {page === "inventory" && (
-          <Card title="Imported inventory and automatic product matching">
+          <Card title={t.inventoryTitle}>
             <div style={{ overflowX: "auto" }}>
               <table style={styles.table}>
                 <thead>
@@ -326,10 +469,11 @@ export default function App() {
         )}
 
         {page === "products" && (
-          <Card title="Product catalogue and pricing control">
+          <Card title={t.productTitle}>
             <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
-              <button style={styles.darkBtn} onClick={addProduct}>+ Add product</button>
-              <button style={styles.darkBtn} onClick={resetCatalogue}>Reset catalogue</button>
+              <button style={styles.darkBtn} onClick={addProduct}>{t.addProduct}</button>
+              <button style={styles.darkBtn} onClick={resetCatalogue}>{t.resetCatalogue}</button>
+              <button style={styles.deleteBtn} onClick={clearLocalData}>{t.clearLocal}</button>
             </div>
 
             <div style={{ overflowX: "auto" }}>
@@ -354,8 +498,8 @@ export default function App() {
                       <td style={styles.td}><input style={styles.input} value={p.zhaga} onChange={e => updateProduct(p.id, "zhaga", e.target.value)} /></td>
                       <td style={styles.td}><input style={styles.input} value={p.d4i} onChange={e => updateProduct(p.id, "d4i", e.target.value)} /></td>
                       <td style={styles.td}>
-                        <button style={styles.smallBtn} onClick={() => duplicateProduct(p)}>Duplicate</button>
-                        <button style={styles.deleteBtn} onClick={() => deleteProduct(p.id)}>Delete</button>
+                        <button style={styles.smallBtn} onClick={() => duplicateProduct(p)}>{t.duplicate}</button>
+                        <button style={styles.deleteBtn} onClick={() => deleteProduct(p.id)}>{t.delete}</button>
                       </td>
                     </tr>
                   ))}
@@ -363,14 +507,12 @@ export default function App() {
               </table>
             </div>
 
-            <p style={styles.note}>
-              Product catalogue is saved locally in browser. Version 9 should move this to Supabase/Airtable so multiple users share the same catalogue.
-            </p>
+            <p style={styles.note}>{t.catalogueNote}</p>
           </Card>
         )}
 
         {page === "assumptions" && (
-          <Card title="Assumptions control center">
+          <Card title={t.assumptionsTitle}>
             <div style={styles.formGrid}>
               {Object.entries(assumptions).map(([key, value]) => (
                 <NumberInput key={key} label={key} value={value} step="0.01" onChange={v => setAssumptions({ ...assumptions, [key]: Number(v) })} />
@@ -380,7 +522,7 @@ export default function App() {
         )}
 
         {page === "proposal" && (
-          <Card title={`Proposal summary for ${client}`}>
+          <Card title={`${t.proposalSummary} ${client}`}>
             <p style={styles.largeText}>
               VIMALUX has analysed <b>{num(totals.qty)}</b> luminaires. The proposed Smart LED upgrade has an estimated sales CAPEX of <b>{eur(totals.salesCapex)}</b>.
             </p>
@@ -390,20 +532,20 @@ export default function App() {
             <p style={styles.largeText}>
               VIMALUX gross margin proxy is <b>{eur(totals.margin)}</b>, with recurring SaaS potential of <b>{eur(totals.saas)}</b> per year.
             </p>
-            <p style={styles.note}>Preliminary and non-binding. Final offer depends on technical audit, lighting design, product confirmation, installation conditions, contract structure and financing approval.</p>
-            <button style={styles.darkBtn} onClick={() => window.print()}>Print / PDF</button>
+            <p style={styles.note}>{t.preliminary}</p>
+            <button style={styles.darkBtn} onClick={() => window.print()}>{t.print}</button>
           </Card>
         )}
 
         {page === "investor" && (
-          <Card title="Investor dashboard">
+          <Card title={t.investorTitle}>
             <div style={styles.kpiGridSmall}>
               <Kpi title="Annual net cashflow" value={eur(totals.netSaving)} />
-              <Kpi title="Investor value proxy" value={eur(totals.investorValue)} />
+              <Kpi title={t.investorProxy} value={eur(totals.investorValue)} />
               <Kpi title={`${assumptions.years}Y net value`} value={eur(totals.periodValue)} />
               <Kpi title="CO₂ saving/year" value={`${num(totals.co2)} t`} />
             </div>
-            <p style={styles.note}>Next version should add IRR, DSCR, debt sizing, receivables assignment and SPV waterfall.</p>
+            <p style={styles.note}>{t.nextInvestor}</p>
           </Card>
         )}
       </main>
@@ -475,7 +617,9 @@ function Compare({ label, value, max }) {
 const styles = {
   app: { minHeight: "100vh", display: "grid", gridTemplateColumns: "260px 1fr", background: "#f4f6f8", color: "#0b1220", fontFamily: "Arial, sans-serif" },
   sidebar: { background: "white", padding: 24, borderRight: "1px solid #e2e8f0" },
-  logo: { fontWeight: 900, letterSpacing: "0.14em", marginBottom: 30, fontSize: 20 },
+  logo: { fontWeight: 900, letterSpacing: "0.14em", marginBottom: 20, fontSize: 20 },
+  langBtn: { background: "#e2e8f0", color: "#0f172a", border: 0, borderRadius: 10, padding: "8px 12px", fontWeight: 900, cursor: "pointer" },
+  langActive: { background: "#0f172a", color: "white", border: 0, borderRadius: 10, padding: "8px 12px", fontWeight: 900, cursor: "pointer" },
   main: { padding: 32 },
   hero: { background: "#07111f", color: "white", borderRadius: 28, padding: 36, display: "flex", justifyContent: "space-between", gap: 20, alignItems: "center", marginBottom: 24 },
   eyebrow: { color: "#93c5fd", letterSpacing: "0.16em", fontSize: 12, textTransform: "uppercase" },
@@ -485,6 +629,7 @@ const styles = {
   darkBtn: { background: "#0f172a", color: "white", border: 0, borderRadius: 14, padding: "13px 18px", fontWeight: 900, cursor: "pointer" },
   smallBtn: { background: "#0f172a", color: "white", border: 0, borderRadius: 10, padding: "8px 10px", fontWeight: 800, cursor: "pointer", marginRight: 6 },
   deleteBtn: { background: "#dc2626", color: "white", border: 0, borderRadius: 10, padding: "8px 10px", fontWeight: 800, cursor: "pointer" },
+  status: { background: "#dcfce7", color: "#166534", padding: 14, borderRadius: 14, fontWeight: 900, marginBottom: 18 },
   kpiGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 },
   kpiGridSmall: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, margin: "18px 0" },
   kpi: { background: "white", borderRadius: 22, padding: 24, boxShadow: "0 8px 24px rgba(15,23,42,.06)", marginBottom: 16 },
