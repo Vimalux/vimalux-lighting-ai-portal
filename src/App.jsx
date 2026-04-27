@@ -12,9 +12,9 @@ const assumptions = {
   energyPrice: 0.29,
   maintenanceCost: 25,
   maintenanceReduction: 75,
-  smartDimmingSaving: 15,
-  powerAidExtraSaving: 8,
-  years: 15,
+  smartDimmingSaving: 20,
+  powerAidExtraSaving: 30,
+  years: 10,
   co2Factor: 0.42
 };
 
