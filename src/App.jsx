@@ -452,7 +452,7 @@ export default function App() {
         watt: 60,
         lumen: 10000,
         sellPrice: 150,
-        install: 45,
+        install: 35,
         category: "New Category",
         zhaga: "Yes",
         d4i: "Yes"
