@@ -31,10 +31,10 @@ const packs = {
 
 const labels = {
   EN: {
-    version: "VIMALUX LIGHTING AI PORTAL · VERSION 9C FIXED",
+    version: "VIMALUX LIGHTING AI PORTAL · VERSION 10A",
     title: "Customer ROI Closing Engine",
-    subtitle: "Customer-facing LED vs Smart vs Smart + PowerAiD ROI comparison.",
-    importExcel: "Import Excel",
+    subtitle: "Audit import, product catalogue import, customer ROI, package comparison and proposal output.",
+    importExcel: "Import Audit Excel",
     dashboard: "Customer Dashboard",
     inventory: "Inventory",
     products: "Products / Prices",
@@ -86,13 +86,20 @@ const labels = {
     assumptionsTitle: "Customer assumptions control center",
     proposalSummary: "Customer proposal summary for",
     preliminary: "Preliminary and non-binding. Final offer depends on technical audit, lighting design, product confirmation, installation conditions, contract structure and financing approval.",
-    noRows: "No valid VIMALUX audit rows found. Check quantity in column D and wattage in column G."
+    noRows: "No valid VIMALUX audit rows found. Check quantity in column D and wattage in column G.",
+    importCatalog: "Import product catalogue",
+    catalogTemplate: "Download product template",
+    replaceCatalogue: "Replace catalogue",
+    mergeCatalogue: "Merge catalogue",
+    catalogueMode: "Catalogue import mode",
+    catalogImportDone: "Product catalogue imported.",
+    noProductsFound: "No valid products found. Check columns: Name, Category, Watt, Lumen, SellPrice, Install, Zhaga, D4i."
   },
   IT: {
-    version: "VIMALUX LIGHTING AI PORTAL · VERSIONE 9C FIXED",
+    version: "VIMALUX LIGHTING AI PORTAL · VERSIONE 10A",
     title: "Motore ROI Cliente",
-    subtitle: "Confronto ROI cliente tra LED, Smart e Smart + PowerAiD.",
-    importExcel: "Importa Excel",
+    subtitle: "Import audit, import catalogo prodotti, ROI cliente, confronto pacchetti e proposta.",
+    importExcel: "Importa Audit Excel",
     dashboard: "Dashboard Cliente",
     inventory: "Inventario",
     products: "Prodotti / Prezzi",
@@ -144,7 +151,14 @@ const labels = {
     assumptionsTitle: "Centro controllo assunzioni cliente",
     proposalSummary: "Sintesi proposta cliente per",
     preliminary: "Preliminare e non vincolante. Offerta finale soggetta ad audit tecnico, lighting design, conferma prodotto, condizioni installative, struttura contrattuale e approvazione finanziaria.",
-    noRows: "Nessuna riga audit VIMALUX valida trovata. Verificare quantità in colonna D e wattaggio in colonna G."
+    noRows: "Nessuna riga audit VIMALUX valida trovata. Verificare quantità in colonna D e wattaggio in colonna G.",
+    importCatalog: "Importa catalogo prodotti",
+    catalogTemplate: "Scarica template prodotti",
+    replaceCatalogue: "Sostituisci catalogo",
+    mergeCatalogue: "Unisci catalogo",
+    catalogueMode: "Modalità import catalogo",
+    catalogImportDone: "Catalogo prodotti importato.",
+    noProductsFound: "Nessun prodotto valido trovato. Verificare colonne: Name, Category, Watt, Lumen, SellPrice, Install, Zhaga, D4i."
   }
 };
 
@@ -162,23 +176,41 @@ function num(v) {
   }).format(v || 0);
 }
 
+function normalizeHeader(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/_/g, "")
+    .replace(/-/g, "");
+}
+
+function readCellByHeaders(row, headers, possibleNames, fallback = "") {
+  for (const name of possibleNames) {
+    const normalized = normalizeHeader(name);
+    const index = headers.findIndex((h) => normalizeHeader(h) === normalized);
+    if (index >= 0 && row[index] !== undefined && row[index] !== "") return row[index];
+  }
+  return fallback;
+}
+
 export default function App() {
-  const [lang, setLang] = useState(() => localStorage.getItem("vml_lang_v9c") || "EN");
+  const [lang, setLang] = useState(() => localStorage.getItem("vml_lang_v10a") || "EN");
   const t = labels[lang];
 
-  const [page, setPage] = useState("dashboard");
-  const [packageType, setPackageType] = useState(() => localStorage.getItem("vml_package_v9c") || "premium");
+  const [page, setPage] = useState("products");
+  const [packageType, setPackageType] = useState(() => localStorage.getItem("vml_package_v10a") || "premium");
   const [client, setClient] = useState("Comune Demo");
   const [statusMsg, setStatusMsg] = useState("");
-  const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem("vml_products_v9c") || "null") || defaultProducts);
-  const [assumptions, setAssumptions] = useState(() => JSON.parse(localStorage.getItem("vml_assumptions_v9c") || "null") || defaultAssumptions);
-  const [rows, setRows] = useState(() => JSON.parse(localStorage.getItem("vml_rows_v9c") || "null") || demoRows);
+  const [catalogMode, setCatalogMode] = useState("replace");
+  const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem("vml_products_v10a") || "null") || defaultProducts);
+  const [assumptions, setAssumptions] = useState(() => JSON.parse(localStorage.getItem("vml_assumptions_v10a") || "null") || defaultAssumptions);
+  const [rows, setRows] = useState(() => JSON.parse(localStorage.getItem("vml_rows_v10a") || "null") || demoRows);
 
-  useEffect(() => localStorage.setItem("vml_lang_v9c", lang), [lang]);
-  useEffect(() => localStorage.setItem("vml_package_v9c", packageType), [packageType]);
-  useEffect(() => localStorage.setItem("vml_products_v9c", JSON.stringify(products)), [products]);
-  useEffect(() => localStorage.setItem("vml_assumptions_v9c", JSON.stringify(assumptions)), [assumptions]);
-  useEffect(() => localStorage.setItem("vml_rows_v9c", JSON.stringify(rows)), [rows]);
+  useEffect(() => localStorage.setItem("vml_lang_v10a", lang), [lang]);
+  useEffect(() => localStorage.setItem("vml_package_v10a", packageType), [packageType]);
+  useEffect(() => localStorage.setItem("vml_products_v10a", JSON.stringify(products)), [products]);
+  useEffect(() => localStorage.setItem("vml_assumptions_v10a", JSON.stringify(assumptions)), [assumptions]);
+  useEffect(() => localStorage.setItem("vml_rows_v10a", JSON.stringify(rows)), [rows]);
 
   function flash(message) {
     setStatusMsg(message);
@@ -192,7 +224,9 @@ export default function App() {
   }
 
   function packageFee(type) {
-    return packs[type]?.fee || 0;
+    if (type === "led") return 0;
+    if (type === "smart") return 6;
+    return 9;
   }
 
   function extraSavingPct(type) {
@@ -206,8 +240,8 @@ export default function App() {
     const w = Number(watt);
 
     if (w >= 180) return products.find((p) => p.id === "main90") || sorted[sorted.length - 1];
-    if (w >= 120) return products.find((p) => p.id === "street60") || sorted.find((p) => p.watt >= 60) || sorted[0];
-    if (w >= 70) return products.find((p) => p.id === "urban45") || sorted.find((p) => p.watt >= 45) || sorted[0];
+    if (w >= 120) return products.find((p) => p.id === "street60") || sorted.find((p) => Number(p.watt) >= 60) || sorted[0];
+    if (w >= 70) return products.find((p) => p.id === "urban45") || sorted.find((p) => Number(p.watt) >= 45) || sorted[0];
 
     return products.find((p) => p.id === "decor35") || sorted[0];
   }
@@ -253,7 +287,7 @@ export default function App() {
   }, [rows, products, assumptions, packageType]);
 
   const totals = useMemo(() => {
-    const t = analysed.reduce(
+    const total = analysed.reduce(
       (a, r) => {
         a.qty += Number(r.qty);
         a.beforeKwh += r.beforeKwh;
@@ -279,11 +313,11 @@ export default function App() {
       }
     );
 
-    t.payback = t.annualNetSaving > 0 ? t.customerCapex / t.annualNetSaving : 0;
-    t.roi = t.customerCapex > 0 ? t.annualNetSaving / t.customerCapex : 0;
-    t.netBenefit = t.annualNetSaving * Number(assumptions.years) - t.customerCapex;
+    total.payback = total.annualNetSaving > 0 ? total.customerCapex / total.annualNetSaving : 0;
+    total.roi = total.customerCapex > 0 ? total.annualNetSaving / total.customerCapex : 0;
+    total.netBenefit = total.annualNetSaving * Number(assumptions.years) - total.customerCapex;
 
-    return t;
+    return total;
   }, [analysed, assumptions]);
 
   async function importExcel(e) {
@@ -326,6 +360,81 @@ export default function App() {
     } else {
       alert(t.noRows);
     }
+  }
+
+  async function importProductCatalogue(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+    if (!matrix.length) {
+      alert(t.noProductsFound);
+      return;
+    }
+
+    const headers = matrix[0];
+
+    const imported = matrix
+      .slice(1)
+      .map((row, index) => {
+        const name = readCellByHeaders(row, headers, ["Name", "Product", "ProductName", "Nome", "Prodotto"], "");
+        const category = readCellByHeaders(row, headers, ["Category", "Categoria", "Type", "Tipo"], "General");
+        const watt = Number(readCellByHeaders(row, headers, ["Watt", "W", "Power", "Potenza"], 0));
+        const lumen = Number(readCellByHeaders(row, headers, ["Lumen", "Lumens", "lm", "Flusso"], 0));
+        const sellPrice = Number(readCellByHeaders(row, headers, ["SellPrice", "Sell", "Price", "Prezzo", "PrezzoVendita"], 0));
+        const install = Number(readCellByHeaders(row, headers, ["Install", "InstallPrice", "Installation", "Installazione"], 0));
+        const zhaga = String(readCellByHeaders(row, headers, ["Zhaga", "ZhagaReady"], "Yes"));
+        const d4i = String(readCellByHeaders(row, headers, ["D4i", "Dali", "Driver"], "Yes"));
+
+        return {
+          id: `imported_${Date.now()}_${index}`,
+          name,
+          category,
+          watt,
+          lumen,
+          sellPrice,
+          install,
+          zhaga,
+          d4i
+        };
+      })
+      .filter((p) => p.name && p.watt > 0 && p.sellPrice > 0);
+
+    if (!imported.length) {
+      alert(t.noProductsFound);
+      return;
+    }
+
+    if (catalogMode === "replace") {
+      setProducts(imported);
+    } else {
+      setProducts((prev) => [...prev, ...imported]);
+    }
+
+    flash(t.catalogImportDone);
+    setPage("products");
+  }
+
+  function downloadProductTemplate() {
+    const csv = [
+      "Name,Category,Watt,Lumen,SellPrice,Install,Zhaga,D4i",
+      "VIMALUX Street Pro 60W Smart,Street,60,10200,150,45,Yes,Yes",
+      "VIMALUX Urban 45W Smart,Urban,45,7650,135,45,Yes,Yes"
+    ].join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+
+    a.href = url;
+    a.download = "vimalux_product_catalog_template.csv";
+    a.click();
+
+    URL.revokeObjectURL(url);
   }
 
   function updateProduct(id, field, value) {
@@ -376,10 +485,10 @@ export default function App() {
   }
 
   function clearLocalData() {
-    localStorage.removeItem("vml_products_v9c");
-    localStorage.removeItem("vml_assumptions_v9c");
-    localStorage.removeItem("vml_rows_v9c");
-    localStorage.removeItem("vml_package_v9c");
+    localStorage.removeItem("vml_products_v10a");
+    localStorage.removeItem("vml_assumptions_v10a");
+    localStorage.removeItem("vml_rows_v10a");
+    localStorage.removeItem("vml_package_v10a");
 
     setProducts(defaultProducts);
     setAssumptions(defaultAssumptions);
@@ -426,7 +535,7 @@ export default function App() {
     const a = document.createElement("a");
 
     a.href = url;
-    a.download = "vimalux_customer_roi_v9c_fixed.csv";
+    a.download = "vimalux_customer_roi_v10a.csv";
     a.click();
 
     URL.revokeObjectURL(url);
@@ -437,7 +546,20 @@ export default function App() {
     setClient("Comune Demo");
   }
 
-  return (
+  function prettyLabel(key) {
+    const map = {
+      energyPrice: "Energy price €/kWh",
+      maintenanceCost: "Maintenance cost €/lamp/year",
+      maintenanceReduction: "Maintenance reduction %",
+      smartDimmingSaving: "Smart dimming saving %",
+      powerAidExtraSaving: "PowerAiD extra saving %",
+      years: "Analysis years",
+      co2Factor: "CO₂ factor kg/kWh"
+    };
+
+    return map[key] || key;
+  }
+    return (
     <div style={styles.app}>
       <aside style={styles.sidebar}>
         <div style={styles.logo}>VIMALUX</div>
@@ -621,7 +743,7 @@ export default function App() {
 
         {page === "products" && (
           <Card title={t.productTitle}>
-            <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
+            <div style={styles.catalogTools}>
               <button style={styles.darkBtn} onClick={addProduct}>
                 {t.addProduct}
               </button>
@@ -631,9 +753,43 @@ export default function App() {
               <button style={styles.deleteBtn} onClick={clearLocalData}>
                 {t.clearLocal}
               </button>
+              <button style={styles.darkBtn} onClick={downloadProductTemplate}>
+                {t.catalogTemplate}
+              </button>
             </div>
 
-            <div style={{ overflowX: "auto" }}>
+            <div style={styles.importPanel}>
+              <div>
+                <div style={styles.panelTitle}>{t.catalogueMode}</div>
+                <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                  <button
+                    style={catalogMode === "replace" ? styles.choiceActive : styles.choiceBtn}
+                    onClick={() => setCatalogMode("replace")}
+                  >
+                    {t.replaceCatalogue}
+                  </button>
+                  <button
+                    style={catalogMode === "merge" ? styles.choiceActive : styles.choiceBtn}
+                    onClick={() => setCatalogMode("merge")}
+                  >
+                    {t.mergeCatalogue}
+                  </button>
+                </div>
+              </div>
+
+              <label style={styles.catalogUpload}>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={importProductCatalogue}
+                  style={{ display: "none" }}
+                />
+                <b>{t.importCatalog}</b>
+                <span>Name, Category, Watt, Lumen, SellPrice, Install, Zhaga, D4i</span>
+              </label>
+            </div>
+
+            <div style={{ overflowX: "auto", marginTop: 18 }}>
               <table style={styles.table}>
                 <thead>
                   <tr>
@@ -742,20 +898,6 @@ export default function App() {
       </main>
     </div>
   );
-}
-
-function prettyLabel(key) {
-  const map = {
-    energyPrice: "Energy price €/kWh",
-    maintenanceCost: "Maintenance cost €/lamp/year",
-    maintenanceReduction: "Maintenance reduction %",
-    smartDimmingSaving: "Smart dimming saving %",
-    powerAidExtraSaving: "PowerAiD extra saving %",
-    years: "Analysis years",
-    co2Factor: "CO₂ factor kg/kWh"
-  };
-
-  return map[key] || key;
 }
 
 function PackageSelector({ t, packageType, setPackageType }) {
@@ -1013,6 +1155,57 @@ const styles = {
     boxShadow: "0 8px 24px rgba(15,23,42,.06)",
     marginBottom: 24,
     overflow: "hidden"
+  },
+  catalogTools: {
+    display: "flex",
+    gap: 10,
+    marginBottom: 18,
+    flexWrap: "wrap"
+  },
+  importPanel: {
+    background: "#f8fafc",
+    border: "1px solid #e2e8f0",
+    borderRadius: 18,
+    padding: 18,
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 16,
+    alignItems: "center"
+  },
+  panelTitle: {
+    fontWeight: 900,
+    color: "#334155"
+  },
+  choiceBtn: {
+    background: "#e2e8f0",
+    color: "#0f172a",
+    border: 0,
+    borderRadius: 12,
+    padding: "10px 14px",
+    fontWeight: 900,
+    cursor: "pointer"
+  },
+  choiceActive: {
+    background: "#0f172a",
+    color: "white",
+    border: 0,
+    borderRadius: 12,
+    padding: "10px 14px",
+    fontWeight: 900,
+    cursor: "pointer"
+  },
+  catalogUpload: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    border: "2px dashed #cbd5e1",
+    borderRadius: 16,
+    padding: 22,
+    cursor: "pointer",
+    background: "white",
+    textAlign: "center"
   },
   formGrid: {
     display: "grid",
