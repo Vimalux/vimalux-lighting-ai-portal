@@ -12,10 +12,10 @@ const defaultAssumptions = {
   energyPrice: 0.29,
   maintenanceCost: 25,
   maintenanceReduction: 75,
-  smartDimmingSaving: 22,
-  powerAidExtraSaving: 8,
-  years: 15,
-  co2Factor: 0.35
+  smartDimmingSaving: 15,
+  powerAidExtraSaving: 40,
+  years: 10,
+  co2Factor: 0.42
 };
 
 const demoRows = [
