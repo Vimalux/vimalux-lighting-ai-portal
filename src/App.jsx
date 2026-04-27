@@ -1,20 +1,20 @@
 import React, { useMemo, useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 
-const defaultProducts = [
-  { id: "urban45", name: "VIMALUX Urban 45W Smart", watt: 45, lumen: 7650, sellPrice: 135, install: 45, category: "Urban", zhaga: "Yes", d4i: "Yes" },
-  { id: "street60", name: "VIMALUX Street Pro 60W Smart", watt: 60, lumen: 10200, sellPrice: 150, install: 45, category: "Street", zhaga: "Yes", d4i: "Yes" },
-  { id: "main90", name: "VIMALUX Main Road 90W Smart", watt: 90, lumen: 15300, sellPrice: 185, install: 50, category: "Main Road", zhaga: "Yes", d4i: "Yes" },
-  { id: "decor35", name: "VIMALUX Decorative Retrofit 35W Smart", watt: 35, lumen: 5600, sellPrice: 120, install: 50, category: "Decorative", zhaga: "Optional", d4i: "Yes" }
+const products = [
+  { id: "urban45", name: "VIMALUX Urban 45W Smart", watt: 45, lumen: 7650, sellPrice: 135, install: 45, category: "Urban" },
+  { id: "street60", name: "VIMALUX Street Pro 60W Smart", watt: 60, lumen: 10200, sellPrice: 150, install: 45, category: "Street" },
+  { id: "main90", name: "VIMALUX Main Road 90W Smart", watt: 90, lumen: 15300, sellPrice: 185, install: 50, category: "Main Road" },
+  { id: "decor35", name: "VIMALUX Decorative Retrofit 35W Smart", watt: 35, lumen: 5600, sellPrice: 120, install: 50, category: "Decorative" }
 ];
 
-const defaultAssumptions = {
+const assumptions = {
   energyPrice: 0.29,
   maintenanceCost: 25,
   maintenanceReduction: 75,
   smartDimmingSaving: 15,
-  powerAidExtraSaving: 40,
-  years: 10,
+  powerAidExtraSaving: 8,
+  years: 15,
   co2Factor: 0.42
 };
 
@@ -23,142 +23,66 @@ const demoRows = [
   { id: 2, area: "Urban roads", existingType: "HPS 120W", existingWatt: 120, qty: 500, hours: 4200 }
 ];
 
-const packs = {
-  led: { fee: 0 },
-  smart: { fee: 6 },
-  premium: { fee: 9 }
-};
-
 const labels = {
   EN: {
-    version: "VIMALUX LIGHTING AI PORTAL · VERSION 10A",
-    title: "Customer ROI Closing Engine",
-    subtitle: "Audit import, product catalogue import, customer ROI, package comparison and proposal output.",
-    importExcel: "Import Audit Excel",
-    dashboard: "Customer Dashboard",
-    inventory: "Inventory",
-    products: "Products / Prices",
-    assumptions: "Assumptions",
+    version: "VIMALUX LIGHTING AI PORTAL · CUSTOMER SAFE MODE",
+    title: "Smart LED ROI Calculator",
+    subtitle: "Upload your lighting audit and compare LED, Smart and Smart + PowerAiD scenarios.",
+    upload: "Upload audit Excel",
+    demo: "Load demo case",
+    dashboard: "Dashboard",
     proposal: "Proposal",
-    packages: "Packages",
-    export: "Export Analysis",
-    print: "Print / PDF",
     client: "Client",
     totalLamps: "Total lamps",
-    projectCapex: "Total project CAPEX",
-    annualNetSaving: "Annual net saving",
+    package: "Selected solution",
+    capex: "Estimated project CAPEX",
+    annualSaving: "Annual net saving",
     payback: "Simple payback",
-    roi: "Customer ROI/year",
-    netBenefit: "Net benefit",
+    roi: "ROI/year",
     co2: "CO₂ saving/year",
-    annualFee: "Annual service fee",
-    package: "Commercial package",
-    ledOnly: "LED only",
-    smart: "Smart Platform",
-    premium: "Smart + PowerAiD",
-    uploadTitle: "Upload VIMALUX audit sheet",
-    uploadMain: "Click to upload Excel audit sheet",
-    uploadInfo1: "Reads ProjectInputSheet / ProjectInputSheet_ITA.",
-    uploadInfo2: "Uses Location B, Type C, Qty D, Watt G, Hours I.",
-    loadDemo: "Load demo",
-    editPrices: "Edit product prices",
-    status: "Customer business case",
-    inventoryRows: "Inventory rows",
-    catalogueProducts: "Products in catalogue",
-    uploadNote: "Upload audit sheet first. Then adjust package, prices and assumptions before generating proposal.",
-    energyComparison: "Energy comparison",
-    existingSystem: "Existing system",
+    netBenefit: "15-year net benefit",
+    led: "LED only",
+    smart: "Smart LED",
+    premium: "Smart LED + PowerAiD",
+    energy: "Energy comparison",
+    existing: "Existing system",
     newSystem: "New system",
-    valueCreation: "Customer value creation",
-    energySavingYear: "Energy saving/year",
-    maintenanceSavingYear: "Maintenance saving/year",
-    serviceOpexYear: "Smart service fee/year",
-    inventoryTitle: "Imported inventory and automatic product matching",
-    productTitle: "Product catalogue and customer pricing",
-    addProduct: "+ Add product",
-    resetCatalogue: "Reset catalogue",
-    clearLocal: "Clear local data",
-    duplicate: "Duplicate",
-    delete: "Delete",
-    resetDone: "Catalogue reset to default products.",
-    clearDone: "Local browser data cleared.",
-    catalogueNote: "Only customer-facing sales prices are shown. Internal purchase prices and margins are intentionally excluded.",
-    assumptionsTitle: "Customer assumptions control center",
-    proposalSummary: "Customer proposal summary for",
-    preliminary: "Preliminary and non-binding. Final offer depends on technical audit, lighting design, product confirmation, installation conditions, contract structure and financing approval.",
-    noRows: "No valid VIMALUX audit rows found. Check quantity in column D and wattage in column G.",
-    importCatalog: "Import product catalogue",
-    catalogTemplate: "Download product template",
-    replaceCatalogue: "Replace catalogue",
-    mergeCatalogue: "Merge catalogue",
-    catalogueMode: "Catalogue import mode",
-    catalogImportDone: "Product catalogue imported.",
-    noProductsFound: "No valid products found. Check columns: Name, Category, Watt, Lumen, SellPrice, Install, Zhaga, D4i."
+    value: "Customer value",
+    print: "Print / PDF",
+    export: "Export analysis",
+    proposalTitle: "Preliminary customer proposal",
+    disclaimer: "Preliminary and non-binding. Final offer depends on technical audit, lighting design, product confirmation, installation conditions, contract structure and financing approval.",
+    noRows: "No valid VIMALUX audit rows found. Check quantity in column D and wattage in column G."
   },
   IT: {
-    version: "VIMALUX LIGHTING AI PORTAL · VERSIONE 10A",
-    title: "Motore ROI Cliente",
-    subtitle: "Import audit, import catalogo prodotti, ROI cliente, confronto pacchetti e proposta.",
-    importExcel: "Importa Audit Excel",
-    dashboard: "Dashboard Cliente",
-    inventory: "Inventario",
-    products: "Prodotti / Prezzi",
-    assumptions: "Assunzioni",
+    version: "VIMALUX LIGHTING AI PORTAL · MODALITÀ CLIENTE",
+    title: "Calcolatore ROI Smart LED",
+    subtitle: "Carica l’audit illuminotecnico e confronta scenari LED, Smart e Smart + PowerAiD.",
+    upload: "Carica audit Excel",
+    demo: "Carica caso demo",
+    dashboard: "Dashboard",
     proposal: "Proposta",
-    packages: "Pacchetti",
-    export: "Esporta Analisi",
-    print: "Stampa / PDF",
     client: "Cliente",
     totalLamps: "Totale lampade",
-    projectCapex: "CAPEX totale progetto",
-    annualNetSaving: "Risparmio netto annuo",
+    package: "Soluzione selezionata",
+    capex: "CAPEX progetto stimato",
+    annualSaving: "Risparmio netto annuo",
     payback: "Payback semplice",
-    roi: "ROI cliente/anno",
-    netBenefit: "Beneficio netto",
+    roi: "ROI/anno",
     co2: "Risparmio CO₂/anno",
-    annualFee: "Canone servizio annuo",
-    package: "Pacchetto commerciale",
-    ledOnly: "Solo LED",
-    smart: "Piattaforma Smart",
-    premium: "Smart + PowerAiD",
-    uploadTitle: "Carica audit sheet VIMALUX",
-    uploadMain: "Clicca per caricare Excel audit sheet",
-    uploadInfo1: "Legge ProjectInputSheet / ProjectInputSheet_ITA.",
-    uploadInfo2: "Usa Località B, Tipo C, Quantità D, Watt G, Ore I.",
-    loadDemo: "Carica demo",
-    editPrices: "Modifica prezzi prodotti",
-    status: "Business case cliente",
-    inventoryRows: "Righe inventario",
-    catalogueProducts: "Prodotti in catalogo",
-    uploadNote: "Carica prima l’audit sheet. Poi modifica pacchetto, prezzi e assunzioni prima di generare la proposta.",
-    energyComparison: "Confronto energia",
-    existingSystem: "Sistema esistente",
+    netBenefit: "Beneficio netto 15 anni",
+    led: "Solo LED",
+    smart: "Smart LED",
+    premium: "Smart LED + PowerAiD",
+    energy: "Confronto energia",
+    existing: "Sistema esistente",
     newSystem: "Nuovo sistema",
-    valueCreation: "Creazione valore cliente",
-    energySavingYear: "Risparmio energia/anno",
-    maintenanceSavingYear: "Risparmio manutenzione/anno",
-    serviceOpexYear: "Canone servizio Smart/anno",
-    inventoryTitle: "Inventario importato e matching automatico prodotto",
-    productTitle: "Catalogo prodotti e prezzi cliente",
-    addProduct: "+ Aggiungi prodotto",
-    resetCatalogue: "Reset catalogo",
-    clearLocal: "Cancella dati locali",
-    duplicate: "Duplica",
-    delete: "Elimina",
-    resetDone: "Catalogo ripristinato ai prodotti default.",
-    clearDone: "Dati locali browser cancellati.",
-    catalogueNote: "Sono mostrati solo i prezzi di vendita al cliente. Prezzi di acquisto e margini interni sono esclusi intenzionalmente.",
-    assumptionsTitle: "Centro controllo assunzioni cliente",
-    proposalSummary: "Sintesi proposta cliente per",
-    preliminary: "Preliminare e non vincolante. Offerta finale soggetta ad audit tecnico, lighting design, conferma prodotto, condizioni installative, struttura contrattuale e approvazione finanziaria.",
-    noRows: "Nessuna riga audit VIMALUX valida trovata. Verificare quantità in colonna D e wattaggio in colonna G.",
-    importCatalog: "Importa catalogo prodotti",
-    catalogTemplate: "Scarica template prodotti",
-    replaceCatalogue: "Sostituisci catalogo",
-    mergeCatalogue: "Unisci catalogo",
-    catalogueMode: "Modalità import catalogo",
-    catalogImportDone: "Catalogo prodotti importato.",
-    noProductsFound: "Nessun prodotto valido trovato. Verificare colonne: Name, Category, Watt, Lumen, SellPrice, Install, Zhaga, D4i."
+    value: "Valore per il cliente",
+    print: "Stampa / PDF",
+    export: "Esporta analisi",
+    proposalTitle: "Proposta preliminare cliente",
+    disclaimer: "Preliminare e non vincolante. Offerta finale soggetta ad audit tecnico, lighting design, conferma prodotto, condizioni installative, struttura contrattuale e approvazione finanziaria.",
+    noRows: "Nessuna riga audit VIMALUX valida trovata. Verificare quantità in colonna D e wattaggio in colonna G."
   }
 };
 
@@ -176,49 +100,21 @@ function num(v) {
   }).format(v || 0);
 }
 
-function normalizeHeader(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .replace(/_/g, "")
-    .replace(/-/g, "");
-}
-
-function readCellByHeaders(row, headers, possibleNames, fallback = "") {
-  for (const name of possibleNames) {
-    const normalized = normalizeHeader(name);
-    const index = headers.findIndex((h) => normalizeHeader(h) === normalized);
-    if (index >= 0 && row[index] !== undefined && row[index] !== "") return row[index];
-  }
-  return fallback;
-}
-
 export default function App() {
-  const [lang, setLang] = useState(() => localStorage.getItem("vml_lang_v10a") || "EN");
+  const [lang, setLang] = useState(() => localStorage.getItem("vml_customer_lang") || "EN");
+  const [page, setPage] = useState("dashboard");
+  const [client, setClient] = useState("Comune Demo");
+  const [packageType, setPackageType] = useState("premium");
+  const [rows, setRows] = useState(demoRows);
+
   const t = labels[lang];
 
-  const [page, setPage] = useState("products");
-  const [packageType, setPackageType] = useState(() => localStorage.getItem("vml_package_v10a") || "premium");
-  const [client, setClient] = useState("Comune Demo");
-  const [statusMsg, setStatusMsg] = useState("");
-  const [catalogMode, setCatalogMode] = useState("replace");
-  const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem("vml_products_v10a") || "null") || defaultProducts);
-  const [assumptions, setAssumptions] = useState(() => JSON.parse(localStorage.getItem("vml_assumptions_v10a") || "null") || defaultAssumptions);
-  const [rows, setRows] = useState(() => JSON.parse(localStorage.getItem("vml_rows_v10a") || "null") || demoRows);
-
-  useEffect(() => localStorage.setItem("vml_lang_v10a", lang), [lang]);
-  useEffect(() => localStorage.setItem("vml_package_v10a", packageType), [packageType]);
-  useEffect(() => localStorage.setItem("vml_products_v10a", JSON.stringify(products)), [products]);
-  useEffect(() => localStorage.setItem("vml_assumptions_v10a", JSON.stringify(assumptions)), [assumptions]);
-  useEffect(() => localStorage.setItem("vml_rows_v10a", JSON.stringify(rows)), [rows]);
-
-  function flash(message) {
-    setStatusMsg(message);
-    setTimeout(() => setStatusMsg(""), 2500);
-  }
+  useEffect(() => {
+    localStorage.setItem("vml_customer_lang", lang);
+  }, [lang]);
 
   function packageName(type) {
-    if (type === "led") return t.ledOnly;
+    if (type === "led") return t.led;
     if (type === "smart") return t.smart;
     return t.premium;
   }
@@ -231,8 +127,8 @@ export default function App() {
 
   function extraSavingPct(type) {
     if (type === "led") return 0;
-    if (type === "smart") return Number(assumptions.smartDimmingSaving);
-    return Number(assumptions.smartDimmingSaving) + Number(assumptions.powerAidExtraSaving);
+    if (type === "smart") return assumptions.smartDimmingSaving;
+    return assumptions.smartDimmingSaving + assumptions.powerAidExtraSaving;
   }
 
   function recommendProduct(watt) {
@@ -254,11 +150,11 @@ export default function App() {
       const savingPct = extraSavingPct(packageType);
       const finalKwh = ledKwh * (1 - savingPct / 100);
 
-      const energySaving = (beforeKwh - finalKwh) * Number(assumptions.energyPrice);
+      const energySaving = (beforeKwh - finalKwh) * assumptions.energyPrice;
       const maintenanceSaving =
         Number(row.qty) *
-        Number(assumptions.maintenanceCost) *
-        Number(assumptions.maintenanceReduction) /
+        assumptions.maintenanceCost *
+        assumptions.maintenanceReduction /
         100;
 
       const serviceFee = Number(row.qty) * packageFee(packageType);
@@ -266,13 +162,12 @@ export default function App() {
       const customerCapex = Number(row.qty) * (Number(product.sellPrice) + Number(product.install));
       const payback = annualNetSaving > 0 ? customerCapex / annualNetSaving : 0;
       const roi = customerCapex > 0 ? annualNetSaving / customerCapex : 0;
-      const co2 = ((beforeKwh - finalKwh) * Number(assumptions.co2Factor)) / 1000;
+      const co2 = ((beforeKwh - finalKwh) * assumptions.co2Factor) / 1000;
 
       return {
         ...row,
         product,
         beforeKwh,
-        ledKwh,
         finalKwh,
         energySaving,
         maintenanceSaving,
@@ -284,7 +179,7 @@ export default function App() {
         co2
       };
     });
-  }, [rows, products, assumptions, packageType]);
+  }, [rows, packageType]);
 
   const totals = useMemo(() => {
     const total = analysed.reduce(
@@ -315,10 +210,10 @@ export default function App() {
 
     total.payback = total.annualNetSaving > 0 ? total.customerCapex / total.annualNetSaving : 0;
     total.roi = total.customerCapex > 0 ? total.annualNetSaving / total.customerCapex : 0;
-    total.netBenefit = total.annualNetSaving * Number(assumptions.years) - total.customerCapex;
+    total.netBenefit = total.annualNetSaving * assumptions.years - total.customerCapex;
 
     return total;
-  }, [analysed, assumptions]);
+  }, [analysed]);
 
   async function importExcel(e) {
     const file = e.target.files?.[0];
@@ -362,152 +257,16 @@ export default function App() {
     }
   }
 
-  async function importProductCatalogue(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const buffer = await file.arrayBuffer();
-    const wb = XLSX.read(buffer, { type: "array" });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-
-    if (!matrix.length) {
-      alert(t.noProductsFound);
-      return;
-    }
-
-    const headers = matrix[0];
-
-    const imported = matrix
-      .slice(1)
-      .map((row, index) => {
-        const name = readCellByHeaders(row, headers, ["Name", "Product", "ProductName", "Nome", "Prodotto"], "");
-        const category = readCellByHeaders(row, headers, ["Category", "Categoria", "Type", "Tipo"], "General");
-        const watt = Number(readCellByHeaders(row, headers, ["Watt", "W", "Power", "Potenza"], 0));
-        const lumen = Number(readCellByHeaders(row, headers, ["Lumen", "Lumens", "lm", "Flusso"], 0));
-        const sellPrice = Number(readCellByHeaders(row, headers, ["SellPrice", "Sell", "Price", "Prezzo", "PrezzoVendita"], 0));
-        const install = Number(readCellByHeaders(row, headers, ["Install", "InstallPrice", "Installation", "Installazione"], 0));
-        const zhaga = String(readCellByHeaders(row, headers, ["Zhaga", "ZhagaReady"], "Yes"));
-        const d4i = String(readCellByHeaders(row, headers, ["D4i", "Dali", "Driver"], "Yes"));
-
-        return {
-          id: `imported_${Date.now()}_${index}`,
-          name,
-          category,
-          watt,
-          lumen,
-          sellPrice,
-          install,
-          zhaga,
-          d4i
-        };
-      })
-      .filter((p) => p.name && p.watt > 0 && p.sellPrice > 0);
-
-    if (!imported.length) {
-      alert(t.noProductsFound);
-      return;
-    }
-
-    if (catalogMode === "replace") {
-      setProducts(imported);
-    } else {
-      setProducts((prev) => [...prev, ...imported]);
-    }
-
-    flash(t.catalogImportDone);
-    setPage("products");
-  }
-
-  function downloadProductTemplate() {
-    const csv = [
-      "Name,Category,Watt,Lumen,SellPrice,Install,Zhaga,D4i",
-      "VIMALUX Street Pro 60W Smart,Street,60,10200,150,45,Yes,Yes",
-      "VIMALUX Urban 45W Smart,Urban,45,7650,135,45,Yes,Yes"
-    ].join("\n");
-
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-
-    a.href = url;
-    a.download = "vimalux_product_catalog_template.csv";
-    a.click();
-
-    URL.revokeObjectURL(url);
-  }
-
-  function updateProduct(id, field, value) {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, [field]: value } : p))
-    );
-  }
-
-  function addProduct() {
-    setProducts((prev) => [
-      ...prev,
-      {
-        id: `product_${Date.now()}`,
-        name: "New Smart LED Product",
-        watt: 60,
-        lumen: 10000,
-        sellPrice: 150,
-        install: 35,
-        category: "New Category",
-        zhaga: "Yes",
-        d4i: "Yes"
-      }
-    ]);
-  }
-
-  function duplicateProduct(product) {
-    setProducts((prev) => [
-      ...prev,
-      {
-        ...product,
-        id: `product_${Date.now()}`,
-        name: `${product.name} Copy`
-      }
-    ]);
-  }
-
-  function deleteProduct(id) {
-    if (products.length <= 1) {
-      alert("You must keep at least one product.");
-      return;
-    }
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-  }
-
-  function resetCatalogue() {
-    setProducts(defaultProducts);
-    flash(t.resetDone);
-  }
-
-  function clearLocalData() {
-    localStorage.removeItem("vml_products_v10a");
-    localStorage.removeItem("vml_assumptions_v10a");
-    localStorage.removeItem("vml_rows_v10a");
-    localStorage.removeItem("vml_package_v10a");
-
-    setProducts(defaultProducts);
-    setAssumptions(defaultAssumptions);
+  function loadDemo() {
     setRows(demoRows);
-    setPackageType("premium");
     setClient("Comune Demo");
-
-    flash(t.clearDone);
-  }
-
-  function updateRow(id, field, value) {
-    setRows((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, [field]: value } : r))
-    );
+    setPackageType("premium");
+    setPage("dashboard");
   }
 
   function exportAnalysis() {
     const header =
-      "package,area,existingType,existingWatt,qty,hours,recommendedProduct,newWatt,totalCustomerCapex,annualServiceFee,annualNetSaving,payback,customerRoi,co2";
+      "package,area,existingType,existingWatt,qty,hours,recommendedProduct,newWatt,totalCustomerCapex,annualNetSaving,payback,customerRoi,co2";
 
     const body = analysed
       .map((r) =>
@@ -521,7 +280,6 @@ export default function App() {
           r.product.name,
           r.product.watt,
           Math.round(r.customerCapex),
-          Math.round(r.serviceFee),
           Math.round(r.annualNetSaving),
           r.payback.toFixed(1),
           (r.roi * 100).toFixed(1) + "%",
@@ -535,57 +293,32 @@ export default function App() {
     const a = document.createElement("a");
 
     a.href = url;
-    a.download = "vimalux_customer_roi_v10a.csv";
+    a.download = "vimalux_customer_roi.csv";
     a.click();
 
     URL.revokeObjectURL(url);
   }
 
-  function resetDemo() {
-    setRows(demoRows);
-    setClient("Comune Demo");
-  }
-
-  function prettyLabel(key) {
-    const map = {
-      energyPrice: "Energy price €/kWh",
-      maintenanceCost: "Maintenance cost €/lamp/year",
-      maintenanceReduction: "Maintenance reduction %",
-      smartDimmingSaving: "Smart dimming saving %",
-      powerAidExtraSaving: "PowerAiD extra saving %",
-      years: "Analysis years",
-      co2Factor: "CO₂ factor kg/kWh"
-    };
-
-    return map[key] || key;
-  }
-    return (
+  return (
     <div style={styles.app}>
       <aside style={styles.sidebar}>
         <div style={styles.logo}>VIMALUX</div>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 22 }}>
-          <button
-            style={lang === "EN" ? styles.langActive : styles.langBtn}
-            onClick={() => setLang("EN")}
-          >
+        <div style={styles.langWrap}>
+          <button style={lang === "EN" ? styles.langActive : styles.langBtn} onClick={() => setLang("EN")}>
             EN
           </button>
-          <button
-            style={lang === "IT" ? styles.langActive : styles.langBtn}
-            onClick={() => setLang("IT")}
-          >
+          <button style={lang === "IT" ? styles.langActive : styles.langBtn} onClick={() => setLang("IT")}>
             IT
           </button>
         </div>
 
-        <Nav label={t.importExcel} id="import" page={page} setPage={setPage} />
-        <Nav label={t.dashboard} id="dashboard" page={page} setPage={setPage} />
-        <Nav label={t.packages} id="packages" page={page} setPage={setPage} />
-        <Nav label={t.inventory} id="inventory" page={page} setPage={setPage} />
-        <Nav label={t.products} id="products" page={page} setPage={setPage} />
-        <Nav label={t.assumptions} id="assumptions" page={page} setPage={setPage} />
-        <Nav label={t.proposal} id="proposal" page={page} setPage={setPage} />
+        <button style={navStyle(page === "dashboard")} onClick={() => setPage("dashboard")}>
+          {t.dashboard}
+        </button>
+        <button style={navStyle(page === "proposal")} onClick={() => setPage("proposal")}>
+          {t.proposal}
+        </button>
       </aside>
 
       <main style={styles.main}>
@@ -596,7 +329,7 @@ export default function App() {
             <p style={styles.subtitle}>{t.subtitle}</p>
           </div>
 
-          <div style={{ display: "flex", gap: 10 }}>
+          <div style={styles.heroActions}>
             <button style={styles.whiteBtn} onClick={exportAnalysis}>
               {t.export}
             </button>
@@ -606,351 +339,81 @@ export default function App() {
           </div>
         </section>
 
-        {statusMsg && <div style={styles.status}>{statusMsg}</div>}
+        <section style={styles.uploadCard}>
+          <label style={styles.uploadBox}>
+            <input type="file" accept=".xlsx,.xls" onChange={importExcel} style={{ display: "none" }} />
+            <b>{t.upload}</b>
+            <span>ProjectInputSheet / ProjectInputSheet_ITA</span>
+          </label>
 
-        <PackageSelector
-          t={t}
-          packageType={packageType}
-          setPackageType={setPackageType}
-        />
+          <button style={styles.darkBtn} onClick={loadDemo}>
+            {t.demo}
+          </button>
+        </section>
+
+        <section style={styles.card}>
+          <h2>{t.package}</h2>
+          <div style={styles.packageGrid}>
+            <button style={packageStyle(packageType === "led")} onClick={() => setPackageType("led")}>
+              {t.led}
+            </button>
+            <button style={packageStyle(packageType === "smart")} onClick={() => setPackageType("smart")}>
+              {t.smart}
+            </button>
+            <button style={packageStyle(packageType === "premium")} onClick={() => setPackageType("premium")}>
+              {t.premium}
+            </button>
+          </div>
+        </section>
 
         <section style={styles.kpiGrid}>
           <Kpi title={t.client} value={client} />
           <Kpi title={t.package} value={packageName(packageType)} />
           <Kpi title={t.totalLamps} value={num(totals.qty)} />
-          <Kpi title={t.projectCapex} value={eur(totals.customerCapex)} />
-          <Kpi title={t.annualNetSaving} value={eur(totals.annualNetSaving)} />
+          <Kpi title={t.capex} value={eur(totals.customerCapex)} />
+          <Kpi title={t.annualSaving} value={eur(totals.annualNetSaving)} />
           <Kpi title={t.payback} value={`${totals.payback.toFixed(1)} years`} />
           <Kpi title={t.roi} value={`${(totals.roi * 100).toFixed(1)}%`} />
-          <Kpi title={t.annualFee} value={eur(totals.serviceFee)} />
+          <Kpi title={t.netBenefit} value={eur(totals.netBenefit)} />
           <Kpi title={t.co2} value={`${num(totals.co2)} t`} />
         </section>
 
-        {page === "import" && (
+        {page === "dashboard" && (
           <section style={styles.grid2}>
-            <Card title={t.uploadTitle}>
-              <label style={styles.uploadBox}>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={importExcel}
-                  style={{ display: "none" }}
-                />
-                <b>{t.uploadMain}</b>
-                <span>{t.uploadInfo1}</span>
-                <span>{t.uploadInfo2}</span>
-              </label>
-
-              <div style={{ marginTop: 18, display: "flex", gap: 10 }}>
-                <button style={styles.darkBtn} onClick={resetDemo}>
-                  {t.loadDemo}
-                </button>
-                <button style={styles.darkBtn} onClick={() => setPage("products")}>
-                  {t.editPrices}
-                </button>
-              </div>
-            </Card>
-
-            <Card title={t.status}>
-              <Kpi title={t.inventoryRows} value={rows.length} />
-              <Kpi title={t.catalogueProducts} value={products.length} />
-              <Kpi title={`${assumptions.years}Y ${t.netBenefit}`} value={eur(totals.netBenefit)} />
-              <Kpi title={t.co2} value={`${num(totals.co2)} t`} />
-              <p style={styles.note}>{t.uploadNote}</p>
-            </Card>
-          </section>
-        )}
-
-        {(page === "dashboard" || page === "packages") && (
-          <section style={styles.grid2}>
-            <Card title={t.energyComparison}>
-              <Compare label={t.existingSystem} value={totals.beforeKwh} max={totals.beforeKwh} />
+            <Card title={t.energy}>
+              <Compare label={t.existing} value={totals.beforeKwh} max={totals.beforeKwh} />
               <Compare label={t.newSystem} value={totals.finalKwh} max={totals.beforeKwh} />
-
-              <p style={styles.note}>
-                Energy price: {assumptions.energyPrice} €/kWh. Extra saving: {extraSavingPct(packageType)}%.
-              </p>
             </Card>
 
-            <Card title={t.valueCreation}>
-              <Kpi title={t.energySavingYear} value={eur(totals.energySaving)} />
-              <Kpi title={t.maintenanceSavingYear} value={eur(totals.maintenanceSaving)} />
-              <Kpi title={t.serviceOpexYear} value={eur(totals.serviceFee)} />
-              <Kpi title={`${assumptions.years}Y ${t.netBenefit}`} value={eur(totals.netBenefit)} />
+            <Card title={t.value}>
+              <Kpi title={t.annualSaving} value={eur(totals.annualNetSaving)} />
+              <Kpi title={t.payback} value={`${totals.payback.toFixed(1)} years`} />
+              <Kpi title={t.roi} value={`${(totals.roi * 100).toFixed(1)}%`} />
+              <Kpi title={t.co2} value={`${num(totals.co2)} t`} />
             </Card>
           </section>
-        )}
-
-        {page === "inventory" && (
-          <Card title={t.inventoryTitle}>
-            <div style={{ overflowX: "auto" }}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    {[
-                      "Area",
-                      "Existing type",
-                      "Old W",
-                      "Qty",
-                      "Hours",
-                      "Recommended",
-                      "New W",
-                      "Customer CAPEX",
-                      "Service fee",
-                      "Net saving",
-                      "Payback"
-                    ].map((h) => (
-                      <th key={h} style={styles.th}>
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {analysed.map((r) => (
-                    <tr key={r.id}>
-                      <td style={styles.td}>
-                        <input style={styles.input} value={r.area} onChange={(e) => updateRow(r.id, "area", e.target.value)} />
-                      </td>
-                      <td style={styles.td}>
-                        <input style={styles.input} value={r.existingType} onChange={(e) => updateRow(r.id, "existingType", e.target.value)} />
-                      </td>
-                      <td style={styles.td}>
-                        <input style={styles.input} type="number" value={r.existingWatt} onChange={(e) => updateRow(r.id, "existingWatt", Number(e.target.value))} />
-                      </td>
-                      <td style={styles.td}>
-                        <input style={styles.input} type="number" value={r.qty} onChange={(e) => updateRow(r.id, "qty", Number(e.target.value))} />
-                      </td>
-                      <td style={styles.td}>
-                        <input style={styles.input} type="number" value={r.hours} onChange={(e) => updateRow(r.id, "hours", Number(e.target.value))} />
-                      </td>
-                      <td style={styles.td}>{r.product.name}</td>
-                      <td style={styles.td}>{r.product.watt}W</td>
-                      <td style={styles.td}>{eur(r.customerCapex)}</td>
-                      <td style={styles.td}>{eur(r.serviceFee)}</td>
-                      <td style={styles.td}>
-                        <b>{eur(r.annualNetSaving)}</b>
-                      </td>
-                      <td style={styles.td}>{r.payback.toFixed(1)}y</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        )}
-
-        {page === "products" && (
-          <Card title={t.productTitle}>
-            <div style={styles.catalogTools}>
-              <button style={styles.darkBtn} onClick={addProduct}>
-                {t.addProduct}
-              </button>
-              <button style={styles.darkBtn} onClick={resetCatalogue}>
-                {t.resetCatalogue}
-              </button>
-              <button style={styles.deleteBtn} onClick={clearLocalData}>
-                {t.clearLocal}
-              </button>
-              <button style={styles.darkBtn} onClick={downloadProductTemplate}>
-                {t.catalogTemplate}
-              </button>
-            </div>
-
-            <div style={styles.importPanel}>
-              <div>
-                <div style={styles.panelTitle}>{t.catalogueMode}</div>
-                <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-                  <button
-                    style={catalogMode === "replace" ? styles.choiceActive : styles.choiceBtn}
-                    onClick={() => setCatalogMode("replace")}
-                  >
-                    {t.replaceCatalogue}
-                  </button>
-                  <button
-                    style={catalogMode === "merge" ? styles.choiceActive : styles.choiceBtn}
-                    onClick={() => setCatalogMode("merge")}
-                  >
-                    {t.mergeCatalogue}
-                  </button>
-                </div>
-              </div>
-
-              <label style={styles.catalogUpload}>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={importProductCatalogue}
-                  style={{ display: "none" }}
-                />
-                <b>{t.importCatalog}</b>
-                <span>Name, Category, Watt, Lumen, SellPrice, Install, Zhaga, D4i</span>
-              </label>
-            </div>
-
-            <div style={{ overflowX: "auto", marginTop: 18 }}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    {[
-                      "Name",
-                      "Category",
-                      "Watt",
-                      "Lumen",
-                      "Sell €",
-                      "Install €",
-                      "Unit CAPEX €",
-                      "Zhaga",
-                      "D4i",
-                      "Actions"
-                    ].map((h) => (
-                      <th key={h} style={styles.th}>
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {products.map((p) => (
-                    <tr key={p.id}>
-                      <td style={styles.td}>
-                        <input style={styles.input} value={p.name} onChange={(e) => updateProduct(p.id, "name", e.target.value)} />
-                      </td>
-                      <td style={styles.td}>
-                        <input style={styles.input} value={p.category} onChange={(e) => updateProduct(p.id, "category", e.target.value)} />
-                      </td>
-                      <td style={styles.td}>
-                        <input style={styles.input} type="number" value={p.watt} onChange={(e) => updateProduct(p.id, "watt", Number(e.target.value))} />
-                      </td>
-                      <td style={styles.td}>
-                        <input style={styles.input} type="number" value={p.lumen} onChange={(e) => updateProduct(p.id, "lumen", Number(e.target.value))} />
-                      </td>
-                      <td style={styles.td}>
-                        <input style={styles.input} type="number" value={p.sellPrice} onChange={(e) => updateProduct(p.id, "sellPrice", Number(e.target.value))} />
-                      </td>
-                      <td style={styles.td}>
-                        <input style={styles.input} type="number" value={p.install} onChange={(e) => updateProduct(p.id, "install", Number(e.target.value))} />
-                      </td>
-                      <td style={styles.td}>
-                        <span style={styles.badge}>
-                          {eur(Number(p.sellPrice) + Number(p.install))}
-                        </span>
-                      </td>
-                      <td style={styles.td}>
-                        <input style={styles.input} value={p.zhaga} onChange={(e) => updateProduct(p.id, "zhaga", e.target.value)} />
-                      </td>
-                      <td style={styles.td}>
-                        <input style={styles.input} value={p.d4i} onChange={(e) => updateProduct(p.id, "d4i", e.target.value)} />
-                      </td>
-                      <td style={styles.td}>
-                        <button style={styles.smallBtn} onClick={() => duplicateProduct(p)}>
-                          {t.duplicate}
-                        </button>
-                        <button style={styles.deleteBtn} onClick={() => deleteProduct(p.id)}>
-                          {t.delete}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <p style={styles.note}>{t.catalogueNote}</p>
-          </Card>
-        )}
-
-        {page === "assumptions" && (
-          <Card title={t.assumptionsTitle}>
-            <div style={styles.formGrid}>
-              {Object.entries(assumptions).map(([key, value]) => (
-                <NumberInput
-                  key={key}
-                  label={prettyLabel(key)}
-                  value={value}
-                  step="0.01"
-                  onChange={(v) => setAssumptions({ ...assumptions, [key]: Number(v) })}
-                />
-              ))}
-            </div>
-          </Card>
         )}
 
         {page === "proposal" && (
-          <Card title={`${t.proposalSummary} ${client}`}>
+          <Card title={t.proposalTitle}>
             <p style={styles.largeText}>
-              VIMALUX has analysed <b>{num(totals.qty)}</b> luminaires. The selected package is <b>{packageName(packageType)}</b>.
+              VIMALUX has analysed <b>{num(totals.qty)}</b> luminaires for <b>{client}</b>.
             </p>
             <p style={styles.largeText}>
-              Total customer CAPEX is <b>{eur(totals.customerCapex)}</b>. Estimated annual net saving is <b>{eur(totals.annualNetSaving)}</b>, equal to a customer ROI of <b>{(totals.roi * 100).toFixed(1)}%</b> per year and a simple payback of <b>{totals.payback.toFixed(1)} years</b>.
+              The selected solution is <b>{packageName(packageType)}</b>. The estimated total project CAPEX is <b>{eur(totals.customerCapex)}</b>.
             </p>
             <p style={styles.largeText}>
-              Over <b>{assumptions.years}</b> years, estimated net customer benefit is <b>{eur(totals.netBenefit)}</b>, with annual CO₂ reduction of <b>{num(totals.co2)} t</b>.
+              Estimated annual net saving is <b>{eur(totals.annualNetSaving)}</b>, equal to a customer ROI of <b>{(totals.roi * 100).toFixed(1)}%</b> per year and a simple payback of <b>{totals.payback.toFixed(1)} years</b>.
             </p>
-            <p style={styles.note}>{t.preliminary}</p>
-            <button style={styles.darkBtn} onClick={() => window.print()}>
-              {t.print}
-            </button>
+            <p style={styles.largeText}>
+              Over 15 years, estimated net customer benefit is <b>{eur(totals.netBenefit)}</b>, with an annual CO₂ reduction of <b>{num(totals.co2)} t</b>.
+            </p>
+            <p style={styles.note}>{t.disclaimer}</p>
           </Card>
         )}
       </main>
     </div>
   );
-}
-
-function PackageSelector({ t, packageType, setPackageType }) {
-  const b = (type) => ({
-    padding: "14px 18px",
-    borderRadius: 14,
-    border: "none",
-    cursor: "pointer",
-    fontWeight: 900,
-    fontSize: 15,
-    background: packageType === type ? "#0f172a" : "#e2e8f0",
-    color: packageType === type ? "white" : "#0f172a"
-  });
-
-  return (
-    <section style={styles.card}>
-      <h2 style={{ marginTop: 0 }}>{t.package}</h2>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <button style={b("led")} onClick={() => setPackageType("led")}>
-          {t.ledOnly}
-        </button>
-        <button style={b("smart")} onClick={() => setPackageType("smart")}>
-          {t.smart}
-        </button>
-        <button style={b("premium")} onClick={() => setPackageType("premium")}>
-          {t.premium}
-        </button>
-      </div>
-    </section>
-  );
-}
-
-function Nav({ label, id, page, setPage }) {
-  return (
-    <button style={navStyle(page === id)} onClick={() => setPage(id)}>
-      {label}
-    </button>
-  );
-}
-
-function navStyle(active) {
-  return {
-    width: "100%",
-    padding: "14px 16px",
-    border: 0,
-    borderRadius: 14,
-    fontWeight: 800,
-    textAlign: "left",
-    cursor: "pointer",
-    marginBottom: 8,
-    background: active ? "#0f172a" : "transparent",
-    color: active ? "white" : "#0f172a"
-  };
 }
 
 function Kpi({ title, value }) {
@@ -971,49 +434,55 @@ function Card({ title, children }) {
   );
 }
 
-function NumberInput({ label, value, onChange, step = "1" }) {
-  return (
-    <label style={styles.label}>
-      {label}
-      <input
-        style={styles.input}
-        type="number"
-        step={step}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
-  );
-}
-
 function Compare({ label, value, max }) {
   const width = Math.max(5, (Number(value) / Math.max(Number(max), 1)) * 100);
 
   return (
     <div style={{ marginBottom: 18 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+      <div style={styles.compareTop}>
         <b>{label}</b>
         <span>{num(value)} kWh/year</span>
       </div>
-      <div style={{ background: "#e2e8f0", borderRadius: 999, height: 18 }}>
-        <div
-          style={{
-            background: "#0f172a",
-            width: `${width}%`,
-            height: 18,
-            borderRadius: 999
-          }}
-        />
+      <div style={styles.barBg}>
+        <div style={{ ...styles.bar, width: `${width}%` }} />
       </div>
     </div>
   );
+}
+
+function navStyle(active) {
+  return {
+    width: "100%",
+    padding: "14px 16px",
+    border: 0,
+    borderRadius: 14,
+    fontWeight: 800,
+    textAlign: "left",
+    cursor: "pointer",
+    marginBottom: 8,
+    background: active ? "#0f172a" : "transparent",
+    color: active ? "white" : "#0f172a"
+  };
+}
+
+function packageStyle(active) {
+  return {
+    padding: "16px 18px",
+    borderRadius: 16,
+    border: "none",
+    cursor: "pointer",
+    fontWeight: 900,
+    fontSize: 16,
+    background: active ? "#0f172a" : "#e2e8f0",
+    color: active ? "white" : "#0f172a"
+  };
 }
 
 const styles = {
   app: {
     minHeight: "100vh",
     display: "grid",
-    gridTemplateColumns: "260px 1fr",
+    gridTemplateColumns: "250px 1fr",
     background: "#f4f6f8",
     color: "#0b1220",
     fontFamily: "Arial, sans-serif"
@@ -1027,7 +496,12 @@ const styles = {
     fontWeight: 900,
     letterSpacing: "0.14em",
     marginBottom: 20,
-    fontSize: 20
+    fontSize: 22
+  },
+  langWrap: {
+    display: "flex",
+    gap: 8,
+    marginBottom: 22
   },
   langBtn: {
     background: "#e2e8f0",
@@ -1062,6 +536,10 @@ const styles = {
     alignItems: "center",
     marginBottom: 24
   },
+  heroActions: {
+    display: "flex",
+    gap: 10
+  },
   eyebrow: {
     color: "#93c5fd",
     letterSpacing: "0.16em",
@@ -1094,32 +572,34 @@ const styles = {
     fontWeight: 900,
     cursor: "pointer"
   },
-  smallBtn: {
-    background: "#0f172a",
-    color: "white",
-    border: 0,
-    borderRadius: 10,
-    padding: "8px 10px",
-    fontWeight: 800,
+  uploadCard: {
+    background: "white",
+    borderRadius: 24,
+    padding: 24,
+    boxShadow: "0 8px 24px rgba(15,23,42,.06)",
+    marginBottom: 24,
+    display: "flex",
+    gap: 16,
+    alignItems: "center",
+    flexWrap: "wrap"
+  },
+  uploadBox: {
+    minWidth: 320,
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    border: "2px dashed #cbd5e1",
+    borderRadius: 20,
+    padding: 28,
     cursor: "pointer",
-    marginRight: 6
+    background: "#f8fafc"
   },
-  deleteBtn: {
-    background: "#dc2626",
-    color: "white",
-    border: 0,
-    borderRadius: 10,
-    padding: "8px 10px",
-    fontWeight: 800,
-    cursor: "pointer"
-  },
-  status: {
-    background: "#dcfce7",
-    color: "#166534",
-    padding: 14,
-    borderRadius: 14,
-    fontWeight: 900,
-    marginBottom: 18
+  packageGrid: {
+    display: "flex",
+    gap: 12,
+    flexWrap: "wrap"
   },
   kpiGrid: {
     display: "grid",
@@ -1156,121 +636,20 @@ const styles = {
     marginBottom: 24,
     overflow: "hidden"
   },
-  catalogTools: {
+  compareTop: {
     display: "flex",
-    gap: 10,
-    marginBottom: 18,
-    flexWrap: "wrap"
+    justifyContent: "space-between",
+    marginBottom: 6
   },
-  importPanel: {
-    background: "#f8fafc",
-    border: "1px solid #e2e8f0",
-    borderRadius: 18,
-    padding: 18,
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: 16,
-    alignItems: "center"
-  },
-  panelTitle: {
-    fontWeight: 900,
-    color: "#334155"
-  },
-  choiceBtn: {
+  barBg: {
     background: "#e2e8f0",
-    color: "#0f172a",
-    border: 0,
-    borderRadius: 12,
-    padding: "10px 14px",
-    fontWeight: 900,
-    cursor: "pointer"
+    borderRadius: 999,
+    height: 18
   },
-  choiceActive: {
+  bar: {
     background: "#0f172a",
-    color: "white",
-    border: 0,
-    borderRadius: 12,
-    padding: "10px 14px",
-    fontWeight: 900,
-    cursor: "pointer"
-  },
-  catalogUpload: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    border: "2px dashed #cbd5e1",
-    borderRadius: 16,
-    padding: 22,
-    cursor: "pointer",
-    background: "white",
-    textAlign: "center"
-  },
-  formGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: 16,
-    marginBottom: 20
-  },
-  label: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
-    fontSize: 13,
-    fontWeight: 800,
-    color: "#475569"
-  },
-  input: {
-    width: "100%",
-    padding: "12px 13px",
-    border: "1px solid #cbd5e1",
-    borderRadius: 12,
-    fontSize: 14,
-    boxSizing: "border-box",
-    minWidth: 130
-  },
-  uploadBox: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    border: "2px dashed #cbd5e1",
-    borderRadius: 20,
-    padding: 40,
-    cursor: "pointer",
-    background: "#f8fafc"
-  },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    minWidth: 1700
-  },
-  th: {
-    textAlign: "left",
-    padding: 12,
-    color: "#64748b",
-    fontSize: 12,
-    borderBottom: "1px solid #e2e8f0",
-    whiteSpace: "nowrap"
-  },
-  td: {
-    padding: 10,
-    borderBottom: "1px solid #e2e8f0",
-    verticalAlign: "middle",
-    minWidth: 150,
-    whiteSpace: "nowrap"
-  },
-  badge: {
-    display: "inline-block",
-    background: "#f1f5f9",
-    borderRadius: 12,
-    padding: "10px 14px",
-    fontWeight: 900,
-    whiteSpace: "nowrap",
-    minWidth: 80,
-    textAlign: "center"
+    height: 18,
+    borderRadius: 999
   },
   note: {
     background: "#f1f5f9",
