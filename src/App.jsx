@@ -31,7 +31,7 @@ const packs = {
 
 const labels = {
   EN: {
-    version: "VIMALUX LIGHTING AI PORTAL · VERSION 9C",
+    version: "VIMALUX LIGHTING AI PORTAL · VERSION 9C FIXED",
     title: "Customer ROI Closing Engine",
     subtitle: "Customer-facing LED vs Smart vs Smart + PowerAiD ROI comparison.",
     importExcel: "Import Excel",
@@ -89,7 +89,7 @@ const labels = {
     noRows: "No valid VIMALUX audit rows found. Check quantity in column D and wattage in column G."
   },
   IT: {
-    version: "VIMALUX LIGHTING AI PORTAL · VERSIONE 9C",
+    version: "VIMALUX LIGHTING AI PORTAL · VERSIONE 9C FIXED",
     title: "Motore ROI Cliente",
     subtitle: "Confronto ROI cliente tra LED, Smart e Smart + PowerAiD.",
     importExcel: "Importa Excel",
@@ -149,11 +149,17 @@ const labels = {
 };
 
 function eur(v) {
-  return new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v || 0);
+  return new Intl.NumberFormat("en-IE", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0
+  }).format(v || 0);
 }
 
 function num(v) {
-  return new Intl.NumberFormat("en-IE", { maximumFractionDigits: 0 }).format(v || 0);
+  return new Intl.NumberFormat("en-IE", {
+    maximumFractionDigits: 0
+  }).format(v || 0);
 }
 
 export default function App() {
@@ -198,29 +204,35 @@ export default function App() {
   function recommendProduct(watt) {
     const sorted = [...products].sort((a, b) => Number(a.watt) - Number(b.watt));
     const w = Number(watt);
-    if (w >= 180) return products.find(p => p.id === "main90") || sorted[sorted.length - 1];
-    if (w >= 120) return products.find(p => p.id === "street60") || sorted.find(p => p.watt >= 60) || sorted[0];
-    if (w >= 70) return products.find(p => p.id === "urban45") || sorted.find(p => p.watt >= 45) || sorted[0];
-    return products.find(p => p.id === "decor35") || sorted[0];
+
+    if (w >= 180) return products.find((p) => p.id === "main90") || sorted[sorted.length - 1];
+    if (w >= 120) return products.find((p) => p.id === "street60") || sorted.find((p) => p.watt >= 60) || sorted[0];
+    if (w >= 70) return products.find((p) => p.id === "urban45") || sorted.find((p) => p.watt >= 45) || sorted[0];
+
+    return products.find((p) => p.id === "decor35") || sorted[0];
   }
 
   const analysed = useMemo(() => {
-    return rows.map(row => {
+    return rows.map((row) => {
       const product = recommendProduct(row.existingWatt);
-      const beforeKwh = Number(row.existingWatt) * Number(row.qty) * Number(row.hours) / 1000;
-      const ledKwh = Number(product.watt) * Number(row.qty) * Number(row.hours) / 1000;
+      const beforeKwh = (Number(row.existingWatt) * Number(row.qty) * Number(row.hours)) / 1000;
+      const ledKwh = (Number(product.watt) * Number(row.qty) * Number(row.hours)) / 1000;
       const savingPct = extraSavingPct(packageType);
       const finalKwh = ledKwh * (1 - savingPct / 100);
 
       const energySaving = (beforeKwh - finalKwh) * Number(assumptions.energyPrice);
-      const maintenanceSaving = Number(row.qty) * Number(assumptions.maintenanceCost) * Number(assumptions.maintenanceReduction) / 100;
-      const serviceFee = Number(row.qty) * packageFee(packageType);
+      const maintenanceSaving =
+        Number(row.qty) *
+        Number(assumptions.maintenanceCost) *
+        Number(assumptions.maintenanceReduction) /
+        100;
 
+      const serviceFee = Number(row.qty) * packageFee(packageType);
       const annualNetSaving = energySaving + maintenanceSaving - serviceFee;
       const customerCapex = Number(row.qty) * (Number(product.sellPrice) + Number(product.install));
       const payback = annualNetSaving > 0 ? customerCapex / annualNetSaving : 0;
       const roi = customerCapex > 0 ? annualNetSaving / customerCapex : 0;
-      const co2 = (beforeKwh - finalKwh) * Number(assumptions.co2Factor) / 1000;
+      const co2 = ((beforeKwh - finalKwh) * Number(assumptions.co2Factor)) / 1000;
 
       return {
         ...row,
@@ -241,32 +253,36 @@ export default function App() {
   }, [rows, products, assumptions, packageType]);
 
   const totals = useMemo(() => {
-    const t = analysed.reduce((a, r) => {
-      a.qty += Number(r.qty);
-      a.beforeKwh += r.beforeKwh;
-      a.finalKwh += r.finalKwh;
-      a.customerCapex += r.customerCapex;
-      a.annualNetSaving += r.annualNetSaving;
-      a.energySaving += r.energySaving;
-      a.maintenanceSaving += r.maintenanceSaving;
-      a.serviceFee += r.serviceFee;
-      a.co2 += r.co2;
-      return a;
-    }, {
-      qty: 0,
-      beforeKwh: 0,
-      finalKwh: 0,
-      customerCapex: 0,
-      annualNetSaving: 0,
-      energySaving: 0,
-      maintenanceSaving: 0,
-      serviceFee: 0,
-      co2: 0
-    });
+    const t = analysed.reduce(
+      (a, r) => {
+        a.qty += Number(r.qty);
+        a.beforeKwh += r.beforeKwh;
+        a.finalKwh += r.finalKwh;
+        a.customerCapex += r.customerCapex;
+        a.annualNetSaving += r.annualNetSaving;
+        a.energySaving += r.energySaving;
+        a.maintenanceSaving += r.maintenanceSaving;
+        a.serviceFee += r.serviceFee;
+        a.co2 += r.co2;
+        return a;
+      },
+      {
+        qty: 0,
+        beforeKwh: 0,
+        finalKwh: 0,
+        customerCapex: 0,
+        annualNetSaving: 0,
+        energySaving: 0,
+        maintenanceSaving: 0,
+        serviceFee: 0,
+        co2: 0
+      }
+    );
 
     t.payback = t.annualNetSaving > 0 ? t.customerCapex / t.annualNetSaving : 0;
     t.roi = t.customerCapex > 0 ? t.annualNetSaving / t.customerCapex : 0;
     t.netBenefit = t.annualNetSaving * Number(assumptions.years) - t.customerCapex;
+
     return t;
   }, [analysed, assumptions]);
 
@@ -298,7 +314,7 @@ export default function App() {
           existingWatt: Number(r[6] || 0),
           hours: Number(r[8] || 4200)
         }))
-        .filter(r => r.qty > 0 && r.existingWatt > 0);
+        .filter((r) => r.qty > 0 && r.existingWatt > 0);
 
       if (parsed.length > bestRows.length) bestRows = parsed;
     }
@@ -313,29 +329,37 @@ export default function App() {
   }
 
   function updateProduct(id, field, value) {
-    setProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
+    setProducts((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, [field]: value } : p))
+    );
   }
 
   function addProduct() {
-    setProducts(prev => [...prev, {
-      id: `product_${Date.now()}`,
-      name: "New Smart LED Product",
-      watt: 60,
-      lumen: 10000,
-      sellPrice: 150,
-      install: 45,
-      category: "New Category",
-      zhaga: "Yes",
-      d4i: "Yes"
-    }]);
+    setProducts((prev) => [
+      ...prev,
+      {
+        id: `product_${Date.now()}`,
+        name: "New Smart LED Product",
+        watt: 60,
+        lumen: 10000,
+        sellPrice: 150,
+        install: 45,
+        category: "New Category",
+        zhaga: "Yes",
+        d4i: "Yes"
+      }
+    ]);
   }
 
   function duplicateProduct(product) {
-    setProducts(prev => [...prev, {
-      ...product,
-      id: `product_${Date.now()}`,
-      name: `${product.name} Copy`
-    }]);
+    setProducts((prev) => [
+      ...prev,
+      {
+        ...product,
+        id: `product_${Date.now()}`,
+        name: `${product.name} Copy`
+      }
+    ]);
   }
 
   function deleteProduct(id) {
@@ -343,7 +367,7 @@ export default function App() {
       alert("You must keep at least one product.");
       return;
     }
-    setProducts(prev => prev.filter(p => p.id !== id));
+    setProducts((prev) => prev.filter((p) => p.id !== id));
   }
 
   function resetCatalogue() {
@@ -356,43 +380,55 @@ export default function App() {
     localStorage.removeItem("vml_assumptions_v9c");
     localStorage.removeItem("vml_rows_v9c");
     localStorage.removeItem("vml_package_v9c");
+
     setProducts(defaultProducts);
     setAssumptions(defaultAssumptions);
     setRows(demoRows);
     setPackageType("premium");
     setClient("Comune Demo");
+
     flash(t.clearDone);
   }
 
   function updateRow(id, field, value) {
-    setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+    setRows((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, [field]: value } : r))
+    );
   }
 
   function exportAnalysis() {
-    const header = "package,area,existingType,existingWatt,qty,hours,recommendedProduct,newWatt,totalCustomerCapex,annualServiceFee,annualNetSaving,payback,customerRoi,co2";
-    const body = analysed.map(r => [
-      packageName(packageType),
-      r.area,
-      r.existingType,
-      r.existingWatt,
-      r.qty,
-      r.hours,
-      r.product.name,
-      r.product.watt,
-      Math.round(r.customerCapex),
-      Math.round(r.serviceFee),
-      Math.round(r.annualNetSaving),
-      r.payback.toFixed(1),
-      (r.roi * 100).toFixed(1) + "%",
-      r.co2.toFixed(1)
-    ].join(",")).join("\n");
+    const header =
+      "package,area,existingType,existingWatt,qty,hours,recommendedProduct,newWatt,totalCustomerCapex,annualServiceFee,annualNetSaving,payback,customerRoi,co2";
+
+    const body = analysed
+      .map((r) =>
+        [
+          packageName(packageType),
+          r.area,
+          r.existingType,
+          r.existingWatt,
+          r.qty,
+          r.hours,
+          r.product.name,
+          r.product.watt,
+          Math.round(r.customerCapex),
+          Math.round(r.serviceFee),
+          Math.round(r.annualNetSaving),
+          r.payback.toFixed(1),
+          (r.roi * 100).toFixed(1) + "%",
+          r.co2.toFixed(1)
+        ].join(",")
+      )
+      .join("\n");
 
     const blob = new Blob([header + "\n" + body], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
+
     a.href = url;
-    a.download = "vimalux_customer_roi_v9c.csv";
+    a.download = "vimalux_customer_roi_v9c_fixed.csv";
     a.click();
+
     URL.revokeObjectURL(url);
   }
 
@@ -407,8 +443,18 @@ export default function App() {
         <div style={styles.logo}>VIMALUX</div>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 22 }}>
-          <button style={lang === "EN" ? styles.langActive : styles.langBtn} onClick={() => setLang("EN")}>EN</button>
-          <button style={lang === "IT" ? styles.langActive : styles.langBtn} onClick={() => setLang("IT")}>IT</button>
+          <button
+            style={lang === "EN" ? styles.langActive : styles.langBtn}
+            onClick={() => setLang("EN")}
+          >
+            EN
+          </button>
+          <button
+            style={lang === "IT" ? styles.langActive : styles.langBtn}
+            onClick={() => setLang("IT")}
+          >
+            IT
+          </button>
         </div>
 
         <Nav label={t.importExcel} id="import" page={page} setPage={setPage} />
@@ -427,15 +473,24 @@ export default function App() {
             <h1 style={styles.h1}>{t.title}</h1>
             <p style={styles.subtitle}>{t.subtitle}</p>
           </div>
+
           <div style={{ display: "flex", gap: 10 }}>
-            <button style={styles.whiteBtn} onClick={exportAnalysis}>{t.export}</button>
-            <button style={styles.whiteBtn} onClick={() => window.print()}>{t.print}</button>
+            <button style={styles.whiteBtn} onClick={exportAnalysis}>
+              {t.export}
+            </button>
+            <button style={styles.whiteBtn} onClick={() => window.print()}>
+              {t.print}
+            </button>
           </div>
         </section>
 
         {statusMsg && <div style={styles.status}>{statusMsg}</div>}
 
-        <PackageSelector t={t} packageType={packageType} setPackageType={setPackageType} />
+        <PackageSelector
+          t={t}
+          packageType={packageType}
+          setPackageType={setPackageType}
+        />
 
         <section style={styles.kpiGrid}>
           <Kpi title={t.client} value={client} />
@@ -453,14 +508,24 @@ export default function App() {
           <section style={styles.grid2}>
             <Card title={t.uploadTitle}>
               <label style={styles.uploadBox}>
-                <input type="file" accept=".xlsx,.xls" onChange={importExcel} style={{ display: "none" }} />
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={importExcel}
+                  style={{ display: "none" }}
+                />
                 <b>{t.uploadMain}</b>
                 <span>{t.uploadInfo1}</span>
                 <span>{t.uploadInfo2}</span>
               </label>
+
               <div style={{ marginTop: 18, display: "flex", gap: 10 }}>
-                <button style={styles.darkBtn} onClick={resetDemo}>{t.loadDemo}</button>
-                <button style={styles.darkBtn} onClick={() => setPage("products")}>{t.editPrices}</button>
+                <button style={styles.darkBtn} onClick={resetDemo}>
+                  {t.loadDemo}
+                </button>
+                <button style={styles.darkBtn} onClick={() => setPage("products")}>
+                  {t.editPrices}
+                </button>
               </div>
             </Card>
 
@@ -479,6 +544,7 @@ export default function App() {
             <Card title={t.energyComparison}>
               <Compare label={t.existingSystem} value={totals.beforeKwh} max={totals.beforeKwh} />
               <Compare label={t.newSystem} value={totals.finalKwh} max={totals.beforeKwh} />
+
               <p style={styles.note}>
                 Energy price: {assumptions.energyPrice} €/kWh. Extra saving: {extraSavingPct(packageType)}%.
               </p>
@@ -499,24 +565,51 @@ export default function App() {
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    {["Area", "Existing type", "Old W", "Qty", "Hours", "Recommended", "New W", "Customer CAPEX", "Service fee", "Net saving", "Payback"].map(h => (
-                      <th key={h} style={styles.th}>{h}</th>
+                    {[
+                      "Area",
+                      "Existing type",
+                      "Old W",
+                      "Qty",
+                      "Hours",
+                      "Recommended",
+                      "New W",
+                      "Customer CAPEX",
+                      "Service fee",
+                      "Net saving",
+                      "Payback"
+                    ].map((h) => (
+                      <th key={h} style={styles.th}>
+                        {h}
+                      </th>
                     ))}
                   </tr>
                 </thead>
+
                 <tbody>
-                  {analysed.map(r => (
+                  {analysed.map((r) => (
                     <tr key={r.id}>
-                      <td style={styles.td}><input style={styles.input} value={r.area} onChange={e => updateRow(r.id, "area", e.target.value)} /></td>
-                      <td style={styles.td}><input style={styles.input} value={r.existingType} onChange={e => updateRow(r.id, "existingType", e.target.value)} /></td>
-                      <td style={styles.td}><input style={styles.input} type="number" value={r.existingWatt} onChange={e => updateRow(r.id, "existingWatt", Number(e.target.value))} /></td>
-                      <td style={styles.td}><input style={styles.input} type="number" value={r.qty} onChange={e => updateRow(r.id, "qty", Number(e.target.value))} /></td>
-                      <td style={styles.td}><input style={styles.input} type="number" value={r.hours} onChange={e => updateRow(r.id, "hours", Number(e.target.value))} /></td>
+                      <td style={styles.td}>
+                        <input style={styles.input} value={r.area} onChange={(e) => updateRow(r.id, "area", e.target.value)} />
+                      </td>
+                      <td style={styles.td}>
+                        <input style={styles.input} value={r.existingType} onChange={(e) => updateRow(r.id, "existingType", e.target.value)} />
+                      </td>
+                      <td style={styles.td}>
+                        <input style={styles.input} type="number" value={r.existingWatt} onChange={(e) => updateRow(r.id, "existingWatt", Number(e.target.value))} />
+                      </td>
+                      <td style={styles.td}>
+                        <input style={styles.input} type="number" value={r.qty} onChange={(e) => updateRow(r.id, "qty", Number(e.target.value))} />
+                      </td>
+                      <td style={styles.td}>
+                        <input style={styles.input} type="number" value={r.hours} onChange={(e) => updateRow(r.id, "hours", Number(e.target.value))} />
+                      </td>
                       <td style={styles.td}>{r.product.name}</td>
                       <td style={styles.td}>{r.product.watt}W</td>
                       <td style={styles.td}>{eur(r.customerCapex)}</td>
                       <td style={styles.td}>{eur(r.serviceFee)}</td>
-                      <td style={styles.td}><b>{eur(r.annualNetSaving)}</b></td>
+                      <td style={styles.td}>
+                        <b>{eur(r.annualNetSaving)}</b>
+                      </td>
                       <td style={styles.td}>{r.payback.toFixed(1)}y</td>
                     </tr>
                   ))}
@@ -529,35 +622,79 @@ export default function App() {
         {page === "products" && (
           <Card title={t.productTitle}>
             <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
-              <button style={styles.darkBtn} onClick={addProduct}>{t.addProduct}</button>
-              <button style={styles.darkBtn} onClick={resetCatalogue}>{t.resetCatalogue}</button>
-              <button style={styles.deleteBtn} onClick={clearLocalData}>{t.clearLocal}</button>
+              <button style={styles.darkBtn} onClick={addProduct}>
+                {t.addProduct}
+              </button>
+              <button style={styles.darkBtn} onClick={resetCatalogue}>
+                {t.resetCatalogue}
+              </button>
+              <button style={styles.deleteBtn} onClick={clearLocalData}>
+                {t.clearLocal}
+              </button>
             </div>
 
             <div style={{ overflowX: "auto" }}>
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    {["Name", "Category", "Watt", "Lumen", "Sell €", "Install €", "Unit CAPEX €", "Zhaga", "D4i", "Actions"].map(h => (
-                      <th key={h} style={styles.th}>{h}</th>
+                    {[
+                      "Name",
+                      "Category",
+                      "Watt",
+                      "Lumen",
+                      "Sell €",
+                      "Install €",
+                      "Unit CAPEX €",
+                      "Zhaga",
+                      "D4i",
+                      "Actions"
+                    ].map((h) => (
+                      <th key={h} style={styles.th}>
+                        {h}
+                      </th>
                     ))}
                   </tr>
                 </thead>
+
                 <tbody>
-                  {products.map(p => (
+                  {products.map((p) => (
                     <tr key={p.id}>
-                      <td style={styles.td}><input style={styles.input} value={p.name} onChange={e => updateProduct(p.id, "name", e.target.value)} /></td>
-                      <td style={styles.td}><input style={styles.input} value={p.category} onChange={e => updateProduct(p.id, "category", e.target.value)} /></td>
-                      <td style={styles.td}><input style={styles.input} type="number" value={p.watt} onChange={e => updateProduct(p.id, "watt", Number(e.target.value))} /></td>
-                      <td style={styles.td}><input style={styles.input} type="number" value={p.lumen} onChange={e => updateProduct(p.id, "lumen", Number(e.target.value))} /></td>
-                      <td style={styles.td}><input style={styles.input} type="number" value={p.sellPrice} onChange={e => updateProduct(p.id, "sellPrice", Number(e.target.value))} /></td>
-                      <td style={styles.td}><input style={styles.input} type="number" value={p.install} onChange={e => updateProduct(p.id, "install", Number(e.target.value))} /></td>
-                      <td style={styles.td}><b>{eur(Number(p.sellPrice) + Number(p.install))}</b></td>
-                      <td style={styles.td}><input style={styles.input} value={p.zhaga} onChange={e => updateProduct(p.id, "zhaga", e.target.value)} /></td>
-                      <td style={styles.td}><input style={styles.input} value={p.d4i} onChange={e => updateProduct(p.id, "d4i", e.target.value)} /></td>
                       <td style={styles.td}>
-                        <button style={styles.smallBtn} onClick={() => duplicateProduct(p)}>{t.duplicate}</button>
-                        <button style={styles.deleteBtn} onClick={() => deleteProduct(p.id)}>{t.delete}</button>
+                        <input style={styles.input} value={p.name} onChange={(e) => updateProduct(p.id, "name", e.target.value)} />
+                      </td>
+                      <td style={styles.td}>
+                        <input style={styles.input} value={p.category} onChange={(e) => updateProduct(p.id, "category", e.target.value)} />
+                      </td>
+                      <td style={styles.td}>
+                        <input style={styles.input} type="number" value={p.watt} onChange={(e) => updateProduct(p.id, "watt", Number(e.target.value))} />
+                      </td>
+                      <td style={styles.td}>
+                        <input style={styles.input} type="number" value={p.lumen} onChange={(e) => updateProduct(p.id, "lumen", Number(e.target.value))} />
+                      </td>
+                      <td style={styles.td}>
+                        <input style={styles.input} type="number" value={p.sellPrice} onChange={(e) => updateProduct(p.id, "sellPrice", Number(e.target.value))} />
+                      </td>
+                      <td style={styles.td}>
+                        <input style={styles.input} type="number" value={p.install} onChange={(e) => updateProduct(p.id, "install", Number(e.target.value))} />
+                      </td>
+                      <td style={styles.td}>
+                        <span style={styles.badge}>
+                          {eur(Number(p.sellPrice) + Number(p.install))}
+                        </span>
+                      </td>
+                      <td style={styles.td}>
+                        <input style={styles.input} value={p.zhaga} onChange={(e) => updateProduct(p.id, "zhaga", e.target.value)} />
+                      </td>
+                      <td style={styles.td}>
+                        <input style={styles.input} value={p.d4i} onChange={(e) => updateProduct(p.id, "d4i", e.target.value)} />
+                      </td>
+                      <td style={styles.td}>
+                        <button style={styles.smallBtn} onClick={() => duplicateProduct(p)}>
+                          {t.duplicate}
+                        </button>
+                        <button style={styles.deleteBtn} onClick={() => deleteProduct(p.id)}>
+                          {t.delete}
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -573,7 +710,13 @@ export default function App() {
           <Card title={t.assumptionsTitle}>
             <div style={styles.formGrid}>
               {Object.entries(assumptions).map(([key, value]) => (
-                <NumberInput key={key} label={prettyLabel(key)} value={value} step="0.01" onChange={v => setAssumptions({ ...assumptions, [key]: Number(v) })} />
+                <NumberInput
+                  key={key}
+                  label={prettyLabel(key)}
+                  value={value}
+                  step="0.01"
+                  onChange={(v) => setAssumptions({ ...assumptions, [key]: Number(v) })}
+                />
               ))}
             </div>
           </Card>
@@ -591,7 +734,9 @@ export default function App() {
               Over <b>{assumptions.years}</b> years, estimated net customer benefit is <b>{eur(totals.netBenefit)}</b>, with annual CO₂ reduction of <b>{num(totals.co2)} t</b>.
             </p>
             <p style={styles.note}>{t.preliminary}</p>
-            <button style={styles.darkBtn} onClick={() => window.print()}>{t.print}</button>
+            <button style={styles.darkBtn} onClick={() => window.print()}>
+              {t.print}
+            </button>
           </Card>
         )}
       </main>
@@ -609,6 +754,7 @@ function prettyLabel(key) {
     years: "Analysis years",
     co2Factor: "CO₂ factor kg/kWh"
   };
+
   return map[key] || key;
 }
 
@@ -628,16 +774,26 @@ function PackageSelector({ t, packageType, setPackageType }) {
     <section style={styles.card}>
       <h2 style={{ marginTop: 0 }}>{t.package}</h2>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <button style={b("led")} onClick={() => setPackageType("led")}>{t.ledOnly}</button>
-        <button style={b("smart")} onClick={() => setPackageType("smart")}>{t.smart}</button>
-        <button style={b("premium")} onClick={() => setPackageType("premium")}>{t.premium}</button>
+        <button style={b("led")} onClick={() => setPackageType("led")}>
+          {t.ledOnly}
+        </button>
+        <button style={b("smart")} onClick={() => setPackageType("smart")}>
+          {t.smart}
+        </button>
+        <button style={b("premium")} onClick={() => setPackageType("premium")}>
+          {t.premium}
+        </button>
       </div>
     </section>
   );
 }
 
 function Nav({ label, id, page, setPage }) {
-  return <button style={navStyle(page === id)} onClick={() => setPage(id)}>{label}</button>;
+  return (
+    <button style={navStyle(page === id)} onClick={() => setPage(id)}>
+      {label}
+    </button>
+  );
 }
 
 function navStyle(active) {
@@ -677,13 +833,20 @@ function NumberInput({ label, value, onChange, step = "1" }) {
   return (
     <label style={styles.label}>
       {label}
-      <input style={styles.input} type="number" step={step} value={value} onChange={e => onChange(e.target.value)} />
+      <input
+        style={styles.input}
+        type="number"
+        step={step}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
     </label>
   );
 }
 
 function Compare({ label, value, max }) {
   const width = Math.max(5, (Number(value) / Math.max(Number(max), 1)) * 100);
+
   return (
     <div style={{ marginBottom: 18 }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
@@ -691,41 +854,241 @@ function Compare({ label, value, max }) {
         <span>{num(value)} kWh/year</span>
       </div>
       <div style={{ background: "#e2e8f0", borderRadius: 999, height: 18 }}>
-        <div style={{ background: "#0f172a", width: `${width}%`, height: 18, borderRadius: 999 }} />
+        <div
+          style={{
+            background: "#0f172a",
+            width: `${width}%`,
+            height: 18,
+            borderRadius: 999
+          }}
+        />
       </div>
     </div>
   );
 }
 
 const styles = {
-  app: { minHeight: "100vh", display: "grid", gridTemplateColumns: "260px 1fr", background: "#f4f6f8", color: "#0b1220", fontFamily: "Arial, sans-serif" },
-  sidebar: { background: "white", padding: 24, borderRight: "1px solid #e2e8f0" },
-  logo: { fontWeight: 900, letterSpacing: "0.14em", marginBottom: 20, fontSize: 20 },
-  langBtn: { background: "#e2e8f0", color: "#0f172a", border: 0, borderRadius: 10, padding: "8px 12px", fontWeight: 900, cursor: "pointer" },
-  langActive: { background: "#0f172a", color: "white", border: 0, borderRadius: 10, padding: "8px 12px", fontWeight: 900, cursor: "pointer" },
-  main: { padding: 32 },
-  hero: { background: "#07111f", color: "white", borderRadius: 28, padding: 36, display: "flex", justifyContent: "space-between", gap: 20, alignItems: "center", marginBottom: 24 },
-  eyebrow: { color: "#93c5fd", letterSpacing: "0.16em", fontSize: 12, textTransform: "uppercase" },
-  h1: { fontSize: 46, margin: "12px 0" },
-  subtitle: { color: "#dbeafe", fontSize: 18 },
-  whiteBtn: { background: "white", color: "#0f172a", border: 0, borderRadius: 14, padding: "13px 18px", fontWeight: 900, cursor: "pointer" },
-  darkBtn: { background: "#0f172a", color: "white", border: 0, borderRadius: 14, padding: "13px 18px", fontWeight: 900, cursor: "pointer" },
-  smallBtn: { background: "#0f172a", color: "white", border: 0, borderRadius: 10, padding: "8px 10px", fontWeight: 800, cursor: "pointer", marginRight: 6 },
-  deleteBtn: { background: "#dc2626", color: "white", border: 0, borderRadius: 10, padding: "8px 10px", fontWeight: 800, cursor: "pointer" },
-  status: { background: "#dcfce7", color: "#166534", padding: 14, borderRadius: 14, fontWeight: 900, marginBottom: 18 },
-  kpiGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 },
-  kpi: { background: "white", borderRadius: 22, padding: 24, boxShadow: "0 8px 24px rgba(15,23,42,.06)", marginBottom: 16 },
-  kpiTitle: { color: "#64748b", fontSize: 14 },
-  kpiValue: { fontSize: 28, fontWeight: 900, marginTop: 10 },
-  grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 },
-  card: { background: "white", borderRadius: 24, padding: 24, boxShadow: "0 8px 24px rgba(15,23,42,.06)", marginBottom: 24 },
-  formGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 20 },
-  label: { display: "flex", flexDirection: "column", gap: 8, fontSize: 13, fontWeight: 800, color: "#475569" },
-  input: { width: "100%", padding: "12px 13px", border: "1px solid #cbd5e1", borderRadius: 12, fontSize: 14 },
-  uploadBox: { display: "flex", flexDirection: "column", gap: 10, alignItems: "center", justifyContent: "center", border: "2px dashed #cbd5e1", borderRadius: 20, padding: 40, cursor: "pointer", background: "#f8fafc" },
-  table: { width: "100%", borderCollapse: "collapse", minWidth: 1450 },
-  th: { textAlign: "left", padding: 10, color: "#64748b", fontSize: 12, borderBottom: "1px solid #e2e8f0" },
-  td: { padding: 8, borderBottom: "1px solid #e2e8f0", verticalAlign: "middle" },
-  note: { background: "#f1f5f9", borderRadius: 18, padding: 16, color: "#475569", lineHeight: 1.5 },
-  largeText: { fontSize: 18, color: "#334155", lineHeight: 1.6 }
+  app: {
+    minHeight: "100vh",
+    display: "grid",
+    gridTemplateColumns: "260px 1fr",
+    background: "#f4f6f8",
+    color: "#0b1220",
+    fontFamily: "Arial, sans-serif"
+  },
+  sidebar: {
+    background: "white",
+    padding: 24,
+    borderRight: "1px solid #e2e8f0"
+  },
+  logo: {
+    fontWeight: 900,
+    letterSpacing: "0.14em",
+    marginBottom: 20,
+    fontSize: 20
+  },
+  langBtn: {
+    background: "#e2e8f0",
+    color: "#0f172a",
+    border: 0,
+    borderRadius: 10,
+    padding: "8px 12px",
+    fontWeight: 900,
+    cursor: "pointer"
+  },
+  langActive: {
+    background: "#0f172a",
+    color: "white",
+    border: 0,
+    borderRadius: 10,
+    padding: "8px 12px",
+    fontWeight: 900,
+    cursor: "pointer"
+  },
+  main: {
+    padding: 32,
+    overflowX: "hidden"
+  },
+  hero: {
+    background: "#07111f",
+    color: "white",
+    borderRadius: 28,
+    padding: 36,
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 20,
+    alignItems: "center",
+    marginBottom: 24
+  },
+  eyebrow: {
+    color: "#93c5fd",
+    letterSpacing: "0.16em",
+    fontSize: 12,
+    textTransform: "uppercase"
+  },
+  h1: {
+    fontSize: 46,
+    margin: "12px 0"
+  },
+  subtitle: {
+    color: "#dbeafe",
+    fontSize: 18
+  },
+  whiteBtn: {
+    background: "white",
+    color: "#0f172a",
+    border: 0,
+    borderRadius: 14,
+    padding: "13px 18px",
+    fontWeight: 900,
+    cursor: "pointer"
+  },
+  darkBtn: {
+    background: "#0f172a",
+    color: "white",
+    border: 0,
+    borderRadius: 14,
+    padding: "13px 18px",
+    fontWeight: 900,
+    cursor: "pointer"
+  },
+  smallBtn: {
+    background: "#0f172a",
+    color: "white",
+    border: 0,
+    borderRadius: 10,
+    padding: "8px 10px",
+    fontWeight: 800,
+    cursor: "pointer",
+    marginRight: 6
+  },
+  deleteBtn: {
+    background: "#dc2626",
+    color: "white",
+    border: 0,
+    borderRadius: 10,
+    padding: "8px 10px",
+    fontWeight: 800,
+    cursor: "pointer"
+  },
+  status: {
+    background: "#dcfce7",
+    color: "#166534",
+    padding: 14,
+    borderRadius: 14,
+    fontWeight: 900,
+    marginBottom: 18
+  },
+  kpiGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: 16,
+    marginBottom: 24
+  },
+  kpi: {
+    background: "white",
+    borderRadius: 22,
+    padding: 24,
+    boxShadow: "0 8px 24px rgba(15,23,42,.06)",
+    marginBottom: 16
+  },
+  kpiTitle: {
+    color: "#64748b",
+    fontSize: 14
+  },
+  kpiValue: {
+    fontSize: 28,
+    fontWeight: 900,
+    marginTop: 10
+  },
+  grid2: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 16
+  },
+  card: {
+    background: "white",
+    borderRadius: 24,
+    padding: 24,
+    boxShadow: "0 8px 24px rgba(15,23,42,.06)",
+    marginBottom: 24,
+    overflow: "hidden"
+  },
+  formGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: 16,
+    marginBottom: 20
+  },
+  label: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    fontSize: 13,
+    fontWeight: 800,
+    color: "#475569"
+  },
+  input: {
+    width: "100%",
+    padding: "12px 13px",
+    border: "1px solid #cbd5e1",
+    borderRadius: 12,
+    fontSize: 14,
+    boxSizing: "border-box",
+    minWidth: 130
+  },
+  uploadBox: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    border: "2px dashed #cbd5e1",
+    borderRadius: 20,
+    padding: 40,
+    cursor: "pointer",
+    background: "#f8fafc"
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    minWidth: 1700
+  },
+  th: {
+    textAlign: "left",
+    padding: 12,
+    color: "#64748b",
+    fontSize: 12,
+    borderBottom: "1px solid #e2e8f0",
+    whiteSpace: "nowrap"
+  },
+  td: {
+    padding: 10,
+    borderBottom: "1px solid #e2e8f0",
+    verticalAlign: "middle",
+    minWidth: 150,
+    whiteSpace: "nowrap"
+  },
+  badge: {
+    display: "inline-block",
+    background: "#f1f5f9",
+    borderRadius: 12,
+    padding: "10px 14px",
+    fontWeight: 900,
+    whiteSpace: "nowrap",
+    minWidth: 80,
+    textAlign: "center"
+  },
+  note: {
+    background: "#f1f5f9",
+    borderRadius: 18,
+    padding: 16,
+    color: "#475569",
+    lineHeight: 1.5
+  },
+  largeText: {
+    fontSize: 18,
+    color: "#334155",
+    lineHeight: 1.6
+  }
 };
