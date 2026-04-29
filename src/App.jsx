@@ -5,27 +5,17 @@ import autoTable from "jspdf-autotable";
 
 /* =====================================================
    VIMALUX LIGHTING AI PORTAL
-   VERSION 30.1 – UI + CORRECTED STACKED SAVINGS ENGINE
+   VERSION 30.2 – FINAL CLEAN APP
 
-   Corrected logic:
-   1) LED Only:
-      - 55% energy saving only
-      - CAPEX = luminaire + installation
-
-   2) Smart CMS:
-      - LED saving
-      - CLO saving
-      - Smart CMS / profile saving
-      - Maintenance saving
-      - Operational value if included
-      - CAPEX = luminaire + installation + smart node
-      - OPEX = CMS fee
-
-   3) Smart + PowerAiD:
-      - Smart CMS total gross saving
-      - + PowerAiD additional saving as % on Smart CMS achieved saving
-      - CAPEX = same as Smart CMS
-      - OPEX = CMS fee + PowerAiD fee
+   Includes:
+   - Italian customer dashboard
+   - Admin/customer separation
+   - Audit import
+   - Product catalogue import in Admin only
+   - Product override in Admin only
+   - Corrected stacked savings engine
+   - Multi-page Italian PDF
+   - Excel export
 ===================================================== */
 
 const productsDefault = [
@@ -34,7 +24,7 @@ const productsDefault = [
     name: "VIMALUX Street 60",
     watt: 60,
     lumen: 10200,
-    sellPrice: 155,
+    sellPrice: 190,
     buyPrice: 110,
     install: 35,
   },
@@ -45,7 +35,7 @@ const productsDefault = [
     lumen: 15300,
     sellPrice: 210,
     buyPrice: 150,
-    install: 40,
+    install: 35,
   },
   {
     id: "highway120",
@@ -85,27 +75,30 @@ const assumptionsDefault = {
 const offers = [
   {
     id: "led",
-    title: "LED Only",
+    title: "Solo LED",
+    shortTitle: "LED Only",
     badge: "Base",
     smart: false,
     powerAid: false,
-    bestFor: "Lowest upfront CAPEX",
+    bestFor: "Minore CAPEX iniziale",
   },
   {
     id: "smart",
     title: "Smart CMS",
-    badge: "Recommended",
+    shortTitle: "Smart CMS",
+    badge: "Consigliato",
     smart: true,
     powerAid: false,
-    bestFor: "CLO + CMS + maintenance + control",
+    bestFor: "CLO + CMS + manutenzione + controllo",
   },
   {
     id: "premium",
     title: "Smart + PowerAiD",
+    shortTitle: "Smart + PowerAiD",
     badge: "Premium",
     smart: true,
     powerAid: true,
-    bestFor: "Highest stacked savings and optimization",
+    bestFor: "Massimo risparmio e ottimizzazione",
   },
 ];
 
@@ -138,6 +131,16 @@ function npv(ratePct, annualCash, years, initialCapex) {
   return value;
 }
 
+function findProductColumn(headers, names) {
+  const lower = headers.map((h) => String(h || "").toLowerCase().trim());
+  for (const name of names) {
+    const target = name.toLowerCase();
+    const idx = lower.findIndex((h) => h.includes(target));
+    if (idx >= 0) return headers[idx];
+  }
+  return null;
+}
+
 function calcCase(project, a, product, offer) {
   const qty = n(project.quantity);
   const years = n(a.proposalYears) || 10;
@@ -147,10 +150,10 @@ function calcCase(project, a, product, offer) {
 
   const oldEnergyCost = oldEnergyKwh * n(a.energyPrice);
 
-  // LED Only is always exactly 55% saving on old baseline.
+  // LED Only = 55% saving only
   const ledSaving = oldEnergyCost * (n(a.ledSavingPct) / 100);
 
-  // Smart layers are added only when Smart is selected.
+  // Smart layers only when Smart selected
   const cloSaving = offer.smart
     ? ledSaving * (n(a.cloSavingPct) / 100)
     : 0;
@@ -179,7 +182,7 @@ function calcCase(project, a, product, offer) {
     maintenanceSaving +
     (project.includeOperationalInBase ? operationalUpside : 0);
 
-  // PowerAiD is 40% on the Smart achieved saving.
+  // PowerAiD = 40% on Smart achieved saving
   const powerAidSaving = offer.powerAid
     ? smartGrossSaving * (n(a.powerAidAdditionalSavingPct) / 100)
     : 0;
@@ -255,7 +258,7 @@ export default function App() {
   const [project, setProject] = useState({
     customer: "",
     municipality: "",
-    country: "Italy",
+    country: "Italia",
     contact: "",
     quantity: 500,
     existingWatt: 100,
@@ -340,13 +343,77 @@ export default function App() {
       }));
 
       showToast(
-        `Audit imported: ${Math.round(totalQty)} luminaires / ${avg.toFixed(
+        `Audit importato: ${Math.round(totalQty)} punti luce / ${avg.toFixed(
           1
         )} W`
       );
     } catch (err) {
       console.error(err);
-      showToast("Audit import failed");
+      showToast("Errore import audit");
+    }
+
+    e.target.value = "";
+  }
+
+  async function importProductCatalogue(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+      if (!rows.length) throw new Error("No product rows");
+
+      const headers = Object.keys(rows[0]);
+
+      const nameCol = findProductColumn(headers, [
+        "name",
+        "product",
+        "prodotto",
+        "nome",
+        "model",
+      ]);
+      const wattCol = findProductColumn(headers, ["watt", "w", "power"]);
+      const lumenCol = findProductColumn(headers, ["lumen", "lm"]);
+      const sellCol = findProductColumn(headers, [
+        "sell",
+        "sellPrice",
+        "price",
+        "prezzo",
+        "sales",
+      ]);
+      const buyCol = findProductColumn(headers, ["buy", "buyPrice", "cost"]);
+      const installCol = findProductColumn(headers, [
+        "install",
+        "installation",
+        "posa",
+        "montaggio",
+      ]);
+
+      const imported = rows
+        .map((row, index) => ({
+          id: `import_${Date.now()}_${index}`,
+          name: String(row[nameCol] || `Prodotto ${index + 1}`),
+          watt: n(row[wattCol]),
+          lumen: n(row[lumenCol]),
+          sellPrice: n(row[sellCol]),
+          buyPrice: n(row[buyCol]),
+          install: n(row[installCol]),
+        }))
+        .filter((p) => p.name && p.watt > 0 && p.sellPrice > 0);
+
+      if (!imported.length) throw new Error("No valid products");
+
+      setProducts(imported);
+      setProject((p) => ({ ...p, selectedProductId: imported[0].id }));
+
+      showToast(`Catalogo prodotti importato: ${imported.length} prodotti`);
+    } catch (err) {
+      console.error(err);
+      showToast("Errore import catalogo prodotti");
     }
 
     e.target.value = "";
@@ -355,21 +422,21 @@ export default function App() {
   function exportExcel() {
     const wb = XLSX.utils.book_new();
 
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cases), "Cases");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cases), "Casi");
     XLSX.utils.book_append_sheet(
       wb,
       XLSX.utils.json_to_sheet([project]),
-      "Project"
+      "Progetto"
     );
     XLSX.utils.book_append_sheet(
       wb,
       XLSX.utils.json_to_sheet([assumptions]),
-      "Assumptions"
+      "Assunzioni"
     );
     XLSX.utils.book_append_sheet(
       wb,
       XLSX.utils.json_to_sheet(products),
-      "Products"
+      "Prodotti"
     );
 
     if (audit) {
@@ -380,7 +447,7 @@ export default function App() {
       );
     }
 
-    XLSX.writeFile(wb, "VIMALUX_V30_Stacked_Savings.xlsx");
+    XLSX.writeFile(wb, "VIMALUX_V30_2_Final.xlsx");
   }
 
   function pdfHeader(doc, title, subtitle) {
@@ -390,7 +457,7 @@ export default function App() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
     doc.setTextColor(9, 26, 58);
-    doc.text("VIMALUX Smart Lighting Proposal", 14, 13);
+    doc.text("VIMALUX Proposta Smart Lighting", 14, 13);
 
     doc.setFontSize(13);
     doc.text(title, 14, 23);
@@ -405,47 +472,47 @@ export default function App() {
     const doc = new jsPDF("p", "mm", "a4");
     const navy = [9, 26, 58];
 
-    pdfHeader(doc, "1. Executive Summary", "Commercial overview");
+    pdfHeader(doc, "1. Sintesi Esecutiva", "Panoramica commerciale");
 
     autoTable(doc, {
       startY: 42,
-      head: [["Field", "Value"]],
+      head: [["Campo", "Valore"]],
       body: [
-        ["Customer", project.customer || "-"],
-        ["Municipality", project.municipality || "-"],
-        ["Country", project.country || "-"],
-        ["Selected package", selected.title],
-        ["Quantity", project.quantity],
-        ["Existing wattage", `${project.existingWatt} W`],
-        ["Product", product.name],
+        ["Cliente", project.customer || "-"],
+        ["Comune", project.municipality || "-"],
+        ["Paese", project.country || "-"],
+        ["Pacchetto selezionato", selected.title],
+        ["Quantità", project.quantity],
+        ["Potenza media esistente", `${project.existingWatt} W`],
+        ["Prodotto", product.name],
         ["CAPEX", euro(selected.capex)],
-        ["Annual net saving", euro(selected.annualNetSaving)],
-        ["Payback", `${dec(selected.payback)} years`],
-        ["10Y net value", euro(selected.tenYearNet)],
+        ["Risparmio annuo netto", euro(selected.annualNetSaving)],
+        ["Payback", `${dec(selected.payback)} anni`],
+        ["Valore netto 10 anni", euro(selected.tenYearNet)],
       ],
       headStyles: { fillColor: navy },
     });
 
     doc.addPage();
-    pdfHeader(doc, "2. Offer Comparison", "LED vs Smart vs Premium");
+    pdfHeader(doc, "2. Confronto Pacchetti", "LED vs Smart vs Premium");
 
     autoTable(doc, {
       startY: 42,
       head: [
         [
-          "Package",
+          "Pacchetto",
           "CAPEX",
-          "Annual net",
+          "Risparmio annuo",
           "Payback",
-          "10Y net",
-          "Energy reduction",
+          "Valore 10 anni",
+          "Riduzione energia",
         ],
       ],
       body: cases.map((c) => [
         c.title,
         euro(c.capex),
         euro(c.annualNetSaving),
-        `${dec(c.payback)} yrs`,
+        `${dec(c.payback)} anni`,
         euro(c.tenYearNet),
         `${dec(c.energyReductionPct)}%`,
       ]),
@@ -454,78 +521,77 @@ export default function App() {
     });
 
     doc.addPage();
-    pdfHeader(doc, "3. Value Stack", "Corrected stacked savings engine");
+    pdfHeader(doc, "3. Value Stack", "Motore di risparmio cumulativo");
 
     autoTable(doc, {
       startY: 42,
-      head: [["Layer", "Annual value", "Logic"]],
+      head: [["Voce", "Valore annuo", "Logica"]],
       body: [
         [
-          "LED saving",
+          "Risparmio LED",
           euro(selected.ledSaving),
-          `${assumptions.ledSavingPct}% on old baseline energy cost`,
+          `${assumptions.ledSavingPct}% sul costo energia baseline`,
         ],
         [
-          "CLO saving",
+          "Risparmio CLO",
           euro(selected.cloSaving),
-          selected.smart ? `${assumptions.cloSavingPct}% on LED saving` : "Not included",
+          selected.smart
+            ? `${assumptions.cloSavingPct}% sul risparmio LED`
+            : "Non incluso",
         ],
         [
-          "Smart CMS / profile saving",
+          "Risparmio Smart CMS / profili",
           euro(selected.smartSolutionSaving),
           selected.smart
-            ? `${assumptions.smartSolutionSavingPct}% on LED saving`
-            : "Not included",
+            ? `${assumptions.smartSolutionSavingPct}% sul risparmio LED`
+            : "Non incluso",
         ],
         [
-          "Maintenance saving",
+          "Risparmio manutenzione",
           euro(selected.maintenanceSaving),
           selected.smart
-            ? `${assumptions.maintenanceSavingPct}% maintenance reduction`
-            : "Not included",
+            ? `${assumptions.maintenanceSavingPct}% riduzione manutenzione`
+            : "Non incluso",
         ],
         [
-          "Operational upside",
-          euro(selected.operationalUpside),
-          project.includeOperationalInBase
-            ? "Included in base"
-            : "Shown separately / not included",
-        ],
-        [
-          "PowerAiD saving",
+          "PowerAiD",
           euro(selected.powerAidSaving),
           selected.powerAid
-            ? `${assumptions.powerAidAdditionalSavingPct}% on Smart achieved saving`
-            : "Not included",
+            ? `${assumptions.powerAidAdditionalSavingPct}% sul risparmio Smart ottenuto`
+            : "Non incluso",
         ],
-        ["Recurring OPEX", `-${euro(selected.opex)}`, "CMS / PowerAiD annual fees"],
+        [
+          "OPEX ricorrente",
+          `-${euro(selected.opex)}`,
+          "Canone CMS / PowerAiD",
+        ],
       ],
       headStyles: { fillColor: navy },
       styles: { fontSize: 8.5 },
     });
 
     doc.addPage();
-    pdfHeader(doc, "4. Audit Baseline", "Imported customer audit sheet");
+    pdfHeader(doc, "4. Baseline Audit", "Dati importati dal file cliente");
 
     autoTable(doc, {
       startY: 42,
-      head: [["Audit parameter", "Value"]],
+      head: [["Parametro Audit", "Valore"]],
       body: [
-        ["Source file", audit?.fileName || "Manual input"],
-        ["Rows used", audit?.rows || "-"],
-        ["Quantity", project.quantity],
-        ["Average existing wattage", `${project.existingWatt} W`],
-        ["Rule", "Rows 1–29, Column D = quantity, Column G = watt"],
+        ["File sorgente", audit?.fileName || "Input manuale"],
+        ["Righe utilizzate", audit?.rows || "-"],
+        ["Quantità", project.quantity],
+        ["Potenza media esistente", `${project.existingWatt} W`],
+        ["Regola import", "Righe 1–29, Colonna D = quantità, Colonna G = watt"],
       ],
       headStyles: { fillColor: navy },
     });
 
     doc.addPage();
-    pdfHeader(doc, "5. Assumptions", "Admin modelling inputs");
+    pdfHeader(doc, "5. Assunzioni", "Input di modellazione");
 
     autoTable(doc, {
       startY: 42,
-      head: [["Parameter", "Value"]],
+      head: [["Parametro", "Valore"]],
       body: Object.entries(assumptions).map(([key, value]) => [
         key,
         String(value),
@@ -535,33 +601,33 @@ export default function App() {
     });
 
     doc.addPage();
-    pdfHeader(doc, "6. Disclaimer", "Indicative non-binding proposal");
+    pdfHeader(doc, "6. Disclaimer", "Proposta indicativa non vincolante");
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(60, 60, 60);
     doc.text(
       [
-        "This proposal is indicative and non-binding.",
+        "La presente proposta è indicativa e non vincolante.",
         "",
-        "All calculations are based on customer supplied data, imported audit inputs, standard market assumptions and estimated operating conditions.",
+        "Tutti i calcoli si basano su dati forniti dal cliente, input audit importati, assunzioni standard di mercato e condizioni operative stimate.",
         "",
-        "Final commercial terms, technical scope, financing structure, credit approval and implementation schedule remain subject to due diligence, contract negotiation and management approval.",
+        "I termini commerciali finali, il perimetro tecnico, la struttura finanziaria, l’approvazione creditizia e il piano di implementazione restano soggetti a due diligence, negoziazione contrattuale e approvazione finale.",
         "",
-        "Savings may vary depending on burn hours, tariffs, dimming profile, baseline inventory, maintenance regime and operational execution.",
+        "I risparmi possono variare in funzione delle ore di accensione, tariffe energia, profili di dimmerazione, baseline inventario, regime manutentivo ed esecuzione operativa.",
       ].join("\n"),
       14,
       48,
       { maxWidth: 180 }
     );
 
-    doc.save("VIMALUX_V30_Stacked_Savings_Proposal.pdf");
+    doc.save("VIMALUX_V30_2_Proposta.pdf");
   }
 
   return (
     <div style={s.page}>
       {toast && (
-        <div style={toast.includes("failed") ? s.toastErr : s.toast}>
+        <div style={toast.toLowerCase().includes("errore") ? s.toastErr : s.toast}>
           {toast}
         </div>
       )}
@@ -569,13 +635,19 @@ export default function App() {
       <div style={s.header}>
         <div>
           <h1 style={s.h1}>VIMALUX Lighting AI Portal</h1>
-          <p style={s.sub}>Version 30.1 – Corrected Stacked Savings Engine</p>
+          <p style={s.sub}>Versione 30.2 – Final Clean App</p>
         </div>
 
         <div style={s.row}>
-          <button style={s.btnDark}>Customer</button>
           <button
-            style={s.btn}
+            style={!admin ? s.btnDark : s.btn}
+            onClick={() => setAdmin(false)}
+          >
+            Dashboard Cliente
+          </button>
+
+          <button
+            style={admin ? s.btnDark : s.btn}
             onClick={() => {
               setAdmin(true);
               setTimeout(
@@ -586,9 +658,11 @@ export default function App() {
           >
             Admin
           </button>
+
           <button style={s.btnDark} onClick={exportPdf}>
-            PDF Proposal
+            Proposta PDF
           </button>
+
           <button style={s.btn} onClick={exportExcel}>
             Excel
           </button>
@@ -607,7 +681,7 @@ export default function App() {
               <span style={s.badge}>{c.badge}</span>
             </div>
 
-            <p style={s.bestFor}>Best for: {c.bestFor}</p>
+            <p style={s.bestFor}>Ideale per: {c.bestFor}</p>
 
             <div style={s.metricRow}>
               <span>
@@ -618,25 +692,25 @@ export default function App() {
               <span>
                 Payback
                 <br />
-                <b>{dec(c.payback)} yrs</b>
+                <b>{dec(c.payback)} anni</b>
               </span>
             </div>
 
             <div style={s.metricRow}>
               <span>
-                Annual net
+                Risparmio annuo
                 <br />
                 <b>{euro(c.annualNetSaving)}</b>
               </span>
               <span>
-                10Y net
+                Valore 10 anni
                 <br />
                 <b>{euro(c.tenYearNet)}</b>
               </span>
             </div>
 
             <p style={s.green}>
-              Energy reduction: {dec(c.energyReductionPct)}%
+              Riduzione energetica: {dec(c.energyReductionPct)}%
             </p>
           </button>
         ))}
@@ -644,17 +718,17 @@ export default function App() {
 
       <div style={s.auditBox}>
         <div>
-          <b>Audit import</b>
+          <b>Import Audit</b>
           <br />
           {audit
             ? `${audit.fileName}: ${Math.round(
                 audit.quantity
-              )} luminaires · ${audit.averageWatt.toFixed(1)} W avg`
-            : "Upload VIMALUX audit sheet. Reads only rows 1–29, column D quantity, column G watt."}
+              )} punti luce · ${audit.averageWatt.toFixed(1)} W medio`
+            : "Importa il file audit VIMALUX. Legge solo righe 1–29, colonna D quantità, colonna G watt."}
         </div>
 
         <label style={s.greenBtn}>
-          Import Audit Sheet
+          Importa Audit
           <input
             type="file"
             accept=".xlsx,.xls,.csv"
@@ -665,12 +739,12 @@ export default function App() {
       </div>
 
       <div style={s.kpis}>
-        <Kpi label="Annual Net Saving" value={euro(selected.annualNetSaving)} />
-        <Kpi label="Payback" value={`${dec(selected.payback)} yrs`} />
-        <Kpi label="10Y Net Value" value={euro(selected.tenYearNet)} />
+        <Kpi label="Risparmio annuo netto" value={euro(selected.annualNetSaving)} />
+        <Kpi label="Payback" value={`${dec(selected.payback)} anni`} />
+        <Kpi label="Valore netto 10 anni" value={euro(selected.tenYearNet)} />
         <Kpi label="CAPEX" value={euro(selected.capex)} />
         <Kpi
-          label="Energy Reduction"
+          label="Riduzione energetica"
           value={`${dec(selected.energyReductionPct)}%`}
         />
         <Kpi label="NPV" value={euro(selected.valueNpv)} />
@@ -678,42 +752,42 @@ export default function App() {
 
       <div style={s.grid2}>
         <div style={s.card}>
-          <h2>Project Input</h2>
+          <h2>Input Progetto</h2>
 
           <div style={s.formGrid}>
             <Input
-              label="Customer"
+              label="Cliente"
               value={project.customer}
               onChange={(v) => updateProject("customer", v)}
             />
             <Input
-              label="Municipality"
+              label="Comune"
               value={project.municipality}
               onChange={(v) => updateProject("municipality", v)}
             />
             <Input
-              label="Country"
+              label="Paese"
               value={project.country}
               onChange={(v) => updateProject("country", v)}
             />
             <Input
-              label="Contact"
+              label="Contatto"
               value={project.contact}
               onChange={(v) => updateProject("contact", v)}
             />
             <Input
-              label="Quantity"
+              label="Quantità"
               value={project.quantity}
               onChange={(v) => updateProject("quantity", n(v))}
             />
             <Input
-              label="Existing wattage"
+              label="Potenza media esistente"
               value={project.existingWatt}
               onChange={(v) => updateProject("existingWatt", n(v))}
             />
 
             <label>
-              Product
+              Prodotto
               <select
                 style={s.input}
                 value={project.selectedProductId}
@@ -723,30 +797,19 @@ export default function App() {
               >
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} – {p.watt}W – {euro(p.sellPrice)}
+                    {p.name} – {p.watt}W
                   </option>
                 ))}
               </select>
             </label>
 
             <label style={s.check}>
-              Installation included
+              Installazione inclusa
               <input
                 type="checkbox"
                 checked={project.includeInstallation}
                 onChange={(e) =>
                   updateProject("includeInstallation", e.target.checked)
-                }
-              />
-            </label>
-
-            <label style={s.check}>
-              Include operational upside in base
-              <input
-                type="checkbox"
-                checked={project.includeOperationalInBase}
-                onChange={(e) =>
-                  updateProject("includeOperationalInBase", e.target.checked)
                 }
               />
             </label>
@@ -756,37 +819,36 @@ export default function App() {
         <div style={s.card}>
           <h2>Value Stack</h2>
           <Bar
-            label="LED saving"
+            label="Risparmio LED"
             value={selected.ledSaving}
             max={selected.grossSaving}
           />
           <Bar
-            label="CLO saving"
+            label="Risparmio CLO"
             value={selected.cloSaving}
             max={selected.grossSaving}
           />
           <Bar
-            label="Smart CMS / profile saving"
+            label="Risparmio Smart CMS / profili"
             value={selected.smartSolutionSaving}
             max={selected.grossSaving}
           />
           <Bar
-            label="Maintenance saving"
+            label="Risparmio manutenzione"
             value={selected.maintenanceSaving}
             max={selected.grossSaving}
           />
           <Bar
-            label="Operational upside"
-            value={project.includeOperationalInBase ? selected.operationalUpside : 0}
-            max={selected.grossSaving}
-            green
-          />
-          <Bar
-            label="PowerAiD saving"
+            label="PowerAiD"
             value={selected.powerAidSaving}
             max={selected.grossSaving}
           />
-          <Bar label="OPEX" value={-selected.opex} max={selected.grossSaving} red />
+          <Bar
+            label="OPEX"
+            value={-selected.opex}
+            max={selected.grossSaving}
+            red
+          />
         </div>
       </div>
 
@@ -795,6 +857,17 @@ export default function App() {
           <div style={s.grid2}>
             <div style={s.card}>
               <h2>Admin Assumptions</h2>
+
+              <label style={s.importBtn}>
+                Import Product Catalogue
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={importProductCatalogue}
+                  style={{ display: "none" }}
+                />
+              </label>
+
               <div style={s.formGrid}>
                 {Object.entries(assumptions).map(([k, v]) => (
                   <Input
@@ -805,6 +878,17 @@ export default function App() {
                   />
                 ))}
               </div>
+
+              <label style={s.check}>
+                Include operational upside in base
+                <input
+                  type="checkbox"
+                  checked={project.includeOperationalInBase}
+                  onChange={(e) =>
+                    updateProject("includeOperationalInBase", e.target.checked)
+                  }
+                />
+              </label>
             </div>
 
             <div style={s.card}>
@@ -880,7 +964,7 @@ function Input({ label, value, onChange }) {
   );
 }
 
-function Bar({ label, value, max, red, green }) {
+function Bar({ label, value, max, red }) {
   const w = Math.min((Math.abs(n(value)) / Math.max(1, n(max))) * 100, 100);
 
   return (
@@ -897,7 +981,7 @@ function Bar({ label, value, max, red, green }) {
           style={{
             ...s.fill,
             width: `${Math.max(3, w)}%`,
-            background: red ? "#ef4444" : green ? "#22c55e" : "#2563eb",
+            background: red ? "#ef4444" : "#2563eb",
           }}
         />
       </div>
@@ -1008,6 +1092,16 @@ const s = {
     fontWeight: 900,
     cursor: "pointer",
   },
+  importBtn: {
+    display: "inline-block",
+    background: "#0f172a",
+    color: "#fff",
+    borderRadius: 14,
+    padding: "13px 18px",
+    fontWeight: 900,
+    cursor: "pointer",
+    marginBottom: 18,
+  },
   kpis: {
     display: "grid",
     gridTemplateColumns: "repeat(3, 1fr)",
@@ -1058,6 +1152,7 @@ const s = {
     border: "1px solid #cbd5e1",
     borderRadius: 14,
     padding: 12,
+    marginTop: 14,
   },
   barTop: {
     display: "flex",
