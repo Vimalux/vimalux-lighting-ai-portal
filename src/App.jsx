@@ -15,7 +15,7 @@ import autoTable from "jspdf-autotable";
    3) Strategic upside = qualitative, not monetised in base payback
 ===================================================== */
 
-const STORAGE_KEY = "vimalux_app_v26_state";
+const STORAGE_KEY = "vimalux_app_v27_state";
 const ADMIN_PASSWORD = "vimalux-admin";
 
 const defaultProducts = [
@@ -1052,28 +1052,38 @@ export default function VimaluxLightingPortalV26() {
 }
 
 function OfferCard({ calc, selected, onSelect }) {
+  const upsidePayback =
+    calc.annualUpsideNetSaving > 0
+      ? calc.totalCapex / calc.annualUpsideNetSaving
+      : null;
+
   return (
     <button onClick={onSelect} style={selected ? styles.offerCardSelected : styles.offerCard}>
       <div style={styles.offerTop}>
         <span style={styles.offerTitle}>{calc.offer.title}</span>
         <span style={styles.offerBadge}>{calc.offer.badge}</span>
       </div>
+
       <p style={styles.offerSub}>{calc.offer.positioning}</p>
+
       <div style={styles.offerMetrics}>
         <div>
-          <small>Upside Payback</small>
-          <b>{calc.annualUpsideNetSaving > 0 ? `${num(calc.totalCapex / calc.annualUpsideNetSaving, 1)} yrs` : "N/A"}</b>
+          <small>Base Payback</small>
+          <b>{calc.basePaybackYears ? `${num(calc.basePaybackYears, 1)} yrs` : "N/A"}</b>
         </div>
+
         <div>
-          <small>Upside 10Y Net</small>
-          <b>{euro(calc.upsideTenYearNetSavings)}</b>
+          <small>Upside Payback</small>
+          <b>{upsidePayback ? `${num(upsidePayback, 1)} yrs` : "N/A"}</b>
         </div>
       </div>
-      <div style={styles.offerFoot}>Bankable payback: {calc.basePaybackYears ? `${num(calc.basePaybackYears, 1)} yrs` : "N/A"} · Upside: {euro(calc.operationalUpside)} / year</div>
+
+      <div style={styles.offerFoot}>
+        Base 10Y: {euro(calc.baseTenYearNetSavings)} · Upside: {euro(calc.operationalUpside)} / year
+      </div>
     </button>
   );
 }
-
 function SectionTitle({ title, sub }) {
   return (
     <div>
