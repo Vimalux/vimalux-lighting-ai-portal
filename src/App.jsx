@@ -5,7 +5,7 @@ import autoTable from "jspdf-autotable";
 
 /* =====================================================
    VIMALUX LIGHTING AI PORTAL
-   VERSION 28 – CLEAN WORKING AUDIT + ROI ENGINE
+   VERSION 29 – SMART SOLUTION ROI ENGINE
    React single-file build
    No Tailwind dependency
 ===================================================== */
@@ -33,6 +33,7 @@ const productsDefault = [
 
 const assumptionsDefault = {
   ledSavingPct: 55,
+  smartSolutionSavingPct: 20,
   energyPrice: 0.29,
   burningHours: 4200,
   maintenanceOldPerLamp: 25,
@@ -64,7 +65,7 @@ const offers = [
     smart: true,
     powerAid: false,
     badge: "Recommended",
-    bestFor: "Bankable control + maintenance",
+    bestFor: "Smart control + CLO + maintenance + optimized profiles",
   },
   {
     id: "premium",
@@ -72,7 +73,7 @@ const offers = [
     smart: true,
     powerAid: true,
     badge: "Premium",
-    bestFor: "Highest 10Y value",
+    bestFor: "Highest 10Y value and maximum measured optimization",
   },
 ];
 
@@ -106,8 +107,14 @@ function calcCase(project, a, product, offer) {
   const cloSaving = offer.smart ? postLedCost * (n(a.cloSavingPct) / 100) : 0;
   const postCloCost = postLedCost - cloSaving;
 
+  const smartSolutionSaving = offer.smart
+    ? postCloCost * (n(a.smartSolutionSavingPct) / 100)
+    : 0;
+
+  const postSmartCost = postCloCost - smartSolutionSaving;
+
   const powerAidSaving = offer.powerAid
-    ? postCloCost * (n(a.powerAidAdditionalSavingPct) / 100)
+    ? postSmartCost * (n(a.powerAidAdditionalSavingPct) / 100)
     : 0;
 
   const maintenanceSaving = offer.smart
@@ -115,7 +122,11 @@ function calcCase(project, a, product, offer) {
     : 0;
 
   const guaranteedSaving =
-    ledSaving + cloSaving + powerAidSaving + maintenanceSaving;
+    ledSaving +
+    cloSaving +
+    smartSolutionSaving +
+    powerAidSaving +
+    maintenanceSaving;
 
   const opex =
     (offer.smart ? qty * n(a.cmsFeePerLampYear) : 0) +
@@ -137,10 +148,10 @@ function calcCase(project, a, product, offer) {
   const upsideNet = baseNet + operationalUpside;
 
   const years = n(a.proposalYears) || 10;
+  const rate = n(a.discountRatePct) / 100;
 
   let baseNpv = -capex;
   let upsideNpv = -capex;
-  const rate = n(a.discountRatePct) / 100;
 
   for (let y = 1; y <= years; y += 1) {
     baseNpv += baseNet / Math.pow(1 + rate, y);
@@ -152,6 +163,7 @@ function calcCase(project, a, product, offer) {
     capex,
     ledSaving,
     cloSaving,
+    smartSolutionSaving,
     powerAidSaving,
     maintenanceSaving,
     guaranteedSaving,
@@ -166,7 +178,9 @@ function calcCase(project, a, product, offer) {
     baseNpv,
     upsideNpv,
     energyReductionPct: oldEnergyCost
-      ? ((ledSaving + cloSaving + powerAidSaving) / oldEnergyCost) * 100
+      ? ((ledSaving + cloSaving + smartSolutionSaving + powerAidSaving) /
+          oldEnergyCost) *
+        100
       : 0,
   };
 }
@@ -309,6 +323,7 @@ export default function App() {
       body: [
         ["LED saving", euro(selected.ledSaving)],
         ["CLO saving", euro(selected.cloSaving)],
+        ["Smart solution saving", euro(selected.smartSolutionSaving)],
         ["Maintenance saving", euro(selected.maintenanceSaving)],
         ["PowerAiD saving", euro(selected.powerAidSaving)],
         ["OPEX", `-${euro(selected.opex)}`],
@@ -329,7 +344,7 @@ export default function App() {
       });
     }
 
-    doc.save("VIMALUX_V28_Proposal.pdf");
+    doc.save("VIMALUX_V29_Proposal.pdf");
   }
 
   function exportExcel() {
@@ -353,10 +368,14 @@ export default function App() {
     );
 
     if (audit) {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([audit]), "Audit");
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet([audit]),
+        "Audit"
+      );
     }
 
-    XLSX.writeFile(wb, "VIMALUX_V28.xlsx");
+    XLSX.writeFile(wb, "VIMALUX_V29.xlsx");
   }
 
   return (
@@ -370,7 +389,7 @@ export default function App() {
       <div style={s.header}>
         <div>
           <h1 style={s.h1}>VIMALUX Lighting AI Portal</h1>
-          <p style={s.sub}>Version 28 – Clean Audit + ROI Engine</p>
+          <p style={s.sub}>Version 29 – Smart Solution ROI Engine</p>
         </div>
 
         <div style={s.row}>
@@ -550,6 +569,11 @@ export default function App() {
             max={selected.guaranteedSaving}
           />
           <Bar
+            label="Smart solution saving"
+            value={selected.smartSolutionSaving}
+            max={selected.guaranteedSaving}
+          />
+          <Bar
             label="Maintenance saving"
             value={selected.maintenanceSaving}
             max={selected.guaranteedSaving}
@@ -559,7 +583,12 @@ export default function App() {
             value={selected.powerAidSaving}
             max={selected.guaranteedSaving}
           />
-          <Bar label="OPEX" value={-selected.opex} max={selected.guaranteedSaving} red />
+          <Bar
+            label="OPEX"
+            value={-selected.opex}
+            max={selected.guaranteedSaving}
+            red
+          />
           <Bar
             label="Operational upside"
             value={selected.operationalUpside}
