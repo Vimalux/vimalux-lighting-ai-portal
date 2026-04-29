@@ -5,48 +5,17 @@ import autoTable from "jspdf-autotable";
 
 /* =====================================================
    VIMALUX LIGHTING AI PORTAL
-   VERSION 30.4 – FINAL REAL ENTERPRISE APP
+   VERSION 30.5 – FINAL REAL ENTERPRISE APP
 
-   Includes:
-   - IT / EN language switch
-   - Customer / Admin separation
-   - Audit import: rows 1–29, column D quantity, column G watt
-   - Product catalogue import in Admin only
-   - Product override in Admin only
-   - Corrected stacked savings logic
-   - PowerAiD = % on Smart achieved saving
-   - Multi-page PDF in selected language
-   - Excel export
+   Fix:
+   - PowerAiD saving = % of remaining energy cost after Smart
+   - Energy reduction capped at 100%
 ===================================================== */
 
 const productsDefault = [
-  {
-    id: "street60",
-    name: "VIMALUX Street 60",
-    watt: 60,
-    lumen: 10200,
-    sellPrice: 190,
-    buyPrice: 110,
-    install: 35,
-  },
-  {
-    id: "road90",
-    name: "VIMALUX Road 90",
-    watt: 90,
-    lumen: 15300,
-    sellPrice: 210,
-    buyPrice: 150,
-    install: 35,
-  },
-  {
-    id: "highway120",
-    name: "VIMALUX Highway 120",
-    watt: 120,
-    lumen: 20400,
-    sellPrice: 285,
-    buyPrice: 205,
-    install: 45,
-  },
+  { id: "street60", name: "VIMALUX Street 60", watt: 60, lumen: 10200, sellPrice: 190, buyPrice: 110, install: 35 },
+  { id: "road90", name: "VIMALUX Road 90", watt: 90, lumen: 15300, sellPrice: 210, buyPrice: 150, install: 35 },
+  { id: "highway120", name: "VIMALUX Highway 120", watt: 120, lumen: 20400, sellPrice: 285, buyPrice: 205, install: 45 },
 ];
 
 const assumptionsDefault = {
@@ -55,7 +24,7 @@ const assumptionsDefault = {
   smartSolutionSavingPct: 20,
   maintenanceOldPerLamp: 25,
   maintenanceSavingPct: 50,
-  powerAidAdditionalSavingPct: 40,
+  powerAidAdditionalSavingPct: 35,
 
   energyPrice: 0.29,
   burningHours: 4200,
@@ -75,7 +44,7 @@ const assumptionsDefault = {
 
 const translations = {
   it: {
-    version: "Versione 30.4 – Final Real Enterprise App",
+    version: "Versione 30.5 – Final Real Enterprise App",
     customerDashboard: "Dashboard Cliente",
     admin: "Admin",
     pdf: "Proposta PDF",
@@ -103,8 +72,7 @@ const translations = {
     npv: "NPV",
 
     auditImport: "Import Audit",
-    auditHelp:
-      "Importa il file audit VIMALUX. Legge solo righe 1–29, colonna D quantità, colonna G watt.",
+    auditHelp: "Importa il file audit VIMALUX. Legge solo righe 1–29, colonna D quantità, colonna G watt.",
     importAudit: "Importa Audit",
 
     projectInput: "Input Progetto",
@@ -145,7 +113,7 @@ const translations = {
   },
 
   en: {
-    version: "Version 30.4 – Final Real Enterprise App",
+    version: "Version 30.5 – Final Real Enterprise App",
     customerDashboard: "Customer Dashboard",
     admin: "Admin",
     pdf: "PDF Proposal",
@@ -173,8 +141,7 @@ const translations = {
     npv: "NPV",
 
     auditImport: "Audit Import",
-    auditHelp:
-      "Upload VIMALUX audit sheet. Reads only rows 1–29, column D quantity, column G watt.",
+    auditHelp: "Upload VIMALUX audit sheet. Reads only rows 1–29, column D quantity, column G watt.",
     importAudit: "Import Audit",
 
     projectInput: "Project Input",
@@ -221,9 +188,7 @@ function n(v) {
 }
 
 function euro(v) {
-  return `€${new Intl.NumberFormat("it-IT", {
-    maximumFractionDigits: 0,
-  }).format(n(v))}`;
+  return `€${new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0 }).format(n(v))}`;
 }
 
 function dec(v, d = 1) {
@@ -260,9 +225,7 @@ function calcCase(project, a, product, offer) {
   const qty = n(project.quantity);
   const years = n(a.proposalYears) || 10;
 
-  const oldEnergyKwh =
-    (qty * n(project.existingWatt) * n(a.burningHours)) / 1000;
-
+  const oldEnergyKwh = (qty * n(project.existingWatt) * n(a.burningHours)) / 1000;
   const oldEnergyCost = oldEnergyKwh * n(a.energyPrice);
 
   const ledSaving = oldEnergyCost * (n(a.ledSavingPct) / 100);
@@ -276,9 +239,7 @@ function calcCase(project, a, product, offer) {
     : 0;
 
   const maintenanceSaving = offer.smart
-    ? qty *
-      n(a.maintenanceOldPerLamp) *
-      (n(a.maintenanceSavingPct) / 100)
+    ? qty * n(a.maintenanceOldPerLamp) * (n(a.maintenanceSavingPct) / 100)
     : 0;
 
   const operationalUpside = offer.smart
@@ -288,6 +249,13 @@ function calcCase(project, a, product, offer) {
         n(a.adminReductionPerLampYear))
     : 0;
 
+  const smartEnergySaving = ledSaving + cloSaving + smartSolutionSaving;
+
+  const remainingEnergyCostAfterSmart = Math.max(
+    0,
+    oldEnergyCost - smartEnergySaving
+  );
+
   const smartGrossSaving =
     ledSaving +
     cloSaving +
@@ -296,7 +264,7 @@ function calcCase(project, a, product, offer) {
     (project.includeOperationalInBase ? operationalUpside : 0);
 
   const powerAidSaving = offer.powerAid
-    ? smartGrossSaving * (n(a.powerAidAdditionalSavingPct) / 100)
+    ? remainingEnergyCostAfterSmart * (n(a.powerAidAdditionalSavingPct) / 100)
     : 0;
 
   const grossSaving =
@@ -320,8 +288,10 @@ function calcCase(project, a, product, offer) {
   const tenYearNet = annualNetSaving * years;
   const valueNpv = npv(n(a.discountRatePct), annualNetSaving, years, capex);
 
-  const energySavingOnly =
+  const uncappedEnergySavingOnly =
     ledSaving + cloSaving + smartSolutionSaving + powerAidSaving;
+
+  const energySavingOnly = Math.min(oldEnergyCost, uncappedEnergySavingOnly);
 
   const energyReductionPct =
     oldEnergyCost > 0 ? (energySavingOnly / oldEnergyCost) * 100 : 0;
@@ -346,6 +316,7 @@ function calcCase(project, a, product, offer) {
     maintenanceSaving,
     operationalUpside,
     smartGrossSaving,
+    remainingEnergyCostAfterSmart,
     powerAidSaving,
     grossSaving,
     opex,
@@ -383,34 +354,12 @@ export default function App() {
 
   const adminRef = useRef(null);
 
-  const product =
-    products.find((p) => p.id === project.selectedProductId) || products[0];
+  const product = products.find((p) => p.id === project.selectedProductId) || products[0];
 
   const offers = [
-    {
-      id: "led",
-      title: t.led,
-      badge: t.base,
-      smart: false,
-      powerAid: false,
-      bestFor: t.ledBest,
-    },
-    {
-      id: "smart",
-      title: t.smart,
-      badge: t.recommended,
-      smart: true,
-      powerAid: false,
-      bestFor: t.smartBest,
-    },
-    {
-      id: "premium",
-      title: t.premium,
-      badge: t.premiumBadge,
-      smart: true,
-      powerAid: true,
-      bestFor: t.premiumBest,
-    },
+    { id: "led", title: t.led, badge: t.base, smart: false, powerAid: false, bestFor: t.ledBest },
+    { id: "smart", title: t.smart, badge: t.recommended, smart: true, powerAid: false, bestFor: t.smartBest },
+    { id: "premium", title: t.premium, badge: t.premiumBadge, smart: true, powerAid: true, bestFor: t.premiumBest },
   ];
 
   const cases = useMemo(
@@ -418,8 +367,7 @@ export default function App() {
     [project, assumptions, product, lang]
   );
 
-  const selected =
-    cases.find((c) => c.id === project.selectedOffer) || cases[0];
+  const selected = cases.find((c) => c.id === project.selectedOffer) || cases[0];
 
   function updateProject(key, value) {
     setProject((p) => ({ ...p, [key]: value }));
@@ -484,12 +432,8 @@ export default function App() {
 
       showToast(
         lang === "it"
-          ? `Audit importato: ${Math.round(totalQty)} punti luce / ${avg.toFixed(
-              1
-            )} W`
-          : `Audit imported: ${Math.round(totalQty)} luminaires / ${avg.toFixed(
-              1
-            )} W`
+          ? `Audit importato: ${Math.round(totalQty)} punti luce / ${avg.toFixed(1)} W`
+          : `Audit imported: ${Math.round(totalQty)} luminaires / ${avg.toFixed(1)} W`
       );
     } catch (err) {
       console.error(err);
@@ -513,29 +457,12 @@ export default function App() {
 
       const headers = Object.keys(rows[0]);
 
-      const nameCol = findProductColumn(headers, [
-        "name",
-        "product",
-        "prodotto",
-        "nome",
-        "model",
-      ]);
+      const nameCol = findProductColumn(headers, ["name", "product", "prodotto", "nome", "model"]);
       const wattCol = findProductColumn(headers, ["watt", "w", "power"]);
       const lumenCol = findProductColumn(headers, ["lumen", "lm"]);
-      const sellCol = findProductColumn(headers, [
-        "sell",
-        "sellPrice",
-        "price",
-        "prezzo",
-        "sales",
-      ]);
+      const sellCol = findProductColumn(headers, ["sell", "sellPrice", "price", "prezzo", "sales"]);
       const buyCol = findProductColumn(headers, ["buy", "buyPrice", "cost"]);
-      const installCol = findProductColumn(headers, [
-        "install",
-        "installation",
-        "posa",
-        "montaggio",
-      ]);
+      const installCol = findProductColumn(headers, ["install", "installation", "posa", "montaggio"]);
 
       const imported = rows
         .map((row, index) => ({
@@ -575,31 +502,15 @@ export default function App() {
     const wb = XLSX.utils.book_new();
 
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cases), "Cases");
-    XLSX.utils.book_append_sheet(
-      wb,
-      XLSX.utils.json_to_sheet([project]),
-      "Project"
-    );
-    XLSX.utils.book_append_sheet(
-      wb,
-      XLSX.utils.json_to_sheet([assumptions]),
-      "Assumptions"
-    );
-    XLSX.utils.book_append_sheet(
-      wb,
-      XLSX.utils.json_to_sheet(products),
-      "Products"
-    );
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([project]), "Project");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([assumptions]), "Assumptions");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(products), "Products");
 
     if (audit) {
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet([audit]),
-        "Audit"
-      );
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([audit]), "Audit");
     }
 
-    XLSX.writeFile(wb, "VIMALUX_V30_4_Final.xlsx");
+    XLSX.writeFile(wb, "VIMALUX_V30_5_Final.xlsx");
   }
 
   function pdfHeader(doc, title, subtitle) {
@@ -675,13 +586,23 @@ export default function App() {
 
     autoTable(doc, {
       startY: 42,
-      head: [[lang === "it" ? "Voce" : "Layer", lang === "it" ? "Valore annuo" : "Annual value", "Logic"]],
+      head: [[
+        lang === "it" ? "Voce" : "Layer",
+        lang === "it" ? "Valore annuo" : "Annual value",
+        "Logic",
+      ]],
       body: [
         [t.ledSaving, euro(selected.ledSaving), `${assumptions.ledSavingPct}% baseline`],
-        [t.cloSaving, euro(selected.cloSaving), selected.smart ? `${assumptions.cloSavingPct}%` : "-"],
-        [t.smartSaving, euro(selected.smartSolutionSaving), selected.smart ? `${assumptions.smartSolutionSavingPct}%` : "-"],
+        [t.cloSaving, euro(selected.cloSaving), selected.smart ? `${assumptions.cloSavingPct}% on LED saving` : "-"],
+        [t.smartSaving, euro(selected.smartSolutionSaving), selected.smart ? `${assumptions.smartSolutionSavingPct}% on LED saving` : "-"],
         [t.maintenanceSaving, euro(selected.maintenanceSaving), selected.smart ? `${assumptions.maintenanceSavingPct}%` : "-"],
-        [t.powerAidSaving, euro(selected.powerAidSaving), selected.powerAid ? `${assumptions.powerAidAdditionalSavingPct}% on Smart saving` : "-"],
+        [
+          t.powerAidSaving,
+          euro(selected.powerAidSaving),
+          selected.powerAid
+            ? `${assumptions.powerAidAdditionalSavingPct}% on remaining energy cost after Smart`
+            : "-",
+        ],
         [t.opex, `-${euro(selected.opex)}`, "CMS / PowerAiD"],
       ],
       headStyles: { fillColor: navy },
@@ -710,10 +631,7 @@ export default function App() {
     autoTable(doc, {
       startY: 42,
       head: [["Parameter", "Value"]],
-      body: Object.entries(assumptions).map(([key, value]) => [
-        key,
-        String(value),
-      ]),
+      body: Object.entries(assumptions).map(([key, value]) => [key, String(value)]),
       headStyles: { fillColor: navy },
       styles: { fontSize: 8 },
     });
@@ -765,10 +683,7 @@ export default function App() {
         </div>
 
         <div style={s.row}>
-          <button
-            style={!admin ? s.btnDark : s.btn}
-            onClick={() => setAdmin(false)}
-          >
+          <button style={!admin ? s.btnDark : s.btn} onClick={() => setAdmin(false)}>
             {t.customerDashboard}
           </button>
 
@@ -776,10 +691,7 @@ export default function App() {
             style={admin ? s.btnDark : s.btn}
             onClick={() => {
               setAdmin(true);
-              setTimeout(
-                () => adminRef.current?.scrollIntoView({ behavior: "smooth" }),
-                100
-              );
+              setTimeout(() => adminRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
             }}
           >
             {t.admin}
@@ -793,10 +705,7 @@ export default function App() {
             {t.excel}
           </button>
 
-          <button
-            style={s.btn}
-            onClick={() => setLang(lang === "it" ? "en" : "it")}
-          >
+          <button style={s.btn} onClick={() => setLang(lang === "it" ? "en" : "it")}>
             {t.language}
           </button>
         </div>
@@ -856,20 +765,13 @@ export default function App() {
           <b>{t.auditImport}</b>
           <br />
           {audit
-            ? `${audit.fileName}: ${Math.round(
-                audit.quantity
-              )} ${lang === "it" ? "punti luce" : "luminaires"} · ${audit.averageWatt.toFixed(1)} W`
+            ? `${audit.fileName}: ${Math.round(audit.quantity)} ${lang === "it" ? "punti luce" : "luminaires"} · ${audit.averageWatt.toFixed(1)} W`
             : t.auditHelp}
         </div>
 
         <label style={s.greenBtn}>
           {t.importAudit}
-          <input
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={importAudit}
-            style={{ display: "none" }}
-          />
+          <input type="file" accept=".xlsx,.xls,.csv" onChange={importAudit} style={{ display: "none" }} />
         </label>
       </div>
 
@@ -899,9 +801,7 @@ export default function App() {
               <select
                 style={s.input}
                 value={project.selectedProductId}
-                onChange={(e) =>
-                  updateProject("selectedProductId", e.target.value)
-                }
+                onChange={(e) => updateProject("selectedProductId", e.target.value)}
               >
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -916,9 +816,7 @@ export default function App() {
               <input
                 type="checkbox"
                 checked={project.includeInstallation}
-                onChange={(e) =>
-                  updateProject("includeInstallation", e.target.checked)
-                }
+                onChange={(e) => updateProject("includeInstallation", e.target.checked)}
               />
             </label>
           </div>
@@ -943,22 +841,12 @@ export default function App() {
 
               <label style={s.importBtn}>
                 {t.importCatalogue}
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={importProductCatalogue}
-                  style={{ display: "none" }}
-                />
+                <input type="file" accept=".xlsx,.xls,.csv" onChange={importProductCatalogue} style={{ display: "none" }} />
               </label>
 
               <div style={s.formGrid}>
                 {Object.entries(assumptions).map(([k, v]) => (
-                  <Input
-                    key={k}
-                    label={k}
-                    value={v}
-                    onChange={(x) => updateAssumption(k, x)}
-                  />
+                  <Input key={k} label={k} value={v} onChange={(x) => updateAssumption(k, x)} />
                 ))}
               </div>
 
@@ -967,9 +855,7 @@ export default function App() {
                 <input
                   type="checkbox"
                   checked={project.includeOperationalInBase}
-                  onChange={(e) =>
-                    updateProject("includeOperationalInBase", e.target.checked)
-                  }
+                  onChange={(e) => updateProject("includeOperationalInBase", e.target.checked)}
                 />
               </label>
             </div>
