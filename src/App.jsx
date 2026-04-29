@@ -5,16 +5,17 @@ import autoTable from "jspdf-autotable";
 
 /* =====================================================
    VIMALUX LIGHTING AI PORTAL
-   VERSION 30.2 – FINAL CLEAN APP
+   VERSION 30.4 – FINAL REAL ENTERPRISE APP
 
    Includes:
-   - Italian customer dashboard
-   - Admin/customer separation
-   - Audit import
+   - IT / EN language switch
+   - Customer / Admin separation
+   - Audit import: rows 1–29, column D quantity, column G watt
    - Product catalogue import in Admin only
    - Product override in Admin only
-   - Corrected stacked savings engine
-   - Multi-page Italian PDF
+   - Corrected stacked savings logic
+   - PowerAiD = % on Smart achieved saving
+   - Multi-page PDF in selected language
    - Excel export
 ===================================================== */
 
@@ -72,35 +73,147 @@ const assumptionsDefault = {
   adminReductionPerLampYear: 4,
 };
 
-const offers = [
-  {
-    id: "led",
-    title: "Solo LED",
-    shortTitle: "LED Only",
-    badge: "Base",
-    smart: false,
-    powerAid: false,
-    bestFor: "Minore CAPEX iniziale",
+const translations = {
+  it: {
+    version: "Versione 30.4 – Final Real Enterprise App",
+    customerDashboard: "Dashboard Cliente",
+    admin: "Admin",
+    pdf: "Proposta PDF",
+    excel: "Excel",
+    language: "EN",
+
+    led: "Solo LED",
+    smart: "Smart CMS",
+    premium: "Smart + PowerAiD",
+    base: "Base",
+    recommended: "Consigliato",
+    premiumBadge: "Premium",
+
+    idealFor: "Ideale per",
+    ledBest: "Minore CAPEX iniziale",
+    smartBest: "CLO + CMS + manutenzione + controllo",
+    premiumBest: "Massimo risparmio e ottimizzazione",
+
+    capex: "CAPEX",
+    payback: "Payback",
+    annualSaving: "Risparmio annuo",
+    annualNetSaving: "Risparmio annuo netto",
+    tenYearValue: "Valore netto 10 anni",
+    energyReduction: "Riduzione energetica",
+    npv: "NPV",
+
+    auditImport: "Import Audit",
+    auditHelp:
+      "Importa il file audit VIMALUX. Legge solo righe 1–29, colonna D quantità, colonna G watt.",
+    importAudit: "Importa Audit",
+
+    projectInput: "Input Progetto",
+    customer: "Cliente",
+    municipality: "Comune",
+    country: "Paese",
+    contact: "Contatto",
+    quantity: "Quantità",
+    existingWattage: "Potenza media esistente",
+    product: "Prodotto",
+    installationIncluded: "Installazione inclusa",
+
+    valueStack: "Value Stack",
+    ledSaving: "Risparmio LED",
+    cloSaving: "Risparmio CLO",
+    smartSaving: "Risparmio Smart CMS / profili",
+    maintenanceSaving: "Risparmio manutenzione",
+    powerAidSaving: "PowerAiD",
+    opex: "OPEX",
+
+    adminAssumptions: "Admin Assumptions",
+    productOverride: "Product Override",
+    importCatalogue: "Import Product Catalogue",
+    includeOperational: "Include operational upside in base",
+
+    pdfTitle: "VIMALUX Proposta Smart Lighting",
+    executiveSummary: "Sintesi Esecutiva",
+    packageComparison: "Confronto Pacchetti",
+    auditBaseline: "Baseline Audit",
+    assumptions: "Assunzioni",
+    disclaimer: "Disclaimer",
+    nonBinding: "Proposta indicativa non vincolante",
+    selectedPackage: "Pacchetto selezionato",
+    sourceFile: "File sorgente",
+    rowsUsed: "Righe utilizzate",
+    importRule: "Regola import",
+    manualInput: "Input manuale",
   },
-  {
-    id: "smart",
-    title: "Smart CMS",
-    shortTitle: "Smart CMS",
-    badge: "Consigliato",
-    smart: true,
-    powerAid: false,
-    bestFor: "CLO + CMS + manutenzione + controllo",
+
+  en: {
+    version: "Version 30.4 – Final Real Enterprise App",
+    customerDashboard: "Customer Dashboard",
+    admin: "Admin",
+    pdf: "PDF Proposal",
+    excel: "Excel",
+    language: "IT",
+
+    led: "LED Only",
+    smart: "Smart CMS",
+    premium: "Smart + PowerAiD",
+    base: "Base",
+    recommended: "Recommended",
+    premiumBadge: "Premium",
+
+    idealFor: "Best for",
+    ledBest: "Lowest upfront CAPEX",
+    smartBest: "CLO + CMS + maintenance + control",
+    premiumBest: "Maximum savings and optimization",
+
+    capex: "CAPEX",
+    payback: "Payback",
+    annualSaving: "Annual saving",
+    annualNetSaving: "Annual net saving",
+    tenYearValue: "10-year net value",
+    energyReduction: "Energy reduction",
+    npv: "NPV",
+
+    auditImport: "Audit Import",
+    auditHelp:
+      "Upload VIMALUX audit sheet. Reads only rows 1–29, column D quantity, column G watt.",
+    importAudit: "Import Audit",
+
+    projectInput: "Project Input",
+    customer: "Customer",
+    municipality: "Municipality",
+    country: "Country",
+    contact: "Contact",
+    quantity: "Quantity",
+    existingWattage: "Average existing wattage",
+    product: "Product",
+    installationIncluded: "Installation included",
+
+    valueStack: "Value Stack",
+    ledSaving: "LED saving",
+    cloSaving: "CLO saving",
+    smartSaving: "Smart CMS / profile saving",
+    maintenanceSaving: "Maintenance saving",
+    powerAidSaving: "PowerAiD saving",
+    opex: "OPEX",
+
+    adminAssumptions: "Admin Assumptions",
+    productOverride: "Product Override",
+    importCatalogue: "Import Product Catalogue",
+    includeOperational: "Include operational upside in base",
+
+    pdfTitle: "VIMALUX Smart Lighting Proposal",
+    executiveSummary: "Executive Summary",
+    packageComparison: "Package Comparison",
+    auditBaseline: "Audit Baseline",
+    assumptions: "Assumptions",
+    disclaimer: "Disclaimer",
+    nonBinding: "Indicative non-binding proposal",
+    selectedPackage: "Selected package",
+    sourceFile: "Source file",
+    rowsUsed: "Rows used",
+    importRule: "Import rule",
+    manualInput: "Manual input",
   },
-  {
-    id: "premium",
-    title: "Smart + PowerAiD",
-    shortTitle: "Smart + PowerAiD",
-    badge: "Premium",
-    smart: true,
-    powerAid: true,
-    bestFor: "Massimo risparmio e ottimizzazione",
-  },
-];
+};
 
 function n(v) {
   if (v === "" || v === null || v === undefined) return 0;
@@ -133,11 +246,13 @@ function npv(ratePct, annualCash, years, initialCapex) {
 
 function findProductColumn(headers, names) {
   const lower = headers.map((h) => String(h || "").toLowerCase().trim());
+
   for (const name of names) {
     const target = name.toLowerCase();
     const idx = lower.findIndex((h) => h.includes(target));
     if (idx >= 0) return headers[idx];
   }
+
   return null;
 }
 
@@ -150,10 +265,8 @@ function calcCase(project, a, product, offer) {
 
   const oldEnergyCost = oldEnergyKwh * n(a.energyPrice);
 
-  // LED Only = 55% saving only
   const ledSaving = oldEnergyCost * (n(a.ledSavingPct) / 100);
 
-  // Smart layers only when Smart selected
   const cloSaving = offer.smart
     ? ledSaving * (n(a.cloSavingPct) / 100)
     : 0;
@@ -182,15 +295,12 @@ function calcCase(project, a, product, offer) {
     maintenanceSaving +
     (project.includeOperationalInBase ? operationalUpside : 0);
 
-  // PowerAiD = 40% on Smart achieved saving
   const powerAidSaving = offer.powerAid
     ? smartGrossSaving * (n(a.powerAidAdditionalSavingPct) / 100)
     : 0;
 
   const grossSaving =
-    offer.id === "led"
-      ? ledSaving
-      : smartGrossSaving + powerAidSaving;
+    offer.id === "led" ? ledSaving : smartGrossSaving + powerAidSaving;
 
   const opex =
     (offer.smart ? qty * n(a.cmsFeePerLampYear) : 0) +
@@ -249,6 +359,9 @@ function calcCase(project, a, product, offer) {
 }
 
 export default function App() {
+  const [lang, setLang] = useState("it");
+  const t = translations[lang];
+
   const [products, setProducts] = useState(productsDefault);
   const [assumptions, setAssumptions] = useState(assumptionsDefault);
   const [admin, setAdmin] = useState(false);
@@ -273,9 +386,36 @@ export default function App() {
   const product =
     products.find((p) => p.id === project.selectedProductId) || products[0];
 
+  const offers = [
+    {
+      id: "led",
+      title: t.led,
+      badge: t.base,
+      smart: false,
+      powerAid: false,
+      bestFor: t.ledBest,
+    },
+    {
+      id: "smart",
+      title: t.smart,
+      badge: t.recommended,
+      smart: true,
+      powerAid: false,
+      bestFor: t.smartBest,
+    },
+    {
+      id: "premium",
+      title: t.premium,
+      badge: t.premiumBadge,
+      smart: true,
+      powerAid: true,
+      bestFor: t.premiumBest,
+    },
+  ];
+
   const cases = useMemo(
     () => offers.map((o) => calcCase(project, assumptions, product, o)),
-    [project, assumptions, product]
+    [project, assumptions, product, lang]
   );
 
   const selected =
@@ -314,8 +454,8 @@ export default function App() {
           .slice(0, 29);
 
         raw.forEach((row) => {
-          const qty = n(row[3]); // Column D
-          const watt = n(row[6]); // Column G
+          const qty = n(row[3]);
+          const watt = n(row[6]);
 
           if (qty > 0 && watt > 0) {
             totalQty += qty;
@@ -343,13 +483,17 @@ export default function App() {
       }));
 
       showToast(
-        `Audit importato: ${Math.round(totalQty)} punti luce / ${avg.toFixed(
-          1
-        )} W`
+        lang === "it"
+          ? `Audit importato: ${Math.round(totalQty)} punti luce / ${avg.toFixed(
+              1
+            )} W`
+          : `Audit imported: ${Math.round(totalQty)} luminaires / ${avg.toFixed(
+              1
+            )} W`
       );
     } catch (err) {
       console.error(err);
-      showToast("Errore import audit");
+      showToast(lang === "it" ? "Errore import audit" : "Audit import failed");
     }
 
     e.target.value = "";
@@ -396,7 +540,7 @@ export default function App() {
       const imported = rows
         .map((row, index) => ({
           id: `import_${Date.now()}_${index}`,
-          name: String(row[nameCol] || `Prodotto ${index + 1}`),
+          name: String(row[nameCol] || `Product ${index + 1}`),
           watt: n(row[wattCol]),
           lumen: n(row[lumenCol]),
           sellPrice: n(row[sellCol]),
@@ -410,10 +554,18 @@ export default function App() {
       setProducts(imported);
       setProject((p) => ({ ...p, selectedProductId: imported[0].id }));
 
-      showToast(`Catalogo prodotti importato: ${imported.length} prodotti`);
+      showToast(
+        lang === "it"
+          ? `Catalogo prodotti importato: ${imported.length} prodotti`
+          : `Product catalogue imported: ${imported.length} products`
+      );
     } catch (err) {
       console.error(err);
-      showToast("Errore import catalogo prodotti");
+      showToast(
+        lang === "it"
+          ? "Errore import catalogo prodotti"
+          : "Product catalogue import failed"
+      );
     }
 
     e.target.value = "";
@@ -422,21 +574,21 @@ export default function App() {
   function exportExcel() {
     const wb = XLSX.utils.book_new();
 
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cases), "Casi");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cases), "Cases");
     XLSX.utils.book_append_sheet(
       wb,
       XLSX.utils.json_to_sheet([project]),
-      "Progetto"
+      "Project"
     );
     XLSX.utils.book_append_sheet(
       wb,
       XLSX.utils.json_to_sheet([assumptions]),
-      "Assunzioni"
+      "Assumptions"
     );
     XLSX.utils.book_append_sheet(
       wb,
       XLSX.utils.json_to_sheet(products),
-      "Prodotti"
+      "Products"
     );
 
     if (audit) {
@@ -447,7 +599,7 @@ export default function App() {
       );
     }
 
-    XLSX.writeFile(wb, "VIMALUX_V30_2_Final.xlsx");
+    XLSX.writeFile(wb, "VIMALUX_V30_4_Final.xlsx");
   }
 
   function pdfHeader(doc, title, subtitle) {
@@ -457,7 +609,7 @@ export default function App() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
     doc.setTextColor(9, 26, 58);
-    doc.text("VIMALUX Proposta Smart Lighting", 14, 13);
+    doc.text(t.pdfTitle, 14, 13);
 
     doc.setFontSize(13);
     doc.text(title, 14, 23);
@@ -472,47 +624,45 @@ export default function App() {
     const doc = new jsPDF("p", "mm", "a4");
     const navy = [9, 26, 58];
 
-    pdfHeader(doc, "1. Sintesi Esecutiva", "Panoramica commerciale");
+    pdfHeader(doc, `1. ${t.executiveSummary}`, t.nonBinding);
 
     autoTable(doc, {
       startY: 42,
-      head: [["Campo", "Valore"]],
+      head: [[lang === "it" ? "Campo" : "Field", lang === "it" ? "Valore" : "Value"]],
       body: [
-        ["Cliente", project.customer || "-"],
-        ["Comune", project.municipality || "-"],
-        ["Paese", project.country || "-"],
-        ["Pacchetto selezionato", selected.title],
-        ["Quantità", project.quantity],
-        ["Potenza media esistente", `${project.existingWatt} W`],
-        ["Prodotto", product.name],
-        ["CAPEX", euro(selected.capex)],
-        ["Risparmio annuo netto", euro(selected.annualNetSaving)],
-        ["Payback", `${dec(selected.payback)} anni`],
-        ["Valore netto 10 anni", euro(selected.tenYearNet)],
+        [t.customer, project.customer || "-"],
+        [t.municipality, project.municipality || "-"],
+        [t.country, project.country || "-"],
+        [t.selectedPackage, selected.title],
+        [t.quantity, project.quantity],
+        [t.existingWattage, `${project.existingWatt} W`],
+        [t.product, product.name],
+        [t.capex, euro(selected.capex)],
+        [t.annualNetSaving, euro(selected.annualNetSaving)],
+        [t.payback, `${dec(selected.payback)} ${lang === "it" ? "anni" : "years"}`],
+        [t.tenYearValue, euro(selected.tenYearNet)],
       ],
       headStyles: { fillColor: navy },
     });
 
     doc.addPage();
-    pdfHeader(doc, "2. Confronto Pacchetti", "LED vs Smart vs Premium");
+    pdfHeader(doc, `2. ${t.packageComparison}`, "LED vs Smart vs Premium");
 
     autoTable(doc, {
       startY: 42,
-      head: [
-        [
-          "Pacchetto",
-          "CAPEX",
-          "Risparmio annuo",
-          "Payback",
-          "Valore 10 anni",
-          "Riduzione energia",
-        ],
-      ],
+      head: [[
+        lang === "it" ? "Pacchetto" : "Package",
+        t.capex,
+        t.annualSaving,
+        t.payback,
+        t.tenYearValue,
+        t.energyReduction,
+      ]],
       body: cases.map((c) => [
         c.title,
         euro(c.capex),
         euro(c.annualNetSaving),
-        `${dec(c.payback)} anni`,
+        `${dec(c.payback)} ${lang === "it" ? "anni" : "yrs"}`,
         euro(c.tenYearNet),
         `${dec(c.energyReductionPct)}%`,
       ]),
@@ -521,77 +671,45 @@ export default function App() {
     });
 
     doc.addPage();
-    pdfHeader(doc, "3. Value Stack", "Motore di risparmio cumulativo");
+    pdfHeader(doc, "3. Value Stack", "Stacked savings engine");
 
     autoTable(doc, {
       startY: 42,
-      head: [["Voce", "Valore annuo", "Logica"]],
+      head: [[lang === "it" ? "Voce" : "Layer", lang === "it" ? "Valore annuo" : "Annual value", "Logic"]],
       body: [
-        [
-          "Risparmio LED",
-          euro(selected.ledSaving),
-          `${assumptions.ledSavingPct}% sul costo energia baseline`,
-        ],
-        [
-          "Risparmio CLO",
-          euro(selected.cloSaving),
-          selected.smart
-            ? `${assumptions.cloSavingPct}% sul risparmio LED`
-            : "Non incluso",
-        ],
-        [
-          "Risparmio Smart CMS / profili",
-          euro(selected.smartSolutionSaving),
-          selected.smart
-            ? `${assumptions.smartSolutionSavingPct}% sul risparmio LED`
-            : "Non incluso",
-        ],
-        [
-          "Risparmio manutenzione",
-          euro(selected.maintenanceSaving),
-          selected.smart
-            ? `${assumptions.maintenanceSavingPct}% riduzione manutenzione`
-            : "Non incluso",
-        ],
-        [
-          "PowerAiD",
-          euro(selected.powerAidSaving),
-          selected.powerAid
-            ? `${assumptions.powerAidAdditionalSavingPct}% sul risparmio Smart ottenuto`
-            : "Non incluso",
-        ],
-        [
-          "OPEX ricorrente",
-          `-${euro(selected.opex)}`,
-          "Canone CMS / PowerAiD",
-        ],
+        [t.ledSaving, euro(selected.ledSaving), `${assumptions.ledSavingPct}% baseline`],
+        [t.cloSaving, euro(selected.cloSaving), selected.smart ? `${assumptions.cloSavingPct}%` : "-"],
+        [t.smartSaving, euro(selected.smartSolutionSaving), selected.smart ? `${assumptions.smartSolutionSavingPct}%` : "-"],
+        [t.maintenanceSaving, euro(selected.maintenanceSaving), selected.smart ? `${assumptions.maintenanceSavingPct}%` : "-"],
+        [t.powerAidSaving, euro(selected.powerAidSaving), selected.powerAid ? `${assumptions.powerAidAdditionalSavingPct}% on Smart saving` : "-"],
+        [t.opex, `-${euro(selected.opex)}`, "CMS / PowerAiD"],
       ],
       headStyles: { fillColor: navy },
       styles: { fontSize: 8.5 },
     });
 
     doc.addPage();
-    pdfHeader(doc, "4. Baseline Audit", "Dati importati dal file cliente");
+    pdfHeader(doc, `4. ${t.auditBaseline}`, "Imported customer audit sheet");
 
     autoTable(doc, {
       startY: 42,
-      head: [["Parametro Audit", "Valore"]],
+      head: [[lang === "it" ? "Parametro" : "Parameter", lang === "it" ? "Valore" : "Value"]],
       body: [
-        ["File sorgente", audit?.fileName || "Input manuale"],
-        ["Righe utilizzate", audit?.rows || "-"],
-        ["Quantità", project.quantity],
-        ["Potenza media esistente", `${project.existingWatt} W`],
-        ["Regola import", "Righe 1–29, Colonna D = quantità, Colonna G = watt"],
+        [t.sourceFile, audit?.fileName || t.manualInput],
+        [t.rowsUsed, audit?.rows || "-"],
+        [t.quantity, project.quantity],
+        [t.existingWattage, `${project.existingWatt} W`],
+        [t.importRule, "Rows 1–29, Column D = quantity, Column G = watt"],
       ],
       headStyles: { fillColor: navy },
     });
 
     doc.addPage();
-    pdfHeader(doc, "5. Assunzioni", "Input di modellazione");
+    pdfHeader(doc, `5. ${t.assumptions}`, "Admin modelling inputs");
 
     autoTable(doc, {
       startY: 42,
-      head: [["Parametro", "Valore"]],
+      head: [["Parameter", "Value"]],
       body: Object.entries(assumptions).map(([key, value]) => [
         key,
         String(value),
@@ -601,33 +719,41 @@ export default function App() {
     });
 
     doc.addPage();
-    pdfHeader(doc, "6. Disclaimer", "Proposta indicativa non vincolante");
+    pdfHeader(doc, `6. ${t.disclaimer}`, t.nonBinding);
+
+    const disclaimer =
+      lang === "it"
+        ? [
+            "La presente proposta è indicativa e non vincolante.",
+            "",
+            "Tutti i calcoli si basano su dati forniti dal cliente, input audit importati, assunzioni standard di mercato e condizioni operative stimate.",
+            "",
+            "I termini commerciali finali, il perimetro tecnico, la struttura finanziaria, l’approvazione creditizia e il piano di implementazione restano soggetti a due diligence, negoziazione contrattuale e approvazione finale.",
+            "",
+            "I risparmi possono variare in funzione delle ore di accensione, tariffe energia, profili di dimmerazione, baseline inventario, regime manutentivo ed esecuzione operativa.",
+          ]
+        : [
+            "This proposal is indicative and non-binding.",
+            "",
+            "All calculations are based on customer supplied data, imported audit inputs, standard market assumptions and estimated operating conditions.",
+            "",
+            "Final commercial terms, technical scope, financing structure, credit approval and implementation schedule remain subject to due diligence, contract negotiation and management approval.",
+            "",
+            "Savings may vary depending on burn hours, tariffs, dimming profile, baseline inventory, maintenance regime and operational execution.",
+          ];
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(60, 60, 60);
-    doc.text(
-      [
-        "La presente proposta è indicativa e non vincolante.",
-        "",
-        "Tutti i calcoli si basano su dati forniti dal cliente, input audit importati, assunzioni standard di mercato e condizioni operative stimate.",
-        "",
-        "I termini commerciali finali, il perimetro tecnico, la struttura finanziaria, l’approvazione creditizia e il piano di implementazione restano soggetti a due diligence, negoziazione contrattuale e approvazione finale.",
-        "",
-        "I risparmi possono variare in funzione delle ore di accensione, tariffe energia, profili di dimmerazione, baseline inventario, regime manutentivo ed esecuzione operativa.",
-      ].join("\n"),
-      14,
-      48,
-      { maxWidth: 180 }
-    );
+    doc.text(disclaimer.join("\n"), 14, 48, { maxWidth: 180 });
 
-    doc.save("VIMALUX_V30_2_Proposta.pdf");
+    doc.save(lang === "it" ? "VIMALUX_Proposta.pdf" : "VIMALUX_Proposal.pdf");
   }
 
   return (
     <div style={s.page}>
       {toast && (
-        <div style={toast.toLowerCase().includes("errore") ? s.toastErr : s.toast}>
+        <div style={toast.toLowerCase().includes("errore") || toast.toLowerCase().includes("failed") ? s.toastErr : s.toast}>
           {toast}
         </div>
       )}
@@ -635,7 +761,7 @@ export default function App() {
       <div style={s.header}>
         <div>
           <h1 style={s.h1}>VIMALUX Lighting AI Portal</h1>
-          <p style={s.sub}>Versione 30.2 – Final Clean App</p>
+          <p style={s.sub}>{t.version}</p>
         </div>
 
         <div style={s.row}>
@@ -643,7 +769,7 @@ export default function App() {
             style={!admin ? s.btnDark : s.btn}
             onClick={() => setAdmin(false)}
           >
-            Dashboard Cliente
+            {t.customerDashboard}
           </button>
 
           <button
@@ -656,15 +782,22 @@ export default function App() {
               );
             }}
           >
-            Admin
+            {t.admin}
           </button>
 
           <button style={s.btnDark} onClick={exportPdf}>
-            Proposta PDF
+            {t.pdf}
           </button>
 
           <button style={s.btn} onClick={exportExcel}>
-            Excel
+            {t.excel}
+          </button>
+
+          <button
+            style={s.btn}
+            onClick={() => setLang(lang === "it" ? "en" : "it")}
+          >
+            {t.language}
           </button>
         </div>
       </div>
@@ -681,36 +814,38 @@ export default function App() {
               <span style={s.badge}>{c.badge}</span>
             </div>
 
-            <p style={s.bestFor}>Ideale per: {c.bestFor}</p>
+            <p style={s.bestFor}>
+              {t.idealFor}: {c.bestFor}
+            </p>
 
             <div style={s.metricRow}>
               <span>
-                CAPEX
+                {t.capex}
                 <br />
                 <b>{euro(c.capex)}</b>
               </span>
               <span>
-                Payback
+                {t.payback}
                 <br />
-                <b>{dec(c.payback)} anni</b>
+                <b>{dec(c.payback)} {lang === "it" ? "anni" : "yrs"}</b>
               </span>
             </div>
 
             <div style={s.metricRow}>
               <span>
-                Risparmio annuo
+                {t.annualSaving}
                 <br />
                 <b>{euro(c.annualNetSaving)}</b>
               </span>
               <span>
-                Valore 10 anni
+                {t.tenYearValue}
                 <br />
                 <b>{euro(c.tenYearNet)}</b>
               </span>
             </div>
 
             <p style={s.green}>
-              Riduzione energetica: {dec(c.energyReductionPct)}%
+              {t.energyReduction}: {dec(c.energyReductionPct)}%
             </p>
           </button>
         ))}
@@ -718,17 +853,17 @@ export default function App() {
 
       <div style={s.auditBox}>
         <div>
-          <b>Import Audit</b>
+          <b>{t.auditImport}</b>
           <br />
           {audit
             ? `${audit.fileName}: ${Math.round(
                 audit.quantity
-              )} punti luce · ${audit.averageWatt.toFixed(1)} W medio`
-            : "Importa il file audit VIMALUX. Legge solo righe 1–29, colonna D quantità, colonna G watt."}
+              )} ${lang === "it" ? "punti luce" : "luminaires"} · ${audit.averageWatt.toFixed(1)} W`
+            : t.auditHelp}
         </div>
 
         <label style={s.greenBtn}>
-          Importa Audit
+          {t.importAudit}
           <input
             type="file"
             accept=".xlsx,.xls,.csv"
@@ -739,55 +874,28 @@ export default function App() {
       </div>
 
       <div style={s.kpis}>
-        <Kpi label="Risparmio annuo netto" value={euro(selected.annualNetSaving)} />
-        <Kpi label="Payback" value={`${dec(selected.payback)} anni`} />
-        <Kpi label="Valore netto 10 anni" value={euro(selected.tenYearNet)} />
-        <Kpi label="CAPEX" value={euro(selected.capex)} />
-        <Kpi
-          label="Riduzione energetica"
-          value={`${dec(selected.energyReductionPct)}%`}
-        />
-        <Kpi label="NPV" value={euro(selected.valueNpv)} />
+        <Kpi label={t.annualNetSaving} value={euro(selected.annualNetSaving)} />
+        <Kpi label={t.payback} value={`${dec(selected.payback)} ${lang === "it" ? "anni" : "yrs"}`} />
+        <Kpi label={t.tenYearValue} value={euro(selected.tenYearNet)} />
+        <Kpi label={t.capex} value={euro(selected.capex)} />
+        <Kpi label={t.energyReduction} value={`${dec(selected.energyReductionPct)}%`} />
+        <Kpi label={t.npv} value={euro(selected.valueNpv)} />
       </div>
 
       <div style={s.grid2}>
         <div style={s.card}>
-          <h2>Input Progetto</h2>
+          <h2>{t.projectInput}</h2>
 
           <div style={s.formGrid}>
-            <Input
-              label="Cliente"
-              value={project.customer}
-              onChange={(v) => updateProject("customer", v)}
-            />
-            <Input
-              label="Comune"
-              value={project.municipality}
-              onChange={(v) => updateProject("municipality", v)}
-            />
-            <Input
-              label="Paese"
-              value={project.country}
-              onChange={(v) => updateProject("country", v)}
-            />
-            <Input
-              label="Contatto"
-              value={project.contact}
-              onChange={(v) => updateProject("contact", v)}
-            />
-            <Input
-              label="Quantità"
-              value={project.quantity}
-              onChange={(v) => updateProject("quantity", n(v))}
-            />
-            <Input
-              label="Potenza media esistente"
-              value={project.existingWatt}
-              onChange={(v) => updateProject("existingWatt", n(v))}
-            />
+            <Input label={t.customer} value={project.customer} onChange={(v) => updateProject("customer", v)} />
+            <Input label={t.municipality} value={project.municipality} onChange={(v) => updateProject("municipality", v)} />
+            <Input label={t.country} value={project.country} onChange={(v) => updateProject("country", v)} />
+            <Input label={t.contact} value={project.contact} onChange={(v) => updateProject("contact", v)} />
+            <Input label={t.quantity} value={project.quantity} onChange={(v) => updateProject("quantity", n(v))} />
+            <Input label={t.existingWattage} value={project.existingWatt} onChange={(v) => updateProject("existingWatt", n(v))} />
 
             <label>
-              Prodotto
+              {t.product}
               <select
                 style={s.input}
                 value={project.selectedProductId}
@@ -804,7 +912,7 @@ export default function App() {
             </label>
 
             <label style={s.check}>
-              Installazione inclusa
+              {t.installationIncluded}
               <input
                 type="checkbox"
                 checked={project.includeInstallation}
@@ -817,38 +925,13 @@ export default function App() {
         </div>
 
         <div style={s.card}>
-          <h2>Value Stack</h2>
-          <Bar
-            label="Risparmio LED"
-            value={selected.ledSaving}
-            max={selected.grossSaving}
-          />
-          <Bar
-            label="Risparmio CLO"
-            value={selected.cloSaving}
-            max={selected.grossSaving}
-          />
-          <Bar
-            label="Risparmio Smart CMS / profili"
-            value={selected.smartSolutionSaving}
-            max={selected.grossSaving}
-          />
-          <Bar
-            label="Risparmio manutenzione"
-            value={selected.maintenanceSaving}
-            max={selected.grossSaving}
-          />
-          <Bar
-            label="PowerAiD"
-            value={selected.powerAidSaving}
-            max={selected.grossSaving}
-          />
-          <Bar
-            label="OPEX"
-            value={-selected.opex}
-            max={selected.grossSaving}
-            red
-          />
+          <h2>{t.valueStack}</h2>
+          <Bar label={t.ledSaving} value={selected.ledSaving} max={selected.grossSaving} />
+          <Bar label={t.cloSaving} value={selected.cloSaving} max={selected.grossSaving} />
+          <Bar label={t.smartSaving} value={selected.smartSolutionSaving} max={selected.grossSaving} />
+          <Bar label={t.maintenanceSaving} value={selected.maintenanceSaving} max={selected.grossSaving} />
+          <Bar label={t.powerAidSaving} value={selected.powerAidSaving} max={selected.grossSaving} />
+          <Bar label={t.opex} value={-selected.opex} max={selected.grossSaving} red />
         </div>
       </div>
 
@@ -856,10 +939,10 @@ export default function App() {
         {admin && (
           <div style={s.grid2}>
             <div style={s.card}>
-              <h2>Admin Assumptions</h2>
+              <h2>{t.adminAssumptions}</h2>
 
               <label style={s.importBtn}>
-                Import Product Catalogue
+                {t.importCatalogue}
                 <input
                   type="file"
                   accept=".xlsx,.xls,.csv"
@@ -880,7 +963,7 @@ export default function App() {
               </div>
 
               <label style={s.check}>
-                Include operational upside in base
+                {t.includeOperational}
                 <input
                   type="checkbox"
                   checked={project.includeOperationalInBase}
@@ -892,7 +975,7 @@ export default function App() {
             </div>
 
             <div style={s.card}>
-              <h2>Product Override</h2>
+              <h2>{t.productOverride}</h2>
 
               {products.map((p, i) => (
                 <div key={p.id} style={s.productRow}>
