@@ -1,23 +1,27 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-const products = [
-  { id: "urban45", name: "VIMALUX Urban 45W Smart", watt: 45, sellPrice: 135, install: 35 },
-  { id: "street60", name: "VIMALUX Street Pro 60W Smart", watt: 60, sellPrice: 150, install: 35 },
-  { id: "main90", name: "VIMALUX Main Road 90W Smart", watt: 90, sellPrice: 185, install: 35 },
-  { id: "decor35", name: "VIMALUX Decorative Retrofit 35W Smart", watt: 35, sellPrice: 120, install: 35 }
+const ADMIN_PIN = "2026";
+
+const defaultProducts = [
+  { id: "urban45", name: "VIMALUX Urban 45W Smart", watt: 45, sellPrice: 135, buyPrice: 95, install: 35 },
+  { id: "street60", name: "VIMALUX Street Pro 60W Smart", watt: 60, sellPrice: 150, buyPrice: 110, install: 35 },
+  { id: "main90", name: "VIMALUX Main Road 90W Smart", watt: 90, sellPrice: 185, buyPrice: 140, install: 35 },
+  { id: "decor35", name: "VIMALUX Decorative Retrofit 35W Smart", watt: 35, sellPrice: 120, buyPrice: 85, install: 35 }
 ];
 
-const assumptions = {
+const defaultAssumptions = {
   energyPrice: 0.29,
   maintenanceCost: 25,
   maintenanceReduction: 75,
   smartDimmingSaving: 20,
   powerAidExtraSaving: 40,
   years: 10,
-  co2Factor: 0.42
+  co2Factor: 0.42,
+  smartFee: 6,
+  powerAidFee: 3
 };
 
 const demoRows = [
@@ -27,11 +31,15 @@ const demoRows = [
 
 const labels = {
   EN: {
-    version: "VIMALUX LIGHTING AI PORTAL · VERSION 11C",
+    version: "VIMALUX LIGHTING AI PORTAL · VERSION 12A",
     title: "Smart LED ROI Calculator",
-    subtitle: "Upload your lighting audit and generate a customer-ready multi-page proposal.",
+    subtitle: "Customer-safe proposal engine with protected admin controls.",
     dashboard: "Dashboard",
     proposal: "Proposal",
+    admin: "Admin",
+    adminLogin: "Admin login",
+    adminActive: "Admin active",
+    logout: "Logout",
     upload: "Upload audit Excel",
     demo: "Load demo case",
     print: "Export Proposal PDF",
@@ -56,14 +64,27 @@ const labels = {
     disclaimer: "Preliminary and non-binding. Final offer depends on technical audit, lighting design, product confirmation, installation conditions, contract structure and financing approval.",
     noRows: "No valid VIMALUX audit rows found. Check quantity in column D and wattage in column G.",
     nextSteps: "Recommended next step",
-    nextText: "Validate the lighting inventory, confirm technical requirements, and prepare a final commercial proposal."
+    nextText: "Validate the lighting inventory, confirm technical requirements, and prepare a final commercial proposal.",
+    products: "Product catalogue",
+    assumptions: "Commercial assumptions",
+    dataControls: "Data controls",
+    addProduct: "Add product",
+    reset: "Reset catalogue",
+    clear: "Clear local data",
+    delete: "Delete",
+    importCatalog: "Import product catalogue",
+    exportCatalog: "Export catalogue"
   },
   IT: {
-    version: "VIMALUX LIGHTING AI PORTAL · VERSIONE 11C",
+    version: "VIMALUX LIGHTING AI PORTAL · VERSIONE 12A",
     title: "Calcolatore ROI Smart LED",
-    subtitle: "Carica l’audit illuminotecnico e genera una proposta cliente multi-pagina.",
+    subtitle: "Motore proposta cliente con controlli admin protetti.",
     dashboard: "Dashboard",
     proposal: "Proposta",
+    admin: "Admin",
+    adminLogin: "Login admin",
+    adminActive: "Admin attivo",
+    logout: "Esci",
     upload: "Carica audit Excel",
     demo: "Carica caso demo",
     print: "Esporta proposta PDF",
@@ -88,7 +109,16 @@ const labels = {
     disclaimer: "Preliminare e non vincolante. Offerta finale soggetta ad audit tecnico, lighting design, conferma prodotto, condizioni installative, struttura contrattuale e approvazione finanziaria.",
     noRows: "Nessuna riga audit VIMALUX valida trovata. Verificare quantità in colonna D e wattaggio in colonna G.",
     nextSteps: "Prossimo passo consigliato",
-    nextText: "Validare l’inventario illuminotecnico, confermare i requisiti tecnici e preparare una proposta commerciale finale."
+    nextText: "Validare l’inventario illuminotecnico, confermare i requisiti tecnici e preparare una proposta commerciale finale.",
+    products: "Catalogo prodotti",
+    assumptions: "Assunzioni commerciali",
+    dataControls: "Controlli dati",
+    addProduct: "Aggiungi prodotto",
+    reset: "Reset catalogo",
+    clear: "Cancella dati locali",
+    delete: "Elimina",
+    importCatalog: "Importa catalogo prodotti",
+    exportCatalog: "Esporta catalogo"
   }
 };
 
@@ -100,16 +130,31 @@ function num(v) {
   return new Intl.NumberFormat("en-IE", { maximumFractionDigits: 0 }).format(v || 0);
 }
 
+function readSaved(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || "null") || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export default function App() {
-  const [lang, setLang] = useState(() => localStorage.getItem("vml_customer_lang") || "EN");
+  const [lang, setLang] = useState(() => localStorage.getItem("vml_lang") || "EN");
   const [page, setPage] = useState("dashboard");
   const [client, setClient] = useState("Comune Demo");
   const [packageType, setPackageType] = useState("premium");
-  const [rows, setRows] = useState(demoRows);
+  const [rows, setRows] = useState(() => readSaved("vml_rows", demoRows));
+  const [products, setProducts] = useState(() => readSaved("vml_products", defaultProducts));
+  const [assumptions, setAssumptions] = useState(() => readSaved("vml_assumptions", defaultAssumptions));
+  const [admin, setAdmin] = useState(false);
+  const [pin, setPin] = useState("");
 
   const t = labels[lang];
 
-  useEffect(() => localStorage.setItem("vml_customer_lang", lang), [lang]);
+  useEffect(() => localStorage.setItem("vml_lang", lang), [lang]);
+  useEffect(() => localStorage.setItem("vml_rows", JSON.stringify(rows)), [rows]);
+  useEffect(() => localStorage.setItem("vml_products", JSON.stringify(products)), [products]);
+  useEffect(() => localStorage.setItem("vml_assumptions", JSON.stringify(assumptions)), [assumptions]);
 
   function packageName(type) {
     if (type === "led") return t.led;
@@ -119,23 +164,23 @@ export default function App() {
 
   function packageFee(type) {
     if (type === "led") return 0;
-    if (type === "smart") return 6;
-    return 9;
+    if (type === "smart") return Number(assumptions.smartFee);
+    return Number(assumptions.smartFee) + Number(assumptions.powerAidFee);
   }
 
   function extraSavingPct(type) {
     if (type === "led") return 0;
-    if (type === "smart") return assumptions.smartDimmingSaving;
-    return assumptions.smartDimmingSaving + assumptions.powerAidExtraSaving;
+    if (type === "smart") return Number(assumptions.smartDimmingSaving);
+    return Number(assumptions.smartDimmingSaving) + Number(assumptions.powerAidExtraSaving);
   }
 
   function recommendProduct(watt) {
     const sorted = [...products].sort((a, b) => Number(a.watt) - Number(b.watt));
     const w = Number(watt);
-    if (w >= 180) return products.find((p) => p.id === "main90") || sorted[sorted.length - 1];
-    if (w >= 120) return products.find((p) => p.id === "street60") || sorted.find((p) => Number(p.watt) >= 60) || sorted[0];
-    if (w >= 70) return products.find((p) => p.id === "urban45") || sorted.find((p) => Number(p.watt) >= 45) || sorted[0];
-    return products.find((p) => p.id === "decor35") || sorted[0];
+    if (w >= 180) return sorted.find((p) => Number(p.watt) >= 90) || sorted[sorted.length - 1];
+    if (w >= 120) return sorted.find((p) => Number(p.watt) >= 60) || sorted[0];
+    if (w >= 70) return sorted.find((p) => Number(p.watt) >= 45) || sorted[0];
+    return sorted.find((p) => Number(p.watt) >= 35) || sorted[0];
   }
 
   const analysed = useMemo(() => {
@@ -145,16 +190,17 @@ export default function App() {
       const ledKwh = (Number(product.watt) * Number(row.qty) * Number(row.hours)) / 1000;
       const finalKwh = ledKwh * (1 - extraSavingPct(packageType) / 100);
 
-      const energySaving = (beforeKwh - finalKwh) * assumptions.energyPrice;
-      const maintenanceSaving = Number(row.qty) * assumptions.maintenanceCost * assumptions.maintenanceReduction / 100;
+      const energySaving = (beforeKwh - finalKwh) * Number(assumptions.energyPrice);
+      const maintenanceSaving = Number(row.qty) * Number(assumptions.maintenanceCost) * Number(assumptions.maintenanceReduction) / 100;
       const serviceFee = Number(row.qty) * packageFee(packageType);
       const annualNetSaving = energySaving + maintenanceSaving - serviceFee;
       const customerCapex = Number(row.qty) * (Number(product.sellPrice) + Number(product.install));
-      const co2 = ((beforeKwh - finalKwh) * assumptions.co2Factor) / 1000;
+      const internalCost = Number(row.qty) * (Number(product.buyPrice || 0) + Number(product.install));
+      const co2 = ((beforeKwh - finalKwh) * Number(assumptions.co2Factor)) / 1000;
 
-      return { ...row, product, beforeKwh, ledKwh, finalKwh, energySaving, maintenanceSaving, serviceFee, annualNetSaving, customerCapex, co2 };
+      return { ...row, product, beforeKwh, ledKwh, finalKwh, energySaving, maintenanceSaving, serviceFee, annualNetSaving, customerCapex, internalCost, co2 };
     });
-  }, [rows, packageType]);
+  }, [rows, products, assumptions, packageType]);
 
   const totals = useMemo(() => {
     const total = analysed.reduce(
@@ -164,6 +210,7 @@ export default function App() {
         a.ledKwh += r.ledKwh;
         a.finalKwh += r.finalKwh;
         a.customerCapex += r.customerCapex;
+        a.internalCost += r.internalCost;
         a.annualNetSaving += r.annualNetSaving;
         a.energySaving += r.energySaving;
         a.maintenanceSaving += r.maintenanceSaving;
@@ -171,15 +218,16 @@ export default function App() {
         a.co2 += r.co2;
         return a;
       },
-      { qty: 0, beforeKwh: 0, ledKwh: 0, finalKwh: 0, customerCapex: 0, annualNetSaving: 0, energySaving: 0, maintenanceSaving: 0, serviceFee: 0, co2: 0 }
+      { qty: 0, beforeKwh: 0, ledKwh: 0, finalKwh: 0, customerCapex: 0, internalCost: 0, annualNetSaving: 0, energySaving: 0, maintenanceSaving: 0, serviceFee: 0, co2: 0 }
     );
 
     total.payback = total.annualNetSaving > 0 ? total.customerCapex / total.annualNetSaving : 0;
     total.roi = total.customerCapex > 0 ? total.annualNetSaving / total.customerCapex : 0;
-    total.netBenefit = total.annualNetSaving * assumptions.years - total.customerCapex;
+    total.netBenefit = total.annualNetSaving * Number(assumptions.years) - total.customerCapex;
     total.energyReductionPct = total.beforeKwh > 0 ? ((total.beforeKwh - total.finalKwh) / total.beforeKwh) * 100 : 0;
+    total.margin = total.customerCapex - total.internalCost;
     return total;
-  }, [analysed]);
+  }, [analysed, assumptions]);
 
   async function importExcel(e) {
     const file = e.target.files?.[0];
@@ -198,7 +246,6 @@ export default function App() {
 
     for (const ws of candidateSheets) {
       const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-
       const parsed = matrix
         .slice(14)
         .map((r, i) => ({
@@ -223,6 +270,30 @@ export default function App() {
     }
   }
 
+  async function importCatalogue(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+    const imported = json
+      .map((r, i) => ({
+        id: `imported_${Date.now()}_${i}`,
+        name: r.Name || r.Product || r.Nome || "Imported product",
+        watt: Number(r.Watt || r.W || r.Power || 0),
+        sellPrice: Number(r.SellPrice || r.Sell || r.Price || r.Prezzo || 0),
+        buyPrice: Number(r.BuyPrice || r.Buy || r.Cost || 0),
+        install: Number(r.Install || r.Installation || 35)
+      }))
+      .filter((p) => p.name && p.watt > 0 && p.sellPrice > 0);
+
+    if (imported.length) setProducts(imported);
+    else alert("No valid products found.");
+  }
+
   function exportCSV() {
     const header = "package,area,existingType,existingWatt,qty,hours,recommendedProduct,newWatt,totalCustomerCapex,annualNetSaving,customerRoi,co2";
     const body = analysed.map((r) =>
@@ -242,21 +313,40 @@ export default function App() {
       ].join(",")
     ).join("\n");
 
-    const blob = new Blob([header + "\n" + body], { type: "text/csv" });
+    downloadText("vimalux_customer_roi.csv", header + "\n" + body);
+  }
+
+  function exportCatalogue() {
+    const header = "Name,Watt,SellPrice,BuyPrice,Install";
+    const body = products.map((p) => [p.name, p.watt, p.sellPrice, p.buyPrice || 0, p.install].join(",")).join("\n");
+    downloadText("vimalux_product_catalogue.csv", header + "\n" + body);
+  }
+
+  function downloadText(filename, text) {
+    const blob = new Blob([text], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-
     a.href = url;
-    a.download = "vimalux_customer_roi.csv";
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function resetLocal() {
+    localStorage.removeItem("vml_rows");
+    localStorage.removeItem("vml_products");
+    localStorage.removeItem("vml_assumptions");
+    setRows(demoRows);
+    setProducts(defaultProducts);
+    setAssumptions(defaultAssumptions);
+    setPackageType("premium");
+    setClient("Comune Demo");
   }
 
   function buildProposalPDF() {
     const doc = new jsPDF("p", "mm", "a4");
     const navy = [7, 17, 31];
     const teal = [73, 163, 156];
-    const light = [245, 247, 250];
     const quoteId = `VMLX-${new Date().toISOString().slice(0, 10)}-${client.replace(/\s+/g, "_").toUpperCase()}`;
 
     function footer(pageNo) {
@@ -282,7 +372,6 @@ export default function App() {
       return eur(v).replace("€", "€ ");
     }
 
-    /* PAGE 1 */
     doc.setFillColor(...navy);
     doc.rect(0, 0, 210, 297, "F");
     doc.setTextColor(255);
@@ -299,22 +388,14 @@ export default function App() {
     doc.text("Smart LED · CMS · PowerAiD · Financing-ready proposal", 105, 164, { align: "center" });
     footer("1 / 8");
 
-    /* PAGE 2 */
     doc.addPage();
     addHeader("1. PREVENTIVO DEL PROGETTO", "2 / 8");
     doc.setFontSize(10);
     doc.setTextColor(40);
-    doc.text(doc.splitTextToSize(
-      `Grazie per l'interesse dimostrato nei confronti delle soluzioni VIMALUX. La presente proposta preliminare illustra il potenziale tecnico, economico e ambientale per l'aggiornamento dell'infrastruttura di illuminazione esistente di ${client}.`,
-      180
-    ), 15, 34);
-    doc.text(doc.splitTextToSize(
-      "La soluzione può includere apparecchi LED ad alta efficienza, piattaforma Smart CMS, profili di dimming, allarmi, connettività e PowerAiD per regolazione basata sul traffico.",
-      180
-    ), 15, 58);
+    doc.text(doc.splitTextToSize(`La presente proposta preliminare illustra il potenziale tecnico, economico e ambientale per l'aggiornamento dell'infrastruttura di illuminazione esistente di ${client}.`, 180), 15, 34);
 
     autoTable(doc, {
-      startY: 86,
+      startY: 70,
       head: [["Elemento", "Incluso"]],
       body: [
         ["Apparecchi LED VIMALUX", "Sì"],
@@ -329,10 +410,8 @@ export default function App() {
       styles: { fontSize: 9 }
     });
 
-    /* PAGE 3 */
     doc.addPage();
     addHeader("2. ILLUMINAZIONE COME SERVIZIO", "3 / 8");
-
     autoTable(doc, {
       startY: 30,
       head: [["Chiave del progetto", "Valore"]],
@@ -343,31 +422,29 @@ export default function App() {
         ["Risparmio netto annuo", money(totals.annualNetSaving)],
         ["Payback semplice", `${totals.payback.toFixed(1)} anni`],
         ["ROI annuo cliente", `${(totals.roi * 100).toFixed(1)}%`],
-        ["Cashflow netto 10 anni", money(totals.netBenefit)]
+        ["Cashflow netto", money(totals.netBenefit)]
       ],
       headStyles: { fillColor: teal },
       styles: { fontSize: 9 }
     });
 
-    const rows10 = [];
+    const rowsYears = [];
     let cum = -totals.customerCapex;
-    for (let y = 1; y <= assumptions.years; y++) {
+    for (let y = 1; y <= Number(assumptions.years); y++) {
       cum += totals.annualNetSaving;
-      rows10.push([`Year ${y}`, money(totals.annualNetSaving), money(cum)]);
+      rowsYears.push([`Year ${y}`, money(totals.annualNetSaving), money(cum)]);
     }
 
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 12,
       head: [["Anno", "Risparmio netto annuo", "Cashflow accumulato"]],
-      body: rows10,
+      body: rowsYears,
       headStyles: { fillColor: navy },
       styles: { fontSize: 8 }
     });
 
-    /* PAGE 4 */
     doc.addPage();
-    addHeader("3. RIDUZIONE ENERGIA E CO₂", "4 / 8");
-
+    addHeader("3. RIDUZIONE ENERGIA E CO2", "4 / 8");
     autoTable(doc, {
       startY: 30,
       head: [["Parametro", "Risultato"]],
@@ -377,71 +454,50 @@ export default function App() {
         ["Riduzione consumo energetico", `${totals.energyReductionPct.toFixed(1)}%`],
         ["Risparmio energia annuo", money(totals.energySaving)],
         ["Risparmio manutenzione annuo", money(totals.maintenanceSaving)],
-        ["Riduzione CO₂ annua", `${num(totals.co2)} t`]
+        ["Riduzione CO2 annua", `${num(totals.co2)} t`]
       ],
       headStyles: { fillColor: teal },
       styles: { fontSize: 9 }
     });
 
-    /* PAGE 5 */
     doc.addPage();
     addHeader("4. DATI INPUT", "5 / 8");
-
     autoTable(doc, {
       startY: 30,
-      head: [["Area", "Prodotto attuale", "Watt attuale", "PZ", "Ore", "Prodotto VIMALUX", "Nuovo W"]],
-      body: analysed.map(r => [
-        r.area,
-        r.existingType,
-        `${r.existingWatt} W`,
-        num(r.qty),
-        num(r.hours),
-        r.product.name,
-        `${r.product.watt} W`
-      ]),
+      head: [["Area", "Prodotto attuale", "Watt", "PZ", "Ore", "Prodotto VIMALUX", "Nuovo W"]],
+      body: analysed.map((r) => [r.area, r.existingType, `${r.existingWatt} W`, num(r.qty), num(r.hours), r.product.name, `${r.product.watt} W`]),
       headStyles: { fillColor: navy },
-      styles: { fontSize: 8 },
-      columnStyles: { 5: { cellWidth: 42 } }
+      styles: { fontSize: 8 }
     });
 
-    /* PAGE 6 */
     doc.addPage();
     addHeader("5. PRODOTTI E TECNOLOGIA", "6 / 8");
-    doc.setFontSize(10);
-    doc.setTextColor(40);
-    doc.text(doc.splitTextToSize(
-      "Gli apparecchi LED e la piattaforma Smart sono selezionati per combinare efficienza energetica, controllo remoto, monitoraggio, allarmi e possibilità di ulteriori servizi Smart City.",
-      180
-    ), 15, 32);
-
     autoTable(doc, {
-      startY: 58,
+      startY: 30,
       head: [["Tecnologia", "Descrizione"]],
       body: [
-        ["LED ad alta efficienza", "Riduzione immediata dei consumi rispetto all'impianto esistente."],
-        ["Smart CMS", "Gestione remota, programmazione profili, allarmi e reporting."],
-        ["Smart dimming", "Ottimizzazione dei livelli luminosi tramite profili configurabili."],
-        ["PowerAiD", "Dimming adattivo basato su traffico e logiche avanzate."],
-        ["Zhaga / D4i readiness", "Predisposizione per architetture interoperabili e future-ready."]
+        ["LED ad alta efficienza", "Riduzione immediata dei consumi."],
+        ["Smart CMS", "Gestione remota, profili, allarmi e reporting."],
+        ["Smart dimming", "Ottimizzazione dei livelli luminosi."],
+        ["PowerAiD", "Dimming adattivo basato su traffico."],
+        ["Zhaga / D4i readiness", "Architettura interoperabile e future-ready."]
       ],
       headStyles: { fillColor: teal },
       styles: { fontSize: 9 }
     });
 
-    /* PAGE 7 */
     doc.addPage();
     addHeader("6. CERTIFICAZIONI, GARANZIA E NOTE", "7 / 8");
-
     autoTable(doc, {
       startY: 30,
       head: [["Elemento", "Nota"]],
       body: [
         ["CE", "Prodotti conformi ai requisiti europei applicabili."],
         ["RoHS / RAEE", "Conformità ambientale e gestione fine vita."],
-        ["LM79 / LM80", "Riferimenti tecnici per prestazioni e mantenimento del flusso luminoso."],
+        ["LM79 / LM80", "Riferimenti tecnici per prestazioni e mantenimento del flusso."],
         ["Garanzia VIMALUX", "Copertura secondo condizioni applicabili al progetto."],
-        ["ANAC / appalti pubblici", "Da validare secondo struttura contrattuale e normativa applicabile."],
-        ["Finanziamento", "Non costituisce offerta vincolante di finanziamento."]
+        ["ANAC / appalti pubblici", "Da validare secondo struttura contrattuale."],
+        ["Finanziamento", "Non costituisce offerta vincolante."]
       ],
       headStyles: { fillColor: navy },
       styles: { fontSize: 9 }
@@ -451,15 +507,12 @@ export default function App() {
     doc.setTextColor(90);
     doc.text(doc.splitTextToSize(t.disclaimer, 180), 15, doc.lastAutoTable.finalY + 16);
 
-    /* PAGE 8 */
     doc.addPage();
     addHeader("7. CONTATTI E PROSSIMI PASSI", "8 / 8");
-
     doc.setTextColor(...navy);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
     doc.text(t.nextSteps, 15, 42);
-
     doc.setFont("helvetica", "normal");
     doc.setFontSize(11);
     doc.setTextColor(40);
@@ -480,6 +533,16 @@ export default function App() {
     doc.save(`${client.replace(/\s+/g, "_")}_VIMALUX_Proposal.pdf`);
   }
 
+  function tryLogin() {
+    if (pin === ADMIN_PIN) {
+      setAdmin(true);
+      setPin("");
+      setPage("admin");
+    } else {
+      alert("Wrong PIN");
+    }
+  }
+
   return (
     <div style={styles.app}>
       <aside style={styles.sidebar}>
@@ -492,6 +555,21 @@ export default function App() {
 
         <button style={navStyle(page === "dashboard")} onClick={() => setPage("dashboard")}>{t.dashboard}</button>
         <button style={navStyle(page === "proposal")} onClick={() => setPage("proposal")}>{t.proposal}</button>
+
+        {!admin && (
+          <div style={styles.loginBox}>
+            <div style={{ fontWeight: 900, marginBottom: 8 }}>{t.adminLogin}</div>
+            <input style={styles.input} type="password" value={pin} onChange={(e) => setPin(e.target.value)} placeholder="PIN" />
+            <button style={styles.darkBtnFull} onClick={tryLogin}>{t.adminLogin}</button>
+          </div>
+        )}
+
+        {admin && (
+          <>
+            <button style={navStyle(page === "admin")} onClick={() => setPage("admin")}>{t.adminActive}</button>
+            <button style={styles.logoutBtn} onClick={() => { setAdmin(false); setPage("dashboard"); }}>{t.logout}</button>
+          </>
+        )}
       </aside>
 
       <main style={styles.main}>
@@ -541,6 +619,14 @@ export default function App() {
           <Kpi title={t.co2} value={`${num(totals.co2)} t`} />
         </section>
 
+        {admin && (
+          <section style={styles.adminKpis}>
+            <Kpi title="Internal CAPEX" value={eur(totals.internalCost)} />
+            <Kpi title="Gross margin proxy" value={eur(totals.margin)} />
+            <Kpi title="Annual SaaS/PowerAiD fee" value={eur(totals.serviceFee)} />
+          </section>
+        )}
+
         {page === "dashboard" && (
           <section style={styles.grid2}>
             <Card title={t.energy}>
@@ -566,8 +652,87 @@ export default function App() {
             <button style={styles.darkBtn} onClick={buildProposalPDF}>{t.print}</button>
           </Card>
         )}
+
+        {admin && page === "admin" && (
+          <AdminPanel
+            t={t}
+            products={products}
+            setProducts={setProducts}
+            assumptions={assumptions}
+            setAssumptions={setAssumptions}
+            importCatalogue={importCatalogue}
+            exportCatalogue={exportCatalogue}
+            resetLocal={resetLocal}
+          />
+        )}
       </main>
     </div>
+  );
+}
+
+function AdminPanel({ t, products, setProducts, assumptions, setAssumptions, importCatalogue, exportCatalogue, resetLocal }) {
+  function updateProduct(id, field, value) {
+    setProducts((prev) => prev.map((p) => p.id === id ? { ...p, [field]: value } : p));
+  }
+
+  function addProduct() {
+    setProducts((prev) => [...prev, { id: `p_${Date.now()}`, name: "New Product", watt: 60, sellPrice: 150, buyPrice: 100, install: 35 }]);
+  }
+
+  function deleteProduct(id) {
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+  }
+
+  return (
+    <>
+      <Card title={t.assumptions}>
+        <div style={styles.formGrid}>
+          {Object.entries(assumptions).map(([k, v]) => (
+            <label key={k} style={styles.label}>
+              {k}
+              <input style={styles.input} type="number" step="0.01" value={v} onChange={(e) => setAssumptions({ ...assumptions, [k]: Number(e.target.value) })} />
+            </label>
+          ))}
+        </div>
+      </Card>
+
+      <Card title={t.products}>
+        <div style={styles.adminTools}>
+          <button style={styles.darkBtn} onClick={addProduct}>{t.addProduct}</button>
+          <button style={styles.darkBtn} onClick={() => setProducts(defaultProducts)}>{t.reset}</button>
+          <button style={styles.darkBtn} onClick={exportCatalogue}>{t.exportCatalog}</button>
+          <button style={styles.dangerBtn} onClick={resetLocal}>{t.clear}</button>
+          <label style={styles.darkBtn}>
+            {t.importCatalog}
+            <input type="file" accept=".xlsx,.xls,.csv" onChange={importCatalogue} style={{ display: "none" }} />
+          </label>
+        </div>
+
+        <div style={{ overflowX: "auto" }}>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                {["Name", "Watt", "Sell €", "Buy €", "Install €", "Unit CAPEX", "Margin/unit", "Action"].map((h) => <th key={h} style={styles.th}>{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((p) => (
+                <tr key={p.id}>
+                  <td style={styles.td}><input style={styles.input} value={p.name} onChange={(e) => updateProduct(p.id, "name", e.target.value)} /></td>
+                  <td style={styles.td}><input style={styles.input} type="number" value={p.watt} onChange={(e) => updateProduct(p.id, "watt", Number(e.target.value))} /></td>
+                  <td style={styles.td}><input style={styles.input} type="number" value={p.sellPrice} onChange={(e) => updateProduct(p.id, "sellPrice", Number(e.target.value))} /></td>
+                  <td style={styles.td}><input style={styles.input} type="number" value={p.buyPrice || 0} onChange={(e) => updateProduct(p.id, "buyPrice", Number(e.target.value))} /></td>
+                  <td style={styles.td}><input style={styles.input} type="number" value={p.install} onChange={(e) => updateProduct(p.id, "install", Number(e.target.value))} /></td>
+                  <td style={styles.td}><b>{eur(Number(p.sellPrice) + Number(p.install))}</b></td>
+                  <td style={styles.td}><b>{eur(Number(p.sellPrice) - Number(p.buyPrice || 0))}</b></td>
+                  <td style={styles.td}><button style={styles.dangerBtn} onClick={() => deleteProduct(p.id)}>{t.delete}</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </>
   );
 }
 
@@ -639,6 +804,7 @@ const styles = {
   langWrap: { display: "flex", gap: 8, marginBottom: 22 },
   langBtn: { background: "#e2e8f0", color: "#0f172a", border: 0, borderRadius: 10, padding: "8px 12px", fontWeight: 900, cursor: "pointer" },
   langActive: { background: "#0f172a", color: "white", border: 0, borderRadius: 10, padding: "8px 12px", fontWeight: 900, cursor: "pointer" },
+  loginBox: { marginTop: 24, background: "#f8fafc", borderRadius: 16, padding: 14 },
   main: { padding: 32, overflowX: "hidden" },
   hero: { background: "#07111f", color: "white", borderRadius: 28, padding: 36, display: "flex", justifyContent: "space-between", gap: 20, alignItems: "center", marginBottom: 24 },
   heroActions: { display: "flex", gap: 10 },
@@ -646,11 +812,15 @@ const styles = {
   h1: { fontSize: 46, margin: "12px 0" },
   subtitle: { color: "#dbeafe", fontSize: 18 },
   whiteBtn: { background: "white", color: "#0f172a", border: 0, borderRadius: 14, padding: "13px 18px", fontWeight: 900, cursor: "pointer" },
-  darkBtn: { background: "#0f172a", color: "white", border: 0, borderRadius: 14, padding: "13px 18px", fontWeight: 900, cursor: "pointer" },
+  darkBtn: { background: "#0f172a", color: "white", border: 0, borderRadius: 14, padding: "13px 18px", fontWeight: 900, cursor: "pointer", display: "inline-block" },
+  darkBtnFull: { marginTop: 10, width: "100%", background: "#0f172a", color: "white", border: 0, borderRadius: 12, padding: "11px 12px", fontWeight: 900, cursor: "pointer" },
+  dangerBtn: { background: "#dc2626", color: "white", border: 0, borderRadius: 12, padding: "11px 13px", fontWeight: 900, cursor: "pointer" },
+  logoutBtn: { width: "100%", background: "#dc2626", color: "white", border: 0, borderRadius: 14, padding: "14px 16px", fontWeight: 900, cursor: "pointer", marginTop: 8 },
   uploadCard: { background: "white", borderRadius: 24, padding: 24, boxShadow: "0 8px 24px rgba(15,23,42,.06)", marginBottom: 24, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" },
   uploadBox: { minWidth: 320, display: "flex", flexDirection: "column", gap: 8, alignItems: "center", justifyContent: "center", border: "2px dashed #cbd5e1", borderRadius: 20, padding: 28, cursor: "pointer", background: "#f8fafc" },
   packageGrid: { display: "flex", gap: 12, flexWrap: "wrap" },
   kpiGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 },
+  adminKpis: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 },
   kpi: { background: "white", borderRadius: 22, padding: 24, boxShadow: "0 8px 24px rgba(15,23,42,.06)", marginBottom: 16 },
   kpiTitle: { color: "#64748b", fontSize: 14 },
   kpiValue: { fontSize: 28, fontWeight: 900, marginTop: 10 },
@@ -660,5 +830,12 @@ const styles = {
   barBg: { background: "#e2e8f0", borderRadius: 999, height: 18 },
   bar: { background: "#0f172a", height: 18, borderRadius: 999 },
   note: { background: "#f1f5f9", borderRadius: 18, padding: 16, color: "#475569", lineHeight: 1.5 },
-  largeText: { fontSize: 18, color: "#334155", lineHeight: 1.6 }
+  largeText: { fontSize: 18, color: "#334155", lineHeight: 1.6 },
+  input: { width: "100%", boxSizing: "border-box", padding: "11px 12px", border: "1px solid #cbd5e1", borderRadius: 12, fontSize: 14 },
+  formGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 },
+  label: { display: "flex", flexDirection: "column", gap: 8, fontWeight: 800, color: "#475569" },
+  adminTools: { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 18 },
+  table: { width: "100%", borderCollapse: "collapse", minWidth: 1100 },
+  th: { textAlign: "left", padding: 10, borderBottom: "1px solid #e2e8f0", color: "#64748b" },
+  td: { padding: 8, borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }
 };
