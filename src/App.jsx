@@ -457,34 +457,34 @@ export default function VimaluxLightingPortalV13() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div style={styles.page}>
+      <div style={styles.container}>
+        <header style={styles.header}>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">VIMALUX Lighting AI Portal</h1>
-            <p className="text-neutral-400">Version 13 – Admin Product Override + PDF Proposal</p>
+            <h1 style={styles.title}>VIMALUX Lighting AI Portal</h1>
+            <p style={styles.subtitle}>Version 13 – Admin Product Override + PDF Proposal</p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <button onClick={exportPdfProposal} className="px-4 py-2 rounded-xl bg-white text-black font-semibold">
+          <div style={styles.buttonRow}>
+            <button onClick={exportPdfProposal} style={styles.primaryButton}>
               Export PDF Proposal
             </button>
-            <button onClick={exportExcel} className="px-4 py-2 rounded-xl bg-neutral-800 border border-neutral-700">
+            <button onClick={exportExcel} style={styles.secondaryButton}>
               Export Excel
             </button>
           </div>
         </header>
 
         {status && (
-          <div className="rounded-xl border border-neutral-700 bg-neutral-900 px-4 py-3 text-sm text-neutral-300">
+          <div style={styles.statusBox}>
             {status}
           </div>
         )}
 
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 rounded-2xl border border-neutral-800 bg-neutral-900 p-5 space-y-4">
-            <h2 className="text-xl font-semibold">Project Input</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <section style={styles.grid3}>
+          <div style={styles.cardWide}>
+            <h2 style={styles.sectionTitle}>Project Input</h2>
+            <div style={styles.formGrid}>
               <Input label="Customer" value={project.customerName} onChange={(v) => updateProject("customerName", v)} />
               <Input label="Municipality" value={project.municipality} onChange={(v) => updateProject("municipality", v)} />
               <Input label="Country" value={project.country} onChange={(v) => updateProject("country", v)} />
@@ -493,10 +493,10 @@ export default function VimaluxLightingPortalV13() {
               <Input label="Quantity" type="number" value={project.quantity} onChange={(v) => updateProject("quantity", toNumber(v))} />
               <Input label="Existing wattage" type="number" value={project.existingWatt} onChange={(v) => updateProject("existingWatt", toNumber(v))} />
 
-              <label className="space-y-1">
-                <span className="text-sm text-neutral-400">Product</span>
+              <label style={styles.field}>
+                <span style={styles.label}>Product</span>
                 <select
-                  className="w-full rounded-xl bg-neutral-950 border border-neutral-700 px-3 py-2"
+                  style={styles.input}
                   value={project.selectedProductId}
                   onChange={(e) => updateProject("selectedProductId", e.target.value)}
                 >
@@ -509,25 +509,25 @@ export default function VimaluxLightingPortalV13() {
               </label>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2">
+            <div style={styles.toggleGrid}>
               <Toggle label="Smart CMS" checked={project.includeSmart} onChange={(v) => updateProject("includeSmart", v)} />
               <Toggle label="PowerAiD" checked={project.includePowerAid} onChange={(v) => updateProject("includePowerAid", v)} />
               <Toggle label="Installation" checked={project.includeInstallation} onChange={(v) => updateProject("includeInstallation", v)} />
               <Toggle label="Maintenance saving" checked={project.includeMaintenance} onChange={(v) => updateProject("includeMaintenance", v)} />
             </div>
 
-            <label className="space-y-1 block">
-              <span className="text-sm text-neutral-400">Notes</span>
+            <label style={styles.field}>
+              <span style={styles.label}>Notes</span>
               <textarea
-                className="w-full min-h-24 rounded-xl bg-neutral-950 border border-neutral-700 px-3 py-2"
+                style={styles.textarea}
                 value={project.notes}
                 onChange={(e) => updateProject("notes", e.target.value)}
               />
             </label>
           </div>
 
-          <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5 space-y-4">
-            <h2 className="text-xl font-semibold">Result</h2>
+          <div style={styles.card}>
+            <h2 style={styles.sectionTitle}>Result</h2>
             <Metric label="Annual net saving" value={euro(calc.annualNetSaving)} />
             <Metric label="Total CAPEX" value={euro(calc.totalCapex)} />
             <Metric label="Payback" value={calc.paybackYears ? `${calc.paybackYears.toFixed(1)} years` : "N/A"} />
@@ -536,10 +536,10 @@ export default function VimaluxLightingPortalV13() {
           </div>
         </section>
 
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5 space-y-4">
-            <h2 className="text-xl font-semibold">Assumptions</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <section style={styles.grid2}>
+          <div style={styles.card}>
+            <h2 style={styles.sectionTitle}>Assumptions</h2>
+            <div style={styles.formGrid}>
               {Object.entries(assumptions).map(([key, value]) => (
                 <Input
                   key={key}
@@ -552,56 +552,56 @@ export default function VimaluxLightingPortalV13() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5 space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold">Admin Mode</h2>
-              {adminMode && <span className="text-xs px-2 py-1 rounded-full bg-green-900 text-green-200">Enabled</span>}
+          <div style={styles.card}>
+            <div style={styles.adminHeader}>
+              <h2 style={styles.sectionTitle}>Admin Mode</h2>
+              {adminMode && <span style={styles.badge}>Enabled</span>}
             </div>
 
             {!adminMode ? (
-              <div className="flex gap-2">
+              <div style={styles.buttonRow}>
                 <input
-                  className="flex-1 rounded-xl bg-neutral-950 border border-neutral-700 px-3 py-2"
+                  style={styles.input}
                   type="password"
                   placeholder="Admin password"
                   value={adminPassword}
                   onChange={(e) => setAdminPassword(e.target.value)}
                 />
-                <button onClick={loginAdmin} className="px-4 py-2 rounded-xl bg-neutral-100 text-black font-semibold">
+                <button onClick={loginAdmin} style={styles.primaryButton}>
                   Unlock
                 </button>
               </div>
             ) : (
-              <div className="space-y-3">
-                <div className="flex gap-2">
-                  <button onClick={addProduct} className="px-4 py-2 rounded-xl bg-neutral-100 text-black font-semibold">
+              <div style={styles.stack}>
+                <div style={styles.buttonRow}>
+                  <button onClick={addProduct} style={styles.primaryButton}>
                     Add Product
                   </button>
-                  <button onClick={resetProducts} className="px-4 py-2 rounded-xl bg-neutral-800 border border-neutral-700">
+                  <button onClick={resetProducts} style={styles.secondaryButton}>
                     Reset Products
                   </button>
-                  <button onClick={() => setAdminMode(false)} className="px-4 py-2 rounded-xl bg-neutral-800 border border-neutral-700">
+                  <button onClick={() => setAdminMode(false)} style={styles.secondaryButton}>
                     Lock
                   </button>
                 </div>
 
-                <div className="overflow-auto max-h-96 border border-neutral-800 rounded-xl">
-                  <table className="w-full text-sm">
-                    <thead className="bg-neutral-950 text-neutral-400 sticky top-0">
+                <div style={styles.tableWrapSmall}>
+                  <table style={styles.table}>
+                    <thead style={styles.tableHead}>
                       <tr>
-                        <th className="text-left p-2">Name</th>
-                        <th className="text-right p-2">W</th>
-                        <th className="text-right p-2">lm</th>
-                        <th className="text-right p-2">Sell</th>
-                        <th className="text-right p-2">Buy</th>
-                        <th className="text-right p-2">Install</th>
+                        <th style={styles.thLeft}>Name</th>
+                        <th style={styles.thRight}>W</th>
+                        <th style={styles.thRight}>lm</th>
+                        <th style={styles.thRight}>Sell</th>
+                        <th style={styles.thRight}>Buy</th>
+                        <th style={styles.thRight}>Install</th>
                       </tr>
                     </thead>
                     <tbody>
                       {products.map((p) => (
-                        <tr key={p.id} className="border-t border-neutral-800">
-                          <td className="p-2">
-                            <input className="w-48 bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1" value={p.name} onChange={(e) => updateProduct(p.id, "name", e.target.value)} />
+                        <tr key={p.id} style={styles.tr}>
+                          <td style={styles.td}>
+                            <input style={styles.adminInputWide} value={p.name} onChange={(e) => updateProduct(p.id, "name", e.target.value)} />
                           </td>
                           <AdminCell value={p.watt} onChange={(v) => updateProduct(p.id, "watt", v)} />
                           <AdminCell value={p.lumen} onChange={(v) => updateProduct(p.id, "lumen", v)} />
@@ -618,33 +618,33 @@ export default function VimaluxLightingPortalV13() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5 space-y-4">
-          <h2 className="text-xl font-semibold">10-Year Cashflow Preview</h2>
-          <div className="overflow-auto">
-            <table className="w-full text-sm">
-              <thead className="text-neutral-400 border-b border-neutral-800">
+        <section style={styles.card}>
+          <h2 style={styles.sectionTitle}>10-Year Cashflow Preview</h2>
+          <div style={styles.tableWrap}>
+            <table style={styles.table}>
+              <thead style={styles.tableHead}>
                 <tr>
-                  <th className="text-left py-2">Year</th>
-                  <th className="text-right py-2">Old energy</th>
-                  <th className="text-right py-2">New energy</th>
-                  <th className="text-right py-2">Energy saving</th>
-                  <th className="text-right py-2">Maintenance saving</th>
-                  <th className="text-right py-2">New OPEX</th>
-                  <th className="text-right py-2">Net saving</th>
-                  <th className="text-right py-2">Cumulative</th>
+                  <th style={styles.thLeft}>Year</th>
+                  <th style={styles.thRight}>Old energy</th>
+                  <th style={styles.thRight}>New energy</th>
+                  <th style={styles.thRight}>Energy saving</th>
+                  <th style={styles.thRight}>Maintenance saving</th>
+                  <th style={styles.thRight}>New OPEX</th>
+                  <th style={styles.thRight}>Net saving</th>
+                  <th style={styles.thRight}>Cumulative</th>
                 </tr>
               </thead>
               <tbody>
                 {yearRows.map((r) => (
-                  <tr key={r.year} className="border-b border-neutral-800">
-                    <td className="py-2">{r.year}</td>
-                    <td className="text-right">{euro(r.oldEnergyCost)}</td>
-                    <td className="text-right">{euro(r.newEnergyCost)}</td>
-                    <td className="text-right">{euro(r.energySaving)}</td>
-                    <td className="text-right">{euro(r.maintenanceSaving)}</td>
-                    <td className="text-right">{euro(r.newOpex)}</td>
-                    <td className="text-right font-semibold">{euro(r.netSaving)}</td>
-                    <td className="text-right font-semibold">{euro(r.cumulativeNetSaving)}</td>
+                  <tr key={r.year} style={styles.tr}>
+                    <td style={styles.td}>{r.year}</td>
+                    <td style={styles.tdRight}>{euro(r.oldEnergyCost)}</td>
+                    <td style={styles.tdRight}>{euro(r.newEnergyCost)}</td>
+                    <td style={styles.tdRight}>{euro(r.energySaving)}</td>
+                    <td style={styles.tdRight}>{euro(r.maintenanceSaving)}</td>
+                    <td style={styles.tdRight}>{euro(r.newOpex)}</td>
+                    <td style={styles.tdRightStrong}>{euro(r.netSaving)}</td>
+                    <td style={styles.tdRightStrong}>{euro(r.cumulativeNetSaving)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -659,12 +659,54 @@ export default function VimaluxLightingPortalV13() {
 /* =========================
    UI COMPONENTS
 ========================= */
+const styles = {
+  page: { minHeight: "100vh", background: "#0a0a0a", color: "#f5f5f5", padding: 24, fontFamily: "Inter, Arial, sans-serif" },
+  container: { maxWidth: 1280, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" },
+  title: { fontSize: 34, lineHeight: 1.1, margin: 0, fontWeight: 800 },
+  subtitle: { color: "#a3a3a3", marginTop: 8 },
+  buttonRow: { display: "flex", gap: 8, flexWrap: "wrap" },
+  primaryButton: { padding: "10px 14px", borderRadius: 12, border: "1px solid #fff", background: "#fff", color: "#000", fontWeight: 700, cursor: "pointer" },
+  secondaryButton: { padding: "10px 14px", borderRadius: 12, border: "1px solid #404040", background: "#262626", color: "#fff", cursor: "pointer" },
+  statusBox: { border: "1px solid #404040", background: "#171717", borderRadius: 12, padding: 12, color: "#d4d4d4" },
+  grid3: { display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 },
+  grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 },
+  card: { border: "1px solid #262626", background: "#171717", borderRadius: 20, padding: 20, display: "flex", flexDirection: "column", gap: 16 },
+  cardWide: { border: "1px solid #262626", background: "#171717", borderRadius: 20, padding: 20, display: "flex", flexDirection: "column", gap: 16 },
+  sectionTitle: { fontSize: 22, margin: 0, fontWeight: 700 },
+  formGrid: { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16 },
+  toggleGrid: { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 },
+  field: { display: "flex", flexDirection: "column", gap: 6 },
+  label: { fontSize: 13, color: "#a3a3a3" },
+  input: { width: "100%", boxSizing: "border-box", borderRadius: 12, border: "1px solid #404040", background: "#0a0a0a", color: "#fff", padding: "10px 12px" },
+  textarea: { width: "100%", minHeight: 90, boxSizing: "border-box", borderRadius: 12, border: "1px solid #404040", background: "#0a0a0a", color: "#fff", padding: "10px 12px" },
+  metric: { background: "#0a0a0a", border: "1px solid #262626", borderRadius: 14, padding: 16 },
+  metricValue: { fontSize: 26, fontWeight: 800, marginTop: 4 },
+  adminHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  badge: { fontSize: 12, padding: "4px 8px", borderRadius: 999, background: "#14532d", color: "#bbf7d0" },
+  stack: { display: "flex", flexDirection: "column", gap: 12 },
+  tableWrap: { overflowX: "auto" },
+  tableWrapSmall: { overflowX: "auto", maxHeight: 380, border: "1px solid #262626", borderRadius: 12 },
+  table: { width: "100%", borderCollapse: "collapse", fontSize: 14 },
+  tableHead: { background: "#0a0a0a", color: "#a3a3a3", borderBottom: "1px solid #262626" },
+  thLeft: { textAlign: "left", padding: 10, whiteSpace: "nowrap" },
+  thRight: { textAlign: "right", padding: 10, whiteSpace: "nowrap" },
+  tr: { borderBottom: "1px solid #262626" },
+  td: { padding: 10 },
+  tdRight: { padding: 10, textAlign: "right" },
+  tdRightStrong: { padding: 10, textAlign: "right", fontWeight: 700 },
+  toggle: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, borderRadius: 12, border: "1px solid #262626", background: "#0a0a0a", padding: "10px 12px" },
+  toggleLabel: { fontSize: 14, color: "#d4d4d4" },
+  adminInput: { width: 90, textAlign: "right", borderRadius: 8, border: "1px solid #404040", background: "#0a0a0a", color: "#fff", padding: "6px 8px" },
+  adminInputWide: { width: 180, borderRadius: 8, border: "1px solid #404040", background: "#0a0a0a", color: "#fff", padding: "6px 8px" },
+};
+
 function Input({ label, value, onChange, type = "text" }) {
   return (
-    <label className="space-y-1 block">
-      <span className="text-sm text-neutral-400">{label}</span>
+    <label style={styles.field}>
+      <span style={styles.label}>{label}</span>
       <input
-        className="w-full rounded-xl bg-neutral-950 border border-neutral-700 px-3 py-2"
+        style={styles.input}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -675,8 +717,8 @@ function Input({ label, value, onChange, type = "text" }) {
 
 function Toggle({ label, checked, onChange }) {
   return (
-    <label className="flex items-center justify-between gap-3 rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-2">
-      <span className="text-sm text-neutral-300">{label}</span>
+    <label style={styles.toggle}>
+      <span style={styles.toggleLabel}>{label}</span>
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
     </label>
   );
@@ -684,18 +726,18 @@ function Toggle({ label, checked, onChange }) {
 
 function Metric({ label, value }) {
   return (
-    <div className="rounded-xl bg-neutral-950 border border-neutral-800 p-4">
-      <div className="text-sm text-neutral-400">{label}</div>
-      <div className="text-2xl font-bold mt-1">{value}</div>
+    <div style={styles.metric}>
+      <div style={styles.label}>{label}</div>
+      <div style={styles.metricValue}>{value}</div>
     </div>
   );
 }
 
 function AdminCell({ value, onChange }) {
   return (
-    <td className="p-2 text-right">
+    <td style={styles.tdRight}>
       <input
-        className="w-24 text-right bg-neutral-950 border border-neutral-700 rounded-lg px-2 py-1"
+        style={styles.adminInput}
         type="number"
         value={value}
         onChange={(e) => onChange(e.target.value)}
