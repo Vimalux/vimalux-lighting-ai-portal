@@ -184,6 +184,7 @@ export default function VimaluxLightingPortalV15() {
   const [assumptions, setAssumptions] = useState(defaultAssumptions);
   const [project, setProject] = useState(emptyProject);
   const [adminMode, setAdminMode] = useState(false);
+  const [viewMode, setViewMode] = useState("customer");
   const [adminPassword, setAdminPassword] = useState("");
   const [toast, setToast] = useState("");
 
@@ -234,6 +235,7 @@ export default function VimaluxLightingPortalV15() {
   function unlockAdmin() {
     if (adminPassword === ADMIN_PASSWORD) {
       setAdminMode(true);
+      setViewMode("admin");
       setAdminPassword("");
       setToast("Admin mode enabled");
     } else {
@@ -265,6 +267,23 @@ export default function VimaluxLightingPortalV15() {
 
   function exportPdfProposal() {
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    // PAGE 1 COVER
+    doc.setFillColor(17,19,21);
+    doc.rect(0,0,210,297,"F");
+    doc.setTextColor(255,255,255);
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(24);
+    doc.text("VIMALUX",14,24);
+    doc.setFontSize(18);
+    doc.text("Smart Public Lighting Proposal",14,40);
+    doc.setFont("helvetica","normal");
+    doc.setFontSize(11);
+    doc.text(`Customer: ${project.customerName || "-"}`,14,60);
+    doc.text(`Municipality: ${project.municipality || "-"}`,14,68);
+    doc.text(`Date: ${project.proposalDate}`,14,76);
+    doc.text("Energy savings, Smart controls, Lower OPEX, Financing options.",14,98);
+    doc.addPage();
+    // PAGE 2 KPI({ orientation: "portrait", unit: "mm", format: "a4" });
     doc.setFillColor(17, 19, 21);
     doc.rect(0, 0, 210, 34, "F");
     doc.setTextColor(255, 255, 255);
@@ -308,7 +327,17 @@ export default function VimaluxLightingPortalV15() {
 
     doc.setFontSize(8);
     doc.text("Non-binding indication: all figures are indicative and subject to technical validation, financing approval, final product selection, legal structure and site verification.", 14, 285, { maxWidth: 182 });
-    doc.save(`VIMALUX_${project.municipality || "proposal"}_V15.pdf`);
+    doc.addPage();
+    doc.setFontSize(18);
+    doc.setFont("helvetica","bold");
+    doc.text("Why VIMALUX",14,24);
+    doc.setFontSize(11);
+    doc.setFont("helvetica","normal");
+    doc.text("• Financing structures incl. LaaS and receivable-backed models",14,44);
+    doc.text("• Smart CMS + CLO + PowerAiD optimization",14,54);
+    doc.text("• Hardware agnostic execution",14,64);
+    doc.text("• Municipal and investor focused delivery model",14,74);
+    doc.save(`VIMALUX_${project.municipality || "proposal"}_V16.pdf`);
   }
 
   return (
@@ -317,10 +346,10 @@ export default function VimaluxLightingPortalV15() {
       <div style={styles.shell}>
         <header style={styles.header}>
           <div>
-            <div style={styles.brandRow}><div style={styles.logoMark}>V</div><div><h1 style={styles.title}>VIMALUX Lighting AI Portal</h1><p style={styles.subtitle}>Version 15 – Investor Dashboard</p></div></div>
+            <div style={styles.brandRow}><div style={styles.logoMark}>V</div><div><h1 style={styles.title}>VIMALUX Lighting AI Portal</h1><p style={styles.subtitle}>Version 16 – Dual Mode Commercial Platform</p></div></div>
           </div>
           <div style={styles.headerActions}>
-            <span style={adminMode ? styles.adminOn : styles.adminOff}>{adminMode ? "Admin enabled" : "Viewer mode"}</span>
+            <button onClick={() => setViewMode("customer")} style={viewMode === "customer" ? styles.primaryButton : styles.secondaryButton}>Customer View</button><button onClick={() => adminMode && setViewMode("admin")} style={viewMode === "admin" ? styles.primaryButton : styles.secondaryButton}>{adminMode ? "Admin View" : "Admin Locked"}</button><span style={adminMode ? styles.adminOn : styles.adminOff}>{adminMode ? "Admin enabled" : "Viewer mode"}</span>
             <span style={styles.dateBadge}>{new Date().toLocaleDateString("it-IT")}</span>
             <button onClick={exportPdfProposal} style={styles.primaryButton}>PDF Proposal</button>
             <button onClick={exportExcel} style={styles.secondaryButton}>Excel</button>
@@ -367,7 +396,7 @@ export default function VimaluxLightingPortalV15() {
           </div>
         </section>
 
-        <section style={styles.twoGrid}>
+        {viewMode === "admin" && <section style={styles.twoGrid}>
           <div style={styles.card}>
             <SectionTitle title="Assumptions" sub="EU decimal input accepted: 0,29" />
             <div style={styles.formGrid}>{Object.entries(assumptions).map(([key, value]) => <Input key={key} label={key} type="number" value={value} onChange={(v) => updateAssumption(key, v)} />)}</div>
@@ -377,7 +406,7 @@ export default function VimaluxLightingPortalV15() {
             <div style={styles.cardTop}><SectionTitle title="Admin Product Override" sub="Protected catalogue editing" />{adminMode && <span style={styles.adminOn}>Enabled</span>}</div>
             {!adminMode ? <div style={styles.adminLogin}><input style={styles.input} type="password" placeholder="Admin password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} /><button onClick={unlockAdmin} style={styles.primaryButton}>Unlock</button></div> : <div style={styles.stack}><div style={styles.buttonRow}><button onClick={addProduct} style={styles.primaryButton}>Add Product</button><button onClick={() => setProducts(defaultProducts)} style={styles.secondaryButton}>Reset Products</button><button onClick={() => setAdminMode(false)} style={styles.ghostButton}>Lock</button></div><ProductTable products={products} updateProduct={updateProduct} /></div>}
           </div>
-        </section>
+        </section>}
 
         <section style={styles.card}>
           <SectionTitle title="Cashflow Preview" sub="Annual savings logic" />
