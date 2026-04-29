@@ -316,11 +316,23 @@ export default function App() {
     downloadText("vimalux_customer_roi.csv", header + "\n" + body);
   }
 
-  function exportCatalogue() {
-    const header = "Name,Watt,SellPrice,BuyPrice,Install";
-    const body = products.map((p) => [p.name, p.watt, p.sellPrice, p.buyPrice || 0, p.install].join(",")).join("\n");
-    downloadText("vimalux_product_catalogue.csv", header + "\n" + body);
-  }
+ function exportCatalogue() {
+  const data = products.map((p) => ({
+    Name: p.name,
+    Watt: p.watt,
+    SellPrice: p.sellPrice,
+    BuyPrice: p.buyPrice || 0,
+    Install: p.install,
+    UnitCAPEX: Number(p.sellPrice) + Number(p.install),
+    MarginPerUnit: Number(p.sellPrice) - Number(p.buyPrice || 0)
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(wb, ws, "ProductCatalogue");
+  XLSX.writeFile(wb, "vimalux_product_catalogue.xlsx");
+}
 
   function downloadText(filename, text) {
     const blob = new Blob([text], { type: "text/csv" });
