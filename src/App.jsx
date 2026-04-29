@@ -5,9 +5,9 @@ import autoTable from "jspdf-autotable";
 
 /* =====================================================
    VIMALUX LIGHTING AI PORTAL
-   VERSION 29 – SMART SOLUTION ROI ENGINE
-   React single-file build
-   No Tailwind dependency
+   VERSION 30 – FULL ENTERPRISE APP
+   Dashboard + Audit Import + ROI Engine + Admin
+   Product Override + Excel + Multi-page PDF
 ===================================================== */
 
 const productsDefault = [
@@ -45,6 +45,7 @@ const assumptionsDefault = {
   powerAidAdditionalSavingPct: 35,
   proposalYears: 10,
   discountRatePct: 7,
+  kgCo2PerKwh: 0.42,
   serviceEfficiencyPerLampYear: 10,
   fewerFailuresPerLampYear: 6,
   adminReductionPerLampYear: 4,
@@ -65,7 +66,7 @@ const offers = [
     smart: true,
     powerAid: false,
     badge: "Recommended",
-    bestFor: "Smart control + CLO + maintenance + optimized profiles",
+    bestFor: "Control + CLO + smart profiles + maintenance",
   },
   {
     id: "premium",
@@ -73,7 +74,7 @@ const offers = [
     smart: true,
     powerAid: true,
     badge: "Premium",
-    bestFor: "Highest 10Y value and maximum measured optimization",
+    bestFor: "Maximum measured optimization and highest 10Y value",
   },
 ];
 
@@ -110,7 +111,6 @@ function calcCase(project, a, product, offer) {
   const smartSolutionSaving = offer.smart
     ? postCloCost * (n(a.smartSolutionSavingPct) / 100)
     : 0;
-
   const postSmartCost = postCloCost - smartSolutionSaving;
 
   const powerAidSaving = offer.powerAid
@@ -158,8 +158,17 @@ function calcCase(project, a, product, offer) {
     upsideNpv += upsideNet / Math.pow(1 + rate, y);
   }
 
+  const co2SavedTons =
+    oldEnergyCost > 0
+      ? ((ledSaving + cloSaving + smartSolutionSaving + powerAidSaving) /
+          n(a.energyPrice)) *
+        n(a.kgCo2PerKwh) /
+        1000
+      : 0;
+
   return {
     ...offer,
+    productName: product.name,
     capex,
     ledSaving,
     cloSaving,
@@ -177,6 +186,7 @@ function calcCase(project, a, product, offer) {
     upside10Y: upsideNet * years,
     baseNpv,
     upsideNpv,
+    co2SavedTons,
     energyReductionPct: oldEnergyCost
       ? ((ledSaving + cloSaving + smartSolutionSaving + powerAidSaving) /
           oldEnergyCost) *
@@ -191,6 +201,8 @@ export default function App() {
   const [project, setProject] = useState({
     customer: "",
     municipality: "",
+    country: "Italy",
+    contact: "",
     quantity: 500,
     existingWatt: 100,
     selectedProductId: "street60",
@@ -257,9 +269,7 @@ export default function App() {
         });
       });
 
-      if (!totalQty || !totalWatt) {
-        throw new Error("No valid audit rows found");
-      }
+      if (!totalQty || !totalWatt) throw new Error("No valid audit rows");
 
       const avg = totalWatt / totalQty;
 
@@ -289,67 +299,8 @@ export default function App() {
     e.target.value = "";
   }
 
-  function exportPdf() {
-    const doc = new jsPDF();
-
-    doc.setFontSize(20);
-    doc.text("VIMALUX Smart Lighting Proposal", 14, 20);
-
-    doc.setFontSize(10);
-    doc.text(`Customer: ${project.customer || "-"}`, 14, 30);
-    doc.text(`Municipality: ${project.municipality || "-"}`, 14, 36);
-    doc.text(`Selected package: ${selected.title}`, 14, 42);
-
-    autoTable(doc, {
-      startY: 52,
-      head: [["Metric", "Value"]],
-      body: [
-        ["Quantity", project.quantity],
-        ["Existing wattage", `${project.existingWatt} W`],
-        ["CAPEX", euro(selected.capex)],
-        ["Base annual net saving", euro(selected.baseNet)],
-        ["Base payback", `${dec(selected.basePayback)} years`],
-        ["Upside annual net saving", euro(selected.upsideNet)],
-        ["Upside payback", `${dec(selected.upsidePayback)} years`],
-        ["10Y base net", euro(selected.base10Y)],
-        ["10Y upside net", euro(selected.upside10Y)],
-        ["Energy reduction", `${dec(selected.energyReductionPct)}%`],
-      ],
-    });
-
-    autoTable(doc, {
-      startY: doc.lastAutoTable.finalY + 10,
-      head: [["Layer", "Annual value"]],
-      body: [
-        ["LED saving", euro(selected.ledSaving)],
-        ["CLO saving", euro(selected.cloSaving)],
-        ["Smart solution saving", euro(selected.smartSolutionSaving)],
-        ["Maintenance saving", euro(selected.maintenanceSaving)],
-        ["PowerAiD saving", euro(selected.powerAidSaving)],
-        ["OPEX", `-${euro(selected.opex)}`],
-        ["Operational upside", euro(selected.operationalUpside)],
-      ],
-    });
-
-    if (audit) {
-      autoTable(doc, {
-        startY: doc.lastAutoTable.finalY + 10,
-        head: [["Audit", "Value"]],
-        body: [
-          ["File", audit.fileName],
-          ["Rows used", audit.rows],
-          ["Quantity", Math.round(audit.quantity)],
-          ["Average existing wattage", `${audit.averageWatt.toFixed(1)} W`],
-        ],
-      });
-    }
-
-    doc.save("VIMALUX_V29_Proposal.pdf");
-  }
-
   function exportExcel() {
     const wb = XLSX.utils.book_new();
-
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cases), "Cases");
     XLSX.utils.book_append_sheet(
       wb,
@@ -366,16 +317,153 @@ export default function App() {
       XLSX.utils.json_to_sheet(products),
       "Products"
     );
-
     if (audit) {
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet([audit]),
-        "Audit"
-      );
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([audit]), "Audit");
     }
+    XLSX.writeFile(wb, "VIMALUX_V30.xlsx");
+  }
 
-    XLSX.writeFile(wb, "VIMALUX_V29.xlsx");
+  function pdfHeader(doc, title, subtitle) {
+    doc.setFillColor(245, 247, 250);
+    doc.rect(0, 0, 210, 30, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(9, 26, 58);
+    doc.text("VIMALUX Smart Lighting Proposal", 14, 13);
+    doc.setFontSize(13);
+    doc.text(title, 14, 23);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(90, 90, 90);
+    doc.text(subtitle, 120, 23);
+  }
+
+  function exportPdf() {
+    const doc = new jsPDF("p", "mm", "a4");
+    const navy = [9, 26, 58];
+
+    pdfHeader(doc, "1. Executive Summary", "Commercial overview");
+
+    autoTable(doc, {
+      startY: 42,
+      head: [["Field", "Value"]],
+      body: [
+        ["Customer", project.customer || "-"],
+        ["Municipality", project.municipality || "-"],
+        ["Country", project.country || "-"],
+        ["Selected package", selected.title],
+        ["Quantity", project.quantity],
+        ["Existing wattage", `${project.existingWatt} W`],
+        ["Product", product.name],
+        ["CAPEX", euro(selected.capex)],
+        ["Energy reduction", `${dec(selected.energyReductionPct)}%`],
+      ],
+      headStyles: { fillColor: navy },
+    });
+
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 10,
+      head: [["Financial metric", "Base case", "Upside case"]],
+      body: [
+        ["Annual net saving", euro(selected.baseNet), euro(selected.upsideNet)],
+        [
+          "Simple payback",
+          `${dec(selected.basePayback)} years`,
+          `${dec(selected.upsidePayback)} years`,
+        ],
+        ["10Y net benefit", euro(selected.base10Y), euro(selected.upside10Y)],
+        ["NPV", euro(selected.baseNpv), euro(selected.upsideNpv)],
+        ["CO2 saved / year", `${dec(selected.co2SavedTons)} t`, "-"],
+      ],
+      headStyles: { fillColor: navy },
+    });
+
+    doc.addPage();
+    pdfHeader(doc, "2. Offer Comparison", "LED vs Smart vs Premium");
+
+    autoTable(doc, {
+      startY: 42,
+      head: [["Package", "CAPEX", "Base payback", "Base 10Y", "Upside payback", "Upside 10Y"]],
+      body: cases.map((c) => [
+        c.title,
+        euro(c.capex),
+        `${dec(c.basePayback)} yrs`,
+        euro(c.base10Y),
+        `${dec(c.upsidePayback)} yrs`,
+        euro(c.upside10Y),
+      ]),
+      headStyles: { fillColor: navy },
+      styles: { fontSize: 8 },
+    });
+
+    doc.addPage();
+    pdfHeader(doc, "3. Value Stack", "Annual contribution by value layer");
+
+    autoTable(doc, {
+      startY: 42,
+      head: [["Layer", "Annual value", "Comment"]],
+      body: [
+        ["LED saving", euro(selected.ledSaving), "Baseline upgrade saving"],
+        ["CLO saving", euro(selected.cloSaving), "Post-LED optimization"],
+        [
+          "Smart CMS additional saving",
+          euro(selected.smartSolutionSaving),
+          `${assumptions.smartSolutionSavingPct}% additional smart profile saving`,
+        ],
+        ["Maintenance saving", euro(selected.maintenanceSaving), "Smart-enabled reduction"],
+        ["PowerAiD saving", euro(selected.powerAidSaving), "Traffic / adaptive optimization"],
+        ["Recurring OPEX", `-${euro(selected.opex)}`, "CMS / PowerAiD services"],
+        ["Operational upside", euro(selected.operationalUpside), "Not bankable base case"],
+      ],
+      headStyles: { fillColor: navy },
+    });
+
+    doc.addPage();
+    pdfHeader(doc, "4. Audit Baseline", "Imported customer audit sheet");
+
+    autoTable(doc, {
+      startY: 42,
+      head: [["Audit parameter", "Value"]],
+      body: [
+        ["Source file", audit?.fileName || "Manual input"],
+        ["Rows used", audit?.rows || "-"],
+        ["Quantity", project.quantity],
+        ["Average existing wattage", `${project.existingWatt} W`],
+        ["Rule", "Rows 1–29, Column D = quantity, Column G = watt"],
+      ],
+      headStyles: { fillColor: navy },
+    });
+
+    doc.addPage();
+    pdfHeader(doc, "5. Assumptions", "Admin modelling inputs");
+
+    autoTable(doc, {
+      startY: 42,
+      head: [["Parameter", "Value"]],
+      body: Object.entries(assumptions).map(([key, value]) => [key, String(value)]),
+      headStyles: { fillColor: navy },
+      styles: { fontSize: 8 },
+    });
+
+    doc.addPage();
+    pdfHeader(doc, "6. Disclaimer", "Indicative non-binding proposal");
+
+    const disclaimer = [
+      "This proposal is indicative and non-binding.",
+      "",
+      "All calculations are based on customer supplied data, imported audit inputs, standard market assumptions and estimated operating conditions.",
+      "",
+      "Final commercial terms, technical scope, financing structure, credit approval and implementation schedule remain subject to due diligence, contract negotiation and management approval.",
+      "",
+      "Savings may vary depending on burn hours, tariffs, dimming profile, baseline inventory, maintenance regime and operational execution.",
+    ];
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(60, 60, 60);
+    doc.text(disclaimer.join("\n"), 14, 48, { maxWidth: 180 });
+
+    doc.save("VIMALUX_V30_Enterprise_Proposal.pdf");
   }
 
   return (
@@ -389,7 +477,7 @@ export default function App() {
       <div style={s.header}>
         <div>
           <h1 style={s.h1}>VIMALUX Lighting AI Portal</h1>
-          <p style={s.sub}>Version 29 – Smart Solution ROI Engine</p>
+          <p style={s.sub}>Version 30 – Full Enterprise App</p>
         </div>
 
         <div style={s.row}>
@@ -489,15 +577,9 @@ export default function App() {
         <Kpi label="Base Annual Net" value={euro(selected.baseNet)} />
         <Kpi label="Upside Annual Net" value={euro(selected.upsideNet)} />
         <Kpi label="Base Payback" value={`${dec(selected.basePayback)} yrs`} />
-        <Kpi
-          label="Upside Payback"
-          value={`${dec(selected.upsidePayback)} yrs`}
-        />
+        <Kpi label="Upside Payback" value={`${dec(selected.upsidePayback)} yrs`} />
         <Kpi label="CAPEX" value={euro(selected.capex)} />
-        <Kpi
-          label="Energy Reduction"
-          value={`${dec(selected.energyReductionPct)}%`}
-        />
+        <Kpi label="Energy Reduction" value={`${dec(selected.energyReductionPct)}%`} />
       </div>
 
       <div style={s.grid2}>
@@ -505,36 +587,16 @@ export default function App() {
           <h2>Project Input</h2>
 
           <div style={s.formGrid}>
-            <Input
-              label="Customer"
-              value={project.customer}
-              onChange={(v) => updateProject("customer", v)}
-            />
-            <Input
-              label="Municipality"
-              value={project.municipality}
-              onChange={(v) => updateProject("municipality", v)}
-            />
-            <Input
-              label="Quantity"
-              value={project.quantity}
-              onChange={(v) => updateProject("quantity", n(v))}
-            />
-            <Input
-              label="Existing wattage"
-              value={project.existingWatt}
-              onChange={(v) => updateProject("existingWatt", n(v))}
-            />
+            <Input label="Customer" value={project.customer} onChange={(v) => updateProject("customer", v)} />
+            <Input label="Municipality" value={project.municipality} onChange={(v) => updateProject("municipality", v)} />
+            <Input label="Country" value={project.country} onChange={(v) => updateProject("country", v)} />
+            <Input label="Contact" value={project.contact} onChange={(v) => updateProject("contact", v)} />
+            <Input label="Quantity" value={project.quantity} onChange={(v) => updateProject("quantity", n(v))} />
+            <Input label="Existing wattage" value={project.existingWatt} onChange={(v) => updateProject("existingWatt", n(v))} />
 
             <label>
               Product
-              <select
-                style={s.input}
-                value={project.selectedProductId}
-                onChange={(e) =>
-                  updateProject("selectedProductId", e.target.value)
-                }
-              >
+              <select style={s.input} value={project.selectedProductId} onChange={(e) => updateProject("selectedProductId", e.target.value)}>
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} – {p.watt}W – {euro(p.sellPrice)}
@@ -548,9 +610,7 @@ export default function App() {
               <input
                 type="checkbox"
                 checked={project.includeInstallation}
-                onChange={(e) =>
-                  updateProject("includeInstallation", e.target.checked)
-                }
+                onChange={(e) => updateProject("includeInstallation", e.target.checked)}
               />
             </label>
           </div>
@@ -558,43 +618,13 @@ export default function App() {
 
         <div style={s.card}>
           <h2>Value Stack</h2>
-          <Bar
-            label="LED saving"
-            value={selected.ledSaving}
-            max={selected.guaranteedSaving}
-          />
-          <Bar
-            label="CLO saving"
-            value={selected.cloSaving}
-            max={selected.guaranteedSaving}
-          />
-          <Bar
-            label="Smart solution saving"
-            value={selected.smartSolutionSaving}
-            max={selected.guaranteedSaving}
-          />
-          <Bar
-            label="Maintenance saving"
-            value={selected.maintenanceSaving}
-            max={selected.guaranteedSaving}
-          />
-          <Bar
-            label="PowerAiD saving"
-            value={selected.powerAidSaving}
-            max={selected.guaranteedSaving}
-          />
-          <Bar
-            label="OPEX"
-            value={-selected.opex}
-            max={selected.guaranteedSaving}
-            red
-          />
-          <Bar
-            label="Operational upside"
-            value={selected.operationalUpside}
-            max={selected.operationalUpside || 1}
-            green
-          />
+          <Bar label="LED saving" value={selected.ledSaving} max={selected.guaranteedSaving} />
+          <Bar label="CLO saving" value={selected.cloSaving} max={selected.guaranteedSaving} />
+          <Bar label="Smart CMS additional saving" value={selected.smartSolutionSaving} max={selected.guaranteedSaving} />
+          <Bar label="Maintenance saving" value={selected.maintenanceSaving} max={selected.guaranteedSaving} />
+          <Bar label="PowerAiD saving" value={selected.powerAidSaving} max={selected.guaranteedSaving} />
+          <Bar label="OPEX" value={-selected.opex} max={selected.guaranteedSaving} red />
+          <Bar label="Operational upside" value={selected.operationalUpside} max={selected.operationalUpside || 1} green />
         </div>
       </div>
 
@@ -605,12 +635,7 @@ export default function App() {
               <h2>Admin Assumptions</h2>
               <div style={s.formGrid}>
                 {Object.entries(assumptions).map(([k, v]) => (
-                  <Input
-                    key={k}
-                    label={k}
-                    value={v}
-                    onChange={(x) => updateAssumption(k, x)}
-                  />
+                  <Input key={k} label={k} value={v} onChange={(x) => updateAssumption(k, x)} />
                 ))}
               </div>
             </div>
