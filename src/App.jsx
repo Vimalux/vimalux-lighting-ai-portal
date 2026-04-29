@@ -29,6 +29,7 @@ const defaultAssumptions = {
   powerAidFeePerLampYear: 3,
   smartDimmingSavingPct: 18,
   cloSavingPct: 10,
+  powerAidAdditionalSavingPct: 35,
   proposalYears: 10,
   financingMarginPct: 8,
   kgCo2PerKwh: 0.28,
@@ -99,11 +100,18 @@ function calculate(project, assumptions, products) {
   const ledKwh = (quantity * newWatt * hours) / 1000;
   const smartSaving = project.includeSmart ? toNumber(assumptions.smartDimmingSavingPct) / 100 : 0;
   const cloSaving = project.includeSmart ? toNumber(assumptions.cloSavingPct) / 100 : 0;
-  const finalKwh = ledKwh * Math.max(0, 1 - smartSaving - cloSaving);
+  const smartBaseKwh = ledKwh * Math.max(0, 1 - smartSaving - cloSaving);
+  const powerAidAdditionalSaving = project.includePowerAid ? toNumber(assumptions.powerAidAdditionalSavingPct) / 100 : 0;
+  const finalKwh = smartBaseKwh * Math.max(0, 1 - powerAidAdditionalSaving);
 
   const oldEnergyCost = oldKwh * energyPrice;
   const newEnergyCost = finalKwh * energyPrice;
   const energySaving = Math.max(0, oldEnergyCost - newEnergyCost);
+  const ledOnlyEnergyCost = ledKwh * energyPrice;
+  const smartBaseEnergyCost = smartBaseKwh * energyPrice;
+  const ledSaving = Math.max(0, oldEnergyCost - ledOnlyEnergyCost);
+  const smartCmsSaving = project.includeSmart ? Math.max(0, ledOnlyEnergyCost - smartBaseEnergyCost) : 0;
+  const powerAidSaving = project.includePowerAid ? Math.max(0, smartBaseEnergyCost - newEnergyCost) : 0;
   const maintenanceSaving = project.includeMaintenance
     ? quantity * toNumber(assumptions.maintenanceOldPerLamp) * (toNumber(assumptions.maintenanceSavingPct) / 100)
     : 0;
@@ -131,6 +139,9 @@ function calculate(project, assumptions, products) {
     oldEnergyCost,
     newEnergyCost,
     energySaving,
+    ledSaving,
+    smartCmsSaving,
+    powerAidSaving,
     maintenanceSaving,
     annualNewOpex,
     annualNetSaving,
@@ -146,6 +157,8 @@ function calculate(project, assumptions, products) {
     energyReductionPct: oldKwh > 0 ? ((oldKwh - finalKwh) / oldKwh) * 100 : 0,
     co2SavedTons,
     tenYearNetSavings: annualNetSaving * years,
+    smartBaseKwh,
+    ledKwh,
   };
 }
 
@@ -206,12 +219,15 @@ export default function VimaluxLightingPortalV15() {
   }
 
   function updateAssumption(field, value) {
-    setAssumptions((prev) => ({ ...prev, [field]: toNumber(value) }));
+    // Store the raw input string so EU decimal input such as "0,42" remains editable.
+    // Calculations convert values using toNumber().
+    setAssumptions((prev) => ({ ...prev, [field]: value }));
   }
 
   function updateProduct(id, field, value) {
+    // Keep raw numeric input while editing; calculation converts safely with toNumber().
     setProducts((prev) =>
-      prev.map((p) => p.id === id ? { ...p, [field]: field === "name" ? value : toNumber(value) } : p)
+      prev.map((p) => p.id === id ? { ...p, [field]: field === "name" ? value : value } : p)
     );
   }
 
@@ -266,6 +282,11 @@ export default function VimaluxLightingPortalV15() {
       body: [
         ["Annual net saving", euro(calc.annualNetSaving)],
         ["10Y net savings", euro(calc.tenYearNetSavings)],
+        ["LED-only energy saving", euro(calc.ledSaving)],
+        ["Smart CMS + CLO saving", euro(calc.smartCmsSaving)],
+        ["PowerAiD additional saving", euro(calc.powerAidSaving)],
+        ["Maintenance saving", euro(calc.maintenanceSaving)],
+        ["New CMS / PowerAiD OPEX", euro(calc.annualNewOpex)],
         ["Total CAPEX", euro(calc.totalCapex)],
         ["Investor value", euro(calc.investorValue)],
         ["Payback", calc.paybackYears ? `${num(calc.paybackYears, 1)} years` : "N/A"],
@@ -279,8 +300,8 @@ export default function VimaluxLightingPortalV15() {
 
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 8,
-      head: [["Year", "Energy Saving", "Maintenance Saving", "New OPEX", "Net Saving", "Cumulative"]],
-      body: rows.map((r) => [r.year, euro(r.energySaving), euro(r.maintenanceSaving), euro(r.newOpex), euro(r.netSaving), euro(r.cumulativeNetSaving)]),
+      head: [["Year", "LED Saving", "Smart/CLO", "PowerAiD", "Maintenance", "New OPEX", "Net Saving", "Cumulative"]],
+      body: rows.map((r) => [r.year, euro(calc.ledSaving), euro(calc.smartCmsSaving), euro(calc.powerAidSaving), euro(r.maintenanceSaving), euro(r.newOpex), euro(r.netSaving), euro(r.cumulativeNetSaving)]),
       headStyles: { fillColor: [17, 19, 21] },
       styles: { fontSize: 8 },
     });
@@ -360,7 +381,7 @@ export default function VimaluxLightingPortalV15() {
 
         <section style={styles.card}>
           <SectionTitle title="Cashflow Preview" sub="Annual savings logic" />
-          <div style={styles.tableWrap}><table style={styles.table}><thead><tr><Th left>Year</Th><Th>Old Energy</Th><Th>New Energy</Th><Th>Energy Saving</Th><Th>Maintenance</Th><Th>New OPEX</Th><Th>Net Saving</Th><Th>Cumulative</Th></tr></thead><tbody>{rows.map((r) => <tr key={r.year} style={styles.tr}><Td left>{r.year}</Td><Td>{euro(r.oldEnergyCost)}</Td><Td>{euro(r.newEnergyCost)}</Td><Td>{euro(r.energySaving)}</Td><Td>{euro(r.maintenanceSaving)}</Td><Td>{euro(r.newOpex)}</Td><Td strong>{euro(r.netSaving)}</Td><Td strong>{euro(r.cumulativeNetSaving)}</Td></tr>)}</tbody></table></div>
+          <div style={styles.tableWrap}><table style={styles.table}><thead><tr><Th left>Year</Th><Th>Old Energy</Th><Th>New Energy</Th><Th>LED Saving</Th><Th>Smart/CLO</Th><Th>PowerAiD</Th><Th>Maintenance</Th><Th>New OPEX</Th><Th>Net Saving</Th><Th>Cumulative</Th></tr></thead><tbody>{rows.map((r) => <tr key={r.year} style={styles.tr}><Td left>{r.year}</Td><Td>{euro(r.oldEnergyCost)}</Td><Td>{euro(r.newEnergyCost)}</Td><Td>{euro(calc.ledSaving)}</Td><Td>{euro(calc.smartCmsSaving)}</Td><Td>{euro(calc.powerAidSaving)}</Td><Td>{euro(r.maintenanceSaving)}</Td><Td>{euro(r.newOpex)}</Td><Td strong>{euro(r.netSaving)}</Td><Td strong>{euro(r.cumulativeNetSaving)}</Td></tr>)}</tbody></table></div>
         </section>
       </div>
     </div>
