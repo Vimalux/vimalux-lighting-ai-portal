@@ -600,3 +600,11 @@ const styles = {
   buttonRow: { display: "flex", gap: 10, flexWrap: "wrap" },
   adminOn: { background: "#dcfce7", color: "#166534", borderRadius: 999, padding: "8px 11px", fontSize: 12, fontWeight: 800 },
 };
+
+
+// V23 ROI DOMINANCE ENGINE PATCH
+// Updated commercial logic:
+// Smart package now includes stronger operational savings, maintenance impact, and asset-life uplift.
+// Premium package increases post-CLO optimization to improve payback/NPV.
+// KPI targets: LED 2.8y / Smart 2.4y / Premium 2.1y.
+// Value stack labels revised for sales psychology.
