@@ -232,37 +232,96 @@ function parseAuditSheet(sheet, fileName = "") {
   return parseAuditRows(rows, fileName);
 }
 
+function detectAuditColumns(headers) {
+  const normalized = headers.map((h) => ({ original: h, normalized: normalizeHeader(h) }));
+
+  const qtyHit = normalized.find((h) =>
+    h.normalized.includes("numberofluminares") ||
+    h.normalized.includes("numberofluminaires") ||
+    h.normalized.includes("numberofluminaries") ||
+    h.normalized.includes("numerodiapparecchi") ||
+    h.normalized.includes("quantita") ||
+    h.normalized === "qty" ||
+    h.normalized === "quantity"
+  );
+
+  const wattHit = normalized.find((h) => {
+    const n = h.normalized;
+    const looksLikeWatt =
+      n.includes("powerconsumption") ||
+      n.includes("consumodienergia") ||
+      n.includes("potenza") ||
+      n.includes("wattage") ||
+      n.includes("watt");
+    const isHours = n.includes("hour") || n.includes("ore") || n.includes("burning");
+    const isLumen = n.includes("lumen") || n.includes("lm") || n.includes("flusso");
+    return looksLikeWatt && !isHours && !isLumen;
+  });
+
+  const techHit = normalized.find((h) =>
+    h.normalized.includes("currentluminaretype") ||
+    h.normalized.includes("currentluminairetype") ||
+    h.normalized.includes("tipodiluminarecorrente") ||
+    h.normalized.includes("tecnologia") ||
+    h.normalized.includes("technology") ||
+    h.normalized.includes("lamptype")
+  );
+
+  const zoneHit = normalized.find((h) =>
+    h.normalized.includes("location") ||
+    h.normalized.includes("posizione") ||
+    h.normalized.includes("groupnaming") ||
+    h.normalized.includes("zone") ||
+    h.normalized.includes("street") ||
+    h.normalized.includes("via")
+  );
+
+  return {
+    qtyCol: qtyHit ? qtyHit.original : "",
+    wattCol: wattHit ? wattHit.original : "",
+    techCol: techHit ? techHit.original : "",
+    zoneCol: zoneHit ? zoneHit.original : "",
+  };
+}
+
 function parseAuditRows(rows, fileName = "") {
   if (!rows || !rows.length) return emptyAuditSummary;
   const headers = Object.keys(rows[0] || {});
-  const wattCol = findColumn(headers, ["existing wattage", "existing watt", "wattage", "watt", "power", "potenza", "w", "kw", "watt esistente", "potenza esistente", "power consumption per luminare", "power consumption per luminaire"]);
-  const qtyCol = findColumn(headers, ["quantity", "qty", "count", "number", "numero", "quantita", "quantità", "n", "number of luminares", "number of luminaires", "number of luminaries"]);
-  const techCol = findColumn(headers, ["technology", "lamp type", "type", "tecnologia", "tipologia", "source", "sorgente", "current luminare type", "current luminaire type"]);
-  const zoneCol = findColumn(headers, ["zone", "area", "street", "road", "via", "strada", "quartiere", "location", "group naming"]);
+  const detected = detectAuditColumns(headers);
+  const wattCol = detected.wattCol || findColumn(headers, ["existing wattage", "existing watt", "wattage", "watt", "power", "potenza", "w", "kw", "watt esistente", "potenza esistente", "power consumption per luminare", "power consumption per luminaire"]);
+  const qtyCol = detected.qtyCol || findColumn(headers, ["quantity", "qty", "count", "number", "numero", "quantita", "quantità", "n", "number of luminares", "number of luminaires", "number of luminaries"]);
+  const techCol = detected.techCol || findColumn(headers, ["technology", "lamp type", "type", "tecnologia", "tipologia", "source", "sorgente", "current luminare type", "current luminaire type"]);
+  const zoneCol = detected.zoneCol || findColumn(headers, ["zone", "area", "street", "road", "via", "strada", "quartiere", "location", "group naming"]);
 
   let totalQuantity = 0;
   let totalWatt = 0;
+  let validRows = 0;
 
   rows.forEach((row) => {
-    const qty = qtyCol ? Math.max(0, toNumber(row[qtyCol], 1)) || 1 : 1;
-    let watt = wattCol ? toNumber(row[wattCol], 0) : 0;
-    if (normalizeHeader(wattCol).includes("kw")) watt *= 1000;
-    if (watt > 0) {
+    const qtyRaw = qtyCol ? row[qtyCol] : 1;
+    const wattRaw = wattCol ? row[wattCol] : 0;
+    const qty = Math.max(0, toNumber(qtyRaw, 1)) || 1;
+    let watt = toNumber(wattRaw, 0);
+    if (normalizeHeader(wattCol).includes("kw") && watt < 10) watt *= 1000;
+    if (watt > 0 && qty > 0) {
       totalQuantity += qty;
       totalWatt += watt * qty;
+      validRows += 1;
     }
   });
 
   const averageExistingWatt = totalQuantity > 0 ? totalWatt / totalQuantity : 0;
+  if (!wattCol || !qtyCol || totalQuantity <= 0 || averageExistingWatt <= 0) return emptyAuditSummary;
+
   return {
     imported: true,
     fileName,
-    rows: rows.length,
+    rows: validRows,
     quantity: Math.round(totalQuantity),
     totalExistingWatt: totalWatt,
     averageExistingWatt,
     detectedWattColumn: wattCol,
-    detectedQuantityColumn: qtyCol || "1 row = 1 luminaire",
+    detectedQuantityColumn: qtyCol,
     technologyMix: countMix(rows, techCol),
     zoneMix: countMix(rows, zoneCol),
   };
