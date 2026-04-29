@@ -170,13 +170,59 @@ function countMix(rows, column) {
   return mix;
 }
 
+function parseAuditSheet(sheet, fileName = "") {
+  const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+  const limitedRaw = raw.slice(0, 29); // Audit import must ignore everything after row 29.
+
+  const candidateHeaders = [
+    "number of luminares",
+    "number of luminaires",
+    "number of luminaries",
+    "quantity",
+    "qty",
+    "power consumption per luminare",
+    "power consumption per luminaire",
+    "watt",
+    "wattage",
+    "potenza",
+  ];
+
+  let headerIndex = -1;
+  let bestScore = 0;
+
+  limitedRaw.forEach((row, index) => {
+    const joined = row.map((cell) => normalizeHeader(cell)).join(" ");
+    const score = candidateHeaders.reduce((sum, candidate) => {
+      return sum + (joined.includes(normalizeHeader(candidate)) ? 1 : 0);
+    }, 0);
+    if (score > bestScore) {
+      bestScore = score;
+      headerIndex = index;
+    }
+  });
+
+  if (headerIndex < 0 || bestScore < 1) return emptyAuditSummary;
+
+  const headers = limitedRaw[headerIndex].map((h, i) => String(h || `Column ${i + 1}`).trim());
+  const dataRows = limitedRaw.slice(headerIndex + 1).filter((row) => row.some((cell) => String(cell).trim() !== ""));
+  const rows = dataRows.map((row) => {
+    const obj = {};
+    headers.forEach((header, i) => {
+      obj[header] = row[i] ?? "";
+    });
+    return obj;
+  });
+
+  return parseAuditRows(rows, fileName);
+}
+
 function parseAuditRows(rows, fileName = "") {
   if (!rows || !rows.length) return emptyAuditSummary;
   const headers = Object.keys(rows[0] || {});
-  const wattCol = findColumn(headers, ["existing wattage", "existing watt", "wattage", "watt", "power", "potenza", "w", "kw", "watt esistente", "potenza esistente"]);
-  const qtyCol = findColumn(headers, ["quantity", "qty", "count", "number", "numero", "quantita", "quantità", "n"]);
-  const techCol = findColumn(headers, ["technology", "lamp type", "type", "tecnologia", "tipologia", "source", "sorgente"]);
-  const zoneCol = findColumn(headers, ["zone", "area", "street", "road", "via", "strada", "quartiere"]);
+  const wattCol = findColumn(headers, ["existing wattage", "existing watt", "wattage", "watt", "power", "potenza", "w", "kw", "watt esistente", "potenza esistente", "power consumption per luminare", "power consumption per luminaire"]);
+  const qtyCol = findColumn(headers, ["quantity", "qty", "count", "number", "numero", "quantita", "quantità", "n", "number of luminares", "number of luminaires", "number of luminaries"]);
+  const techCol = findColumn(headers, ["technology", "lamp type", "type", "tecnologia", "tipologia", "source", "sorgente", "current luminare type", "current luminaire type"]);
+  const zoneCol = findColumn(headers, ["zone", "area", "street", "road", "via", "strada", "quartiere", "location", "group naming"]);
 
   let totalQuantity = 0;
   let totalWatt = 0;
@@ -468,8 +514,7 @@ export default function VimaluxLightingPortalV26() {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: "array" });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-        const summary = parseAuditRows(rows, file.name);
+        const summary = parseAuditSheet(sheet, file.name);
         if (!summary.imported || !summary.quantity || !summary.averageExistingWatt) {
           setToast("Audit import failed: wattage/quantity columns not detected");
           return;
