@@ -5,7 +5,7 @@ import autoTable from "jspdf-autotable";
 
 /* =====================================================
    VIMALUX LIGHTING AI PORTAL
-   VERSION 25 – BANK GRADE CFO ENGINE
+   VERSION 26 – LIVE AUDIT ENGINE
    React single-file build
    No Tailwind dependency – inline CSS only
 
@@ -15,7 +15,7 @@ import autoTable from "jspdf-autotable";
    3) Strategic upside = qualitative, not monetised in base payback
 ===================================================== */
 
-const STORAGE_KEY = "vimalux_app_v25_state";
+const STORAGE_KEY = "vimalux_app_v26_state";
 const ADMIN_PASSWORD = "vimalux-admin";
 
 const defaultProducts = [
@@ -61,6 +61,19 @@ const emptyProject = {
   includeOperationalUpside: false,
   selectedOffer: "smart_poweraid",
   notes: "",
+};
+
+const emptyAuditSummary = {
+  imported: false,
+  fileName: "",
+  rows: 0,
+  quantity: 0,
+  totalExistingWatt: 0,
+  averageExistingWatt: 0,
+  detectedWattColumn: "",
+  detectedQuantityColumn: "",
+  technologyMix: {},
+  zoneMix: {},
 };
 
 const offers = [
@@ -126,6 +139,94 @@ function pct(value) {
 
 function safeProduct(products, selectedProductId) {
   return products.find((product) => product.id === selectedProductId) || products[0] || defaultProducts[0];
+}
+
+function normalizeHeader(header) {
+  return String(header || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function findColumn(headers, candidates) {
+  const normalized = headers.map((h) => ({ original: h, normalized: normalizeHeader(h) }));
+  for (const candidate of candidates) {
+    const c = normalizeHeader(candidate);
+    const exact = normalized.find((h) => h.normalized === c);
+    if (exact) return exact.original;
+  }
+  for (const candidate of candidates) {
+    const c = normalizeHeader(candidate);
+    const partial = normalized.find((h) => h.normalized.includes(c) || c.includes(h.normalized));
+    if (partial) return partial.original;
+  }
+  return "";
+}
+
+function countMix(rows, column) {
+  if (!column) return {};
+  const mix = {};
+  rows.forEach((row) => {
+    const key = String(row[column] || "Unknown").trim() || "Unknown";
+    mix[key] = (mix[key] || 0) + 1;
+  });
+  return mix;
+}
+
+function parseAuditRows(rows, fileName = "") {
+  if (!rows || !rows.length) return emptyAuditSummary;
+  const headers = Object.keys(rows[0] || {});
+  const wattCol = findColumn(headers, ["existing wattage", "existing watt", "wattage", "watt", "power", "potenza", "w", "kw", "watt esistente", "potenza esistente"]);
+  const qtyCol = findColumn(headers, ["quantity", "qty", "count", "number", "numero", "quantita", "quantità", "n"]);
+  const techCol = findColumn(headers, ["technology", "lamp type", "type", "tecnologia", "tipologia", "source", "sorgente"]);
+  const zoneCol = findColumn(headers, ["zone", "area", "street", "road", "via", "strada", "quartiere"]);
+
+  let totalQuantity = 0;
+  let totalWatt = 0;
+
+  rows.forEach((row) => {
+    const qty = qtyCol ? Math.max(0, toNumber(row[qtyCol], 1)) || 1 : 1;
+    let watt = wattCol ? toNumber(row[wattCol], 0) : 0;
+    if (normalizeHeader(wattCol).includes("kw")) watt *= 1000;
+    if (watt > 0) {
+      totalQuantity += qty;
+      totalWatt += watt * qty;
+    }
+  });
+
+  const averageExistingWatt = totalQuantity > 0 ? totalWatt / totalQuantity : 0;
+  return {
+    imported: true,
+    fileName,
+    rows: rows.length,
+    quantity: Math.round(totalQuantity),
+    totalExistingWatt: totalWatt,
+    averageExistingWatt,
+    detectedWattColumn: wattCol,
+    detectedQuantityColumn: qtyCol || "1 row = 1 luminaire",
+    technologyMix: countMix(rows, techCol),
+    zoneMix: countMix(rows, zoneCol),
+  };
+}
+
+function parseProductRows(rows) {
+  if (!rows || !rows.length) return [];
+  const headers = Object.keys(rows[0] || {});
+  const nameCol = findColumn(headers, ["name", "product", "model", "nome", "prodotto", "luminaire"]);
+  const wattCol = findColumn(headers, ["watt", "w", "power", "potenza"]);
+  const lumenCol = findColumn(headers, ["lumen", "lm", "flux", "flusso"]);
+  const sellCol = findColumn(headers, ["sell", "sell price", "price", "sale", "prezzo vendita", "selling price"]);
+  const buyCol = findColumn(headers, ["buy", "buy price", "cost", "purchase", "prezzo acquisto"]);
+  const installCol = findColumn(headers, ["install", "installation", "install price", "montaggio", "posa"]);
+
+  return rows
+    .map((row, index) => ({
+      id: `import_${Date.now()}_${index}`,
+      name: String(row[nameCol] || `Imported Product ${index + 1}`).trim(),
+      watt: toNumber(row[wattCol], 0),
+      lumen: toNumber(row[lumenCol], 0),
+      sellPrice: toNumber(row[sellCol], 0),
+      buyPrice: toNumber(row[buyCol], 0),
+      install: toNumber(row[installCol], 0),
+    }))
+    .filter((p) => p.name && toNumber(p.watt) > 0);
 }
 
 function npv(ratePct, annualCash, years, initialCapex) {
@@ -295,10 +396,11 @@ function buildRows(calc, useUpside) {
   });
 }
 
-export default function VimaluxLightingPortalV25() {
+export default function VimaluxLightingPortalV26() {
   const [products, setProducts] = useState(defaultProducts);
   const [assumptions, setAssumptions] = useState(defaultAssumptions);
   const [project, setProject] = useState(emptyProject);
+  const [auditSummary, setAuditSummary] = useState(emptyAuditSummary);
   const [adminMode, setAdminMode] = useState(false);
   const [viewMode, setViewMode] = useState("customer");
   const [adminPassword, setAdminPassword] = useState("");
@@ -313,6 +415,7 @@ export default function VimaluxLightingPortalV25() {
       if (parsed.products) setProducts(parsed.products);
       if (parsed.assumptions) setAssumptions({ ...defaultAssumptions, ...parsed.assumptions });
       if (parsed.project) setProject({ ...emptyProject, ...parsed.project });
+      if (parsed.auditSummary) setAuditSummary({ ...emptyAuditSummary, ...parsed.auditSummary });
       if (parsed.adminMode) setAdminMode(parsed.adminMode);
       if (parsed.viewMode) setViewMode(parsed.viewMode);
     } catch (error) {
@@ -321,8 +424,8 @@ export default function VimaluxLightingPortalV25() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ products, assumptions, project, adminMode, viewMode }));
-  }, [products, assumptions, project, adminMode, viewMode]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ products, assumptions, project, auditSummary, adminMode, viewMode }));
+  }, [products, assumptions, project, auditSummary, adminMode, viewMode]);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -354,6 +457,64 @@ export default function VimaluxLightingPortalV25() {
 
   function updateProduct(id, field, value) {
     setProducts((prev) => prev.map((product) => (product.id === id ? { ...product, [field]: value } : product)));
+  }
+
+  function handleAuditImport(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        const summary = parseAuditRows(rows, file.name);
+        if (!summary.imported || !summary.quantity || !summary.averageExistingWatt) {
+          setToast("Audit import failed: wattage/quantity columns not detected");
+          return;
+        }
+        setAuditSummary(summary);
+        setProject((prev) => ({
+          ...prev,
+          quantity: summary.quantity,
+          existingWatt: Math.round(summary.averageExistingWatt * 10) / 10,
+        }));
+        setToast(`Audit imported: ${summary.quantity} luminaires`);
+      } catch (error) {
+        console.error(error);
+        setToast("Audit import failed");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    event.target.value = "";
+  }
+
+  function handleProductCatalogueImport(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        const importedProducts = parseProductRows(rows);
+        if (!importedProducts.length) {
+          setToast("Product import failed: no valid products found");
+          return;
+        }
+        setProducts(importedProducts);
+        setProject((prev) => ({ ...prev, selectedProductId: importedProducts[0].id }));
+        setToast(`Product catalogue imported: ${importedProducts.length} products`);
+      } catch (error) {
+        console.error(error);
+        setToast("Product catalogue import failed");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    event.target.value = "";
   }
 
   function unlockAdmin() {
@@ -388,6 +549,7 @@ export default function VimaluxLightingPortalV25() {
     setProducts(defaultProducts);
     setAssumptions(defaultAssumptions);
     setProject(emptyProject);
+    setAuditSummary(emptyAuditSummary);
     setAdminMode(false);
     setViewMode("customer");
     localStorage.removeItem(STORAGE_KEY);
@@ -423,6 +585,7 @@ export default function VimaluxLightingPortalV25() {
     );
 
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Selected Cashflow");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([auditSummary]), "Audit Summary");
     XLSX.utils.book_append_sheet(
       wb,
       XLSX.utils.json_to_sheet([{ ...project, product: selectedCalc.product.name, selectedOffer: selectedCalc.offer.title }]),
@@ -472,25 +635,44 @@ export default function VimaluxLightingPortalV25() {
     doc.text(`Prepared for: ${customer}`, 14, 68);
     doc.text(`Municipality: ${municipality}`, 14, 76);
     doc.text(`Selected package: ${selectedCalc.offer.title}`, 14, 84);
-    doc.text(`Date: ${project.proposalDate}`, 14, 92);
+    if (auditSummary.imported) doc.text(`Audit source: ${auditSummary.fileName}`, 14, 100);
+    doc.text(`Date: ${project.proposalDate}`, 14, auditSummary.imported ? 108 : 92);
     doc.setDrawColor(37, 99, 235);
     doc.setLineWidth(1.2);
-    doc.line(14, 106, 196, 106);
+    doc.line(14, auditSummary.imported ? 120 : 106, 196, auditSummary.imported ? 120 : 106);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
-    doc.text("Base Case Summary", 14, 130);
+    doc.text("Base Case Summary", 14, auditSummary.imported ? 142 : 130);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.text(`Guaranteed annual saving: ${euro(selectedCalc.guaranteedSaving)}`, 14, 146);
-    doc.text(`Annual base net cashflow: ${euro(selectedCalc.annualBaseNetSaving)}`, 14, 156);
-    doc.text(`Base payback: ${selectedCalc.basePaybackYears ? `${num(selectedCalc.basePaybackYears, 1)} years` : "N/A"}`, 14, 166);
-    doc.text(`Base 10-year net savings: ${euro(selectedCalc.baseTenYearNetSavings)}`, 14, 176);
-    doc.text(`Base NPV: ${euro(selectedCalc.baseNpv)} | Base IRR: ${selectedCalc.baseIrr ? pct(selectedCalc.baseIrr) : "N/A"}`, 14, 186);
-    doc.text(`Operational upside, not included in base case: ${euro(selectedCalc.operationalUpside)} / year`, 14, 200);
+    doc.text(`Guaranteed annual saving: ${euro(selectedCalc.guaranteedSaving)}`, 14, auditSummary.imported ? 158 : 146);
+    doc.text(`Annual base net cashflow: ${euro(selectedCalc.annualBaseNetSaving)}`, 14, auditSummary.imported ? 168 : 156);
+    doc.text(`Base payback: ${selectedCalc.basePaybackYears ? `${num(selectedCalc.basePaybackYears, 1)} years` : "N/A"}`, 14, auditSummary.imported ? 178 : 166);
+    doc.text(`Base 10-year net savings: ${euro(selectedCalc.baseTenYearNetSavings)}`, 14, auditSummary.imported ? 188 : 176);
+    doc.text(`Base NPV: ${euro(selectedCalc.baseNpv)} | Base IRR: ${selectedCalc.baseIrr ? pct(selectedCalc.baseIrr) : "N/A"}`, 14, auditSummary.imported ? 198 : 186);
+    doc.text(`Operational upside, not included in base case: ${euro(selectedCalc.operationalUpside)} / year`, 14, auditSummary.imported ? 212 : 200);
     footer(doc, 1);
 
     doc.addPage();
-    pdfHeader(doc, "1. Offer Comparison", "Bankable base case separated from operational upside");
+    pdfHeader(doc, "1. Audit Baseline", "Imported customer audit sheet baseline");
+    autoTable(doc, {
+      startY: 42,
+      head: [["Audit field", "Value"]],
+      body: [
+        ["Audit source", auditSummary.imported ? auditSummary.fileName : "Manual input"],
+        ["Rows read", auditSummary.imported ? num(auditSummary.rows) : "N/A"],
+        ["Total luminaires", num(selectedCalc.quantity)],
+        ["Average existing wattage", `${num(project.existingWatt, 1)} W`],
+        ["Detected watt column", auditSummary.detectedWattColumn || "Manual"],
+        ["Detected quantity column", auditSummary.detectedQuantityColumn || "Manual"],
+      ],
+      headStyles: { fillColor: [15, 23, 42] },
+      styles: { fontSize: 8.5 },
+    });
+    footer(doc, 7);
+
+    doc.addPage();
+    pdfHeader(doc, "2. Offer Comparison", "Bankable base case separated from operational upside");
     autoTable(doc, {
       startY: 42,
       head: [["Offer", "Position", "Base Net", "Base Payback", "Base 10Y", "Base NPV", "Upside / yr"]],
@@ -509,7 +691,7 @@ export default function VimaluxLightingPortalV25() {
     footer(doc, 2);
 
     doc.addPage();
-    pdfHeader(doc, "2. Guaranteed Value Stack", "Only measurable and bankable savings included in base case");
+    pdfHeader(doc, "3. Guaranteed Value Stack", "Only measurable and bankable savings included in base case");
     autoTable(doc, {
       startY: 42,
       head: [["Layer", "Evidence basis", "Annual value"]],
@@ -526,7 +708,7 @@ export default function VimaluxLightingPortalV25() {
     footer(doc, 3);
 
     doc.addPage();
-    pdfHeader(doc, "3. Operational Upside", "Not included in base case unless explicitly selected");
+    pdfHeader(doc, "4. Operational Upside", "Not included in base case unless explicitly selected");
     autoTable(doc, {
       startY: 42,
       head: [["Layer", "Evidence to collect", "Indicative value"]],
@@ -542,7 +724,7 @@ export default function VimaluxLightingPortalV25() {
     footer(doc, 4);
 
     doc.addPage();
-    pdfHeader(doc, "4. Commercial Options", "Direct purchase, LaaS or financed structure");
+    pdfHeader(doc, "5. Commercial Options", "Direct purchase, LaaS or financed structure");
     autoTable(doc, {
       startY: 42,
       head: [["Commercial metric", "Value"]],
@@ -562,7 +744,7 @@ export default function VimaluxLightingPortalV25() {
     footer(doc, 5);
 
     doc.addPage();
-    pdfHeader(doc, "5. Evidence & Risk Controls", "How to make the case credit-ready");
+    pdfHeader(doc, "6. Evidence & Risk Controls", "How to make the case credit-ready");
     const bullets = [
       "LED savings: document existing wattage, new wattage, burn hours and energy tariff.",
       "CLO: document dimming profiles, CMS logs and post-LED consumption baseline.",
@@ -583,7 +765,7 @@ export default function VimaluxLightingPortalV25() {
     );
     footer(doc, 6);
 
-    doc.save(`VIMALUX_${municipality}_V25_bank_grade_proposal.pdf`);
+    doc.save(`VIMALUX_${municipality}_V26_audit_proposal.pdf`);
   }
 
   const selectedAnnual = project.includeOperationalUpside ? selectedCalc.annualSelectedNetSaving : selectedCalc.annualBaseNetSaving;
@@ -601,7 +783,7 @@ export default function VimaluxLightingPortalV25() {
             <button style={styles.logoMark} onClick={() => setViewMode("customer")}>V</button>
             <div>
               <h1 style={styles.title}>VIMALUX Lighting AI Portal</h1>
-              <p style={styles.subtitle}>Version 25 – Bank Grade CFO Engine</p>
+              <p style={styles.subtitle}>Version 26 – Live Audit Engine</p>
             </div>
           </div>
           <div style={styles.headerActions}>
@@ -638,6 +820,14 @@ export default function VimaluxLightingPortalV25() {
               onSelect={() => updateProject("selectedOffer", calc.offer.id)}
             />
           ))}
+        </section>
+
+        <section style={styles.auditBar}>
+          <div>
+            <strong>Audit import:</strong> upload customer Excel/CSV to replace manual quantity and existing wattage.
+            {auditSummary.imported && <div style={styles.auditMini}>Imported {auditSummary.fileName}: {num(auditSummary.quantity)} luminaires · avg {num(auditSummary.averageExistingWatt, 1)} W</div>}
+          </div>
+          <label style={styles.importButton}>Import Audit Sheet<input type="file" accept=".xlsx,.xls,.csv" onChange={handleAuditImport} style={{ display: "none" }} /></label>
         </section>
 
         <section style={styles.caseToggleRow}>
@@ -742,6 +932,7 @@ export default function VimaluxLightingPortalV25() {
               </div>
               <div style={styles.stack}>
                 <div style={styles.buttonRow}>
+                  <label style={styles.importButtonDark}>Import Product Catalogue<input type="file" accept=".xlsx,.xls,.csv" onChange={handleProductCatalogueImport} style={{ display: "none" }} /></label>
                   <button onClick={addProduct} style={styles.primaryButton}>Add Product</button>
                   <button onClick={() => setProducts(defaultProducts)} style={styles.secondaryButton}>Reset Products</button>
                 </div>
@@ -960,6 +1151,10 @@ const styles = {
   offerSub: { color: "#64748b", margin: "8px 0 16px" },
   offerMetrics: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
   offerFoot: { marginTop: 12, color: "#16a34a", fontSize: 12, fontWeight: 800 },
+  auditBar: { display: "flex", justifyContent: "space-between", gap: 18, alignItems: "center", padding: 18, border: "1px solid #bbf7d0", borderRadius: 20, background: "#f0fdf4", flexWrap: "wrap" },
+  auditMini: { marginTop: 6, color: "#166534", fontSize: 13, fontWeight: 700 },
+  importButton: { border: "1px solid #16a34a", background: "#16a34a", color: "#fff", borderRadius: 14, padding: "11px 16px", fontWeight: 800, cursor: "pointer" },
+  importButtonDark: { border: "1px solid #0f172a", background: "#0f172a", color: "#fff", borderRadius: 14, padding: "11px 16px", fontWeight: 800, cursor: "pointer", display: "inline-flex", alignItems: "center" },
   caseToggleRow: { display: "flex", justifyContent: "space-between", gap: 18, alignItems: "center", padding: 18, border: "1px solid #dbeafe", borderRadius: 20, background: "#eff6ff", flexWrap: "wrap" },
   kpiGrid: { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16 },
   kpiCard: { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 22, padding: 18, boxShadow: "0 10px 28px rgba(15,23,42,.06)" },
