@@ -42,9 +42,9 @@ const defaultAssumptions = {
   discountRatePct: 7,
 
   // Operational upside assumptions. These are separated from bankable base case.
-  serviceEfficiencyPerLampYear: 5,
-  fewerFailuresPerLampYear: 4,
-  adminReductionPerLampYear: 2,
+  serviceEfficiencyPerLampYear: 8,
+  fewerFailuresPerLampYear: 5,
+  adminReductionPerLampYear: 5,
 };
 
 const emptyProject = {
@@ -187,34 +187,22 @@ function parseAuditSheet(sheet, fileName = "") {
   const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
   const limitedRaw = raw.slice(0, 29); // Audit import ignores everything after row 29.
 
-  const candidateHeaders = [
-    "number of luminares",
-    "number of luminaires",
-    "number of luminaries",
-    "numero di apparecchi",
-    "quantity",
-    "qty",
-    "power consumption per luminare",
-    "power consumption per luminaire",
-    "consumo di energia per apparecchio",
-    "watt",
-    "wattage",
-    "potenza",
-  ];
-
   let headerIndex = -1;
   let bestScore = 0;
 
   limitedRaw.forEach((row, index) => {
-    const joined = row.map((cell) => normalizeHeader(cell)).join(" ");
-    const score = candidateHeaders.reduce((sum, candidate) => sum + (joined.includes(normalizeHeader(candidate)) ? 1 : 0), 0);
+    const headers = row.map((h, i) => String(h || `Column ${i + 1}`).trim());
+    const detected = detectAuditColumns(headers);
+    const hasQty = Boolean(detected.qtyCol);
+    const hasWatt = Boolean(detected.wattCol);
+    const score = (hasQty ? 10 : 0) + (hasWatt ? 10 : 0) + headers.filter((h) => String(h).trim()).length / 100;
     if (score > bestScore) {
       bestScore = score;
       headerIndex = index;
     }
   });
 
-  if (headerIndex < 0 || bestScore < 2) return emptyAuditSummary;
+  if (headerIndex < 0 || bestScore < 20) return emptyAuditSummary;
 
   const headers = limitedRaw[headerIndex].map((h, i) => String(h || `Column ${i + 1}`).trim());
   const dataRows = limitedRaw
@@ -230,58 +218,6 @@ function parseAuditSheet(sheet, fileName = "") {
   });
 
   return parseAuditRows(rows, fileName);
-}
-
-function detectAuditColumns(headers) {
-  const normalized = headers.map((h) => ({ original: h, normalized: normalizeHeader(h) }));
-
-  const qtyHit = normalized.find((h) =>
-    h.normalized.includes("numberofluminares") ||
-    h.normalized.includes("numberofluminaires") ||
-    h.normalized.includes("numberofluminaries") ||
-    h.normalized.includes("numerodiapparecchi") ||
-    h.normalized.includes("quantita") ||
-    h.normalized === "qty" ||
-    h.normalized === "quantity"
-  );
-
-  const wattHit = normalized.find((h) => {
-    const n = h.normalized;
-    const looksLikeWatt =
-      n.includes("powerconsumption") ||
-      n.includes("consumodienergia") ||
-      n.includes("potenza") ||
-      n.includes("wattage") ||
-      n.includes("watt");
-    const isHours = n.includes("hour") || n.includes("ore") || n.includes("burning");
-    const isLumen = n.includes("lumen") || n.includes("lm") || n.includes("flusso");
-    return looksLikeWatt && !isHours && !isLumen;
-  });
-
-  const techHit = normalized.find((h) =>
-    h.normalized.includes("currentluminaretype") ||
-    h.normalized.includes("currentluminairetype") ||
-    h.normalized.includes("tipodiluminarecorrente") ||
-    h.normalized.includes("tecnologia") ||
-    h.normalized.includes("technology") ||
-    h.normalized.includes("lamptype")
-  );
-
-  const zoneHit = normalized.find((h) =>
-    h.normalized.includes("location") ||
-    h.normalized.includes("posizione") ||
-    h.normalized.includes("groupnaming") ||
-    h.normalized.includes("zone") ||
-    h.normalized.includes("street") ||
-    h.normalized.includes("via")
-  );
-
-  return {
-    qtyCol: qtyHit ? qtyHit.original : "",
-    wattCol: wattHit ? wattHit.original : "",
-    techCol: techHit ? techHit.original : "",
-    zoneCol: zoneHit ? zoneHit.original : "",
-  };
 }
 
 function parseAuditRows(rows, fileName = "") {
@@ -1125,15 +1061,15 @@ function OfferCard({ calc, selected, onSelect }) {
       <p style={styles.offerSub}>{calc.offer.positioning}</p>
       <div style={styles.offerMetrics}>
         <div>
-          <small>Base Payback</small>
-          <b>{calc.basePaybackYears ? `${num(calc.basePaybackYears, 1)} yrs` : "N/A"}</b>
+          <small>Upside Payback</small>
+          <b>{calc.annualUpsideNetSaving > 0 ? `${num(calc.totalCapex / calc.annualUpsideNetSaving, 1)} yrs` : "N/A"}</b>
         </div>
         <div>
-          <small>Base 10Y Net</small>
-          <b>{euro(calc.baseTenYearNetSavings)}</b>
+          <small>Upside 10Y Net</small>
+          <b>{euro(calc.upsideTenYearNetSavings)}</b>
         </div>
       </div>
-      <div style={styles.offerFoot}>Upside: {euro(calc.operationalUpside)} / year</div>
+      <div style={styles.offerFoot}>Bankable payback: {calc.basePaybackYears ? `${num(calc.basePaybackYears, 1)} yrs` : "N/A"} · Upside: {euro(calc.operationalUpside)} / year</div>
     </button>
   );
 }
