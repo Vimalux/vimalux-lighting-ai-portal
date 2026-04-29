@@ -170,18 +170,33 @@ function countMix(rows, column) {
   return mix;
 }
 
+function parseAuditWorkbook(workbook, fileName = "") {
+  // Scan all sheets and choose the first sheet with valid audit data before row 29.
+  // This is needed because customer templates may have an ITA sheet first and the filled EN sheet second.
+  let best = emptyAuditSummary;
+  workbook.SheetNames.forEach((sheetName) => {
+    const candidate = parseAuditSheet(workbook.Sheets[sheetName], `${fileName} / ${sheetName}`);
+    if (candidate.imported && candidate.quantity > 0 && candidate.averageExistingWatt > 0) {
+      if (!best.imported || candidate.quantity > best.quantity) best = candidate;
+    }
+  });
+  return best;
+}
+
 function parseAuditSheet(sheet, fileName = "") {
   const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-  const limitedRaw = raw.slice(0, 29); // Audit import must ignore everything after row 29.
+  const limitedRaw = raw.slice(0, 29); // Audit import ignores everything after row 29.
 
   const candidateHeaders = [
     "number of luminares",
     "number of luminaires",
     "number of luminaries",
+    "numero di apparecchi",
     "quantity",
     "qty",
     "power consumption per luminare",
     "power consumption per luminaire",
+    "consumo di energia per apparecchio",
     "watt",
     "wattage",
     "potenza",
@@ -192,19 +207,20 @@ function parseAuditSheet(sheet, fileName = "") {
 
   limitedRaw.forEach((row, index) => {
     const joined = row.map((cell) => normalizeHeader(cell)).join(" ");
-    const score = candidateHeaders.reduce((sum, candidate) => {
-      return sum + (joined.includes(normalizeHeader(candidate)) ? 1 : 0);
-    }, 0);
+    const score = candidateHeaders.reduce((sum, candidate) => sum + (joined.includes(normalizeHeader(candidate)) ? 1 : 0), 0);
     if (score > bestScore) {
       bestScore = score;
       headerIndex = index;
     }
   });
 
-  if (headerIndex < 0 || bestScore < 1) return emptyAuditSummary;
+  if (headerIndex < 0 || bestScore < 2) return emptyAuditSummary;
 
   const headers = limitedRaw[headerIndex].map((h, i) => String(h || `Column ${i + 1}`).trim());
-  const dataRows = limitedRaw.slice(headerIndex + 1).filter((row) => row.some((cell) => String(cell).trim() !== ""));
+  const dataRows = limitedRaw
+    .slice(headerIndex + 1)
+    .filter((row) => row.some((cell) => String(cell).trim() !== ""));
+
   const rows = dataRows.map((row) => {
     const obj = {};
     headers.forEach((header, i) => {
@@ -514,7 +530,7 @@ export default function VimaluxLightingPortalV26() {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: "array" });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const summary = parseAuditSheet(sheet, file.name);
+        const summary = parseAuditWorkbook(workbook, file.name);
         if (!summary.imported || !summary.quantity || !summary.averageExistingWatt) {
           setToast("Audit import failed: wattage/quantity columns not detected");
           return;
@@ -821,7 +837,7 @@ export default function VimaluxLightingPortalV26() {
 
   return (
     <div style={styles.page}>
-      {toast && <div style={toast.toLowerCase().includes("wrong") ? styles.toastError : styles.toast}>{toast}</div>}
+      {toast && <div style={(toast.toLowerCase().includes("wrong") || toast.toLowerCase().includes("failed")) ? styles.toastError : styles.toast}>{toast}</div>}
       <div style={styles.shell}>
         <header style={styles.header}>
           <div style={styles.brandRow}>
