@@ -25,13 +25,13 @@ const defaultAssumptions = {
   energyPrice: 0.29,
   burningHours: 4200,
   maintenanceOldPerLamp: 25,
-  maintenanceSavingPct: 80,
-  smartNodeCost: 48,
+  maintenanceSavingPct: 50,
+  smartNodeCost: 62,
   cmsFeePerLampYear: 6,
   powerAidFeePerLampYear: 3,
   smartDimmingSavingPct: 18,
   cloSavingPct: 10,
-  powerAidAdditionalSavingPct: 35,
+  powerAidAdditionalSavingPct: 20,
   proposalYears: 10,
   financingMarginPct: 8,
   kgCo2PerKwh: 0.42,
@@ -99,9 +99,9 @@ function calculate(project, assumptions, products) {
 
   const oldKwh = (quantity * oldWatt * hours) / 1000;
   const ledKwh = (quantity * newWatt * hours) / 1000;
-  const smartSaving = project.includeSmart ? toNumber(assumptions.smartDimmingSavingPct) / 100 : 0;
+  const smartSaving = 0; // removed generic smart dimming, using explicit stacked CLO model
   const cloSaving = project.includeSmart ? toNumber(assumptions.cloSavingPct) / 100 : 0;
-  const smartBaseKwh = ledKwh * Math.max(0, 1 - smartSaving - cloSaving);
+  const smartBaseKwh = project.includeSmart ? ledKwh * Math.max(0, 1 - cloSaving) : ledKwh;
   const powerAidAdditionalSaving = project.includePowerAid ? toNumber(assumptions.powerAidAdditionalSavingPct) / 100 : 0;
   const finalKwh = smartBaseKwh * Math.max(0, 1 - powerAidAdditionalSaving);
 
@@ -111,7 +111,7 @@ function calculate(project, assumptions, products) {
   const newEnergyCost = finalKwh * energyPrice;
 
   const ledSaving = Math.max(0, oldEnergyCost - ledOnlyEnergyCost);
-  const smartCmsSaving = project.includeSmart ? Math.max(0, ledOnlyEnergyCost - smartBaseEnergyCost) : 0;
+  const smartCmsSaving = project.includeSmart ? Math.max(0, ledOnlyEnergyCost - smartBaseEnergyCost) : 0; // CLO saving only
   const powerAidSaving = project.includePowerAid ? Math.max(0, smartBaseEnergyCost - newEnergyCost) : 0;
   const energySaving = Math.max(0, oldEnergyCost - newEnergyCost);
 
@@ -372,14 +372,14 @@ export default function VimaluxLightingPortalV17() {
 
     // Page 3 – Proposed solution
     doc.addPage();
-    pdfHeader(doc, "2. Proposed Solution", "LED + Smart CMS + CLO + optional PowerAiD optimization");
+    pdfHeader(doc, "2. Proposed Solution", "LED + Smart CMS + CLO (stacked) + optional PowerAiD optimization");
     autoTable(doc, {
       startY: 42,
       head: [["Layer", "Function", "Annual impact"]],
       body: [
         ["LED upgrade", `${calc.product.name} / ${num(calc.newWatt)} W`, euro(calc.ledSaving)],
-        ["Smart CMS + CLO", `Adaptive dimming ${num(assumptions.smartDimmingSavingPct)}% + CLO ${num(assumptions.cloSavingPct)}%`, euro(calc.smartCmsSaving)],
-        ["PowerAiD", project.includePowerAid ? `Additional optimization ${num(assumptions.powerAidAdditionalSavingPct)}%` : "Not included", euro(calc.powerAidSaving)],
+        ["Smart CMS + CLO", `CLO ${num(assumptions.cloSavingPct)}%`, euro(calc.smartCmsSaving)],
+        ["PowerAiD", project.includePowerAid ? `Additional optimization on post LED+CLO load ${num(assumptions.powerAidAdditionalSavingPct)}%` : "Not included", euro(calc.powerAidSaving)],
         ["Maintenance optimization", project.includeMaintenance ? `${num(assumptions.maintenanceSavingPct)}% reduction assumption` : "Not included", euro(calc.maintenanceSaving)],
         ["New software / services OPEX", "CMS and PowerAiD recurring fees", `-${euro(calc.annualNewOpex)}`],
       ],
@@ -467,7 +467,7 @@ export default function VimaluxLightingPortalV17() {
             <button style={styles.logoMark} onClick={() => setViewMode("customer")}>V</button>
             <div>
               <h1 style={styles.title}>VIMALUX Lighting AI Portal</h1>
-              <p style={styles.subtitle}>Version 17 – Sales Machine</p>
+              <p style={styles.subtitle}>Version 18 – Stacked CFO Engine</p>
             </div>
           </div>
 
@@ -495,10 +495,10 @@ export default function VimaluxLightingPortalV17() {
           <Kpi label="10Y Net Savings" value={euro(calc.tenYearNetSavings)} note="contract-period impact" />
           <Kpi label="Total CAPEX" value={euro(calc.totalCapex)} note="luminaires + install + smart" />
           <Kpi label="Payback" value={calc.paybackYears ? `${num(calc.paybackYears, 1)} yrs` : "N/A"} note="simple payback" />
-          <Kpi label="Energy Reduction" value={pct(calc.energyReductionPct)} note="baseline vs optimized LED" />
+          <Kpi label="Energy Reduction" value={pct(calc.energyReductionPct)} note="55% LED + stacked add-ons" />
           <Kpi label="CO₂ Saved / Year" value={`${num(calc.co2SavedTons, 1)} t`} note="assumption-based" />
           <Kpi label="LaaS / Month" value={euro(calc.laasMonthly)} note="indicative service price" />
-          {showAdminPanel ? <Kpi label="Investor Value" value={euro(calc.investorValue)} note="CAPEX + margin" /> : <Kpi label="Smart Scope" value={project.includePowerAid ? "CMS + PowerAiD" : "CMS"} note="selected optimization layer" />}
+          {showAdminPanel ? <Kpi label="Investor Value" value={euro(calc.investorValue)} note="CAPEX + margin" /> : <Kpi label="Smart Scope" value={project.includePowerAid ? "CMS + PowerAiD" : project.includeSmart ? "CMS + CLO" : "LED Only"} note="selected optimization layer" />}
         </section>
 
         <section style={styles.mainGrid}>
@@ -524,7 +524,7 @@ export default function VimaluxLightingPortalV17() {
           </div>
 
           <div style={styles.card}>
-            <SectionTitle title="Value Stack" sub="How annual value is created" />
+            <SectionTitle title="Value Stack" sub="55% LED baseline + stacked savings" />
             <ValueLine label="LED-only saving" value={calc.ledSaving} max={calc.annualGrossSaving} />
             <ValueLine label="Smart CMS + CLO" value={calc.smartCmsSaving} max={calc.annualGrossSaving} />
             <ValueLine label="PowerAiD" value={calc.powerAidSaving} max={calc.annualGrossSaving} />
