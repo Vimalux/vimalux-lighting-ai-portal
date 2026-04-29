@@ -105,12 +105,28 @@ const emptyProject = {
    HELPERS
 ========================= */
 function toNumber(value, fallback = 0) {
-  const n = Number(value);
+  if (value === null || value === undefined || value === "") return fallback;
+
+  // Accept both EU decimals and US decimals:
+  // "0,29" -> 0.29
+  // "1.321,50" -> 1321.50
+  // "1321.50" -> 1321.50
+  const raw = String(value).trim().replaceAll(" ", "");
+  const normalized = raw.includes(",")
+    ? raw.replaceAll(".", "").replace(",", ".")
+    : raw;
+
+  const n = Number(normalized);
   return Number.isFinite(n) ? n : fallback;
 }
 
+function inputNumber(value) {
+  if (value === null || value === undefined) return "";
+  return String(value).replace(".", ",");
+}
+
 function euro(value, decimals = 0) {
-  return new Intl.NumberFormat("en-IE", {
+  return new Intl.NumberFormat("it-IT", {
     style: "currency",
     currency: "EUR",
     minimumFractionDigits: decimals,
@@ -660,26 +676,26 @@ export default function VimaluxLightingPortalV13() {
    UI COMPONENTS
 ========================= */
 const styles = {
-  page: { minHeight: "100vh", background: "#0a0a0a", color: "#f5f5f5", padding: 24, fontFamily: "Inter, Arial, sans-serif" },
-  container: { maxWidth: 1280, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" },
-  title: { fontSize: 34, lineHeight: 1.1, margin: 0, fontWeight: 800 },
-  subtitle: { color: "#a3a3a3", marginTop: 8 },
+  page: { minHeight: "100vh", background: "linear-gradient(180deg, #111315 0%, #0d0f11 100%)", color: "#f4f4f4", padding: 24, fontFamily: "Inter, Segoe UI, Arial, sans-serif" },
+  container: { maxWidth: 1320, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap", borderBottom: "1px solid #2b2f34", paddingBottom: 18 },
+  title: { fontSize: 34, lineHeight: 1.1, margin: 0, fontWeight: 850, letterSpacing: "-0.03em" },
+  subtitle: { color: "#9aa0a6", marginTop: 8, fontSize: 15 },
   buttonRow: { display: "flex", gap: 8, flexWrap: "wrap" },
-  primaryButton: { padding: "10px 14px", borderRadius: 12, border: "1px solid #fff", background: "#fff", color: "#000", fontWeight: 700, cursor: "pointer" },
-  secondaryButton: { padding: "10px 14px", borderRadius: 12, border: "1px solid #404040", background: "#262626", color: "#fff", cursor: "pointer" },
+  primaryButton: { padding: "11px 16px", borderRadius: 14, border: "1px solid #f5f5f5", background: "#f5f5f5", color: "#0d0f11", fontWeight: 750, cursor: "pointer", boxShadow: "0 8px 22px rgba(0,0,0,0.22)" },
+  secondaryButton: { padding: "11px 16px", borderRadius: 14, border: "1px solid #353a40", background: "#202327", color: "#f4f4f4", cursor: "pointer" },
   statusBox: { border: "1px solid #404040", background: "#171717", borderRadius: 12, padding: 12, color: "#d4d4d4" },
   grid3: { display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 },
   grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 },
-  card: { border: "1px solid #262626", background: "#171717", borderRadius: 20, padding: 20, display: "flex", flexDirection: "column", gap: 16 },
-  cardWide: { border: "1px solid #262626", background: "#171717", borderRadius: 20, padding: 20, display: "flex", flexDirection: "column", gap: 16 },
+  card: { border: "1px solid #2b2f34", background: "#181a1d", borderRadius: 24, padding: 22, display: "flex", flexDirection: "column", gap: 17, boxShadow: "0 18px 44px rgba(0,0,0,0.18)" },
+  cardWide: { border: "1px solid #2b2f34", background: "#181a1d", borderRadius: 24, padding: 22, display: "flex", flexDirection: "column", gap: 17, boxShadow: "0 18px 44px rgba(0,0,0,0.18)" },
   sectionTitle: { fontSize: 22, margin: 0, fontWeight: 700 },
   formGrid: { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16 },
   toggleGrid: { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 },
   field: { display: "flex", flexDirection: "column", gap: 6 },
   label: { fontSize: 13, color: "#a3a3a3" },
-  input: { width: "100%", boxSizing: "border-box", borderRadius: 12, border: "1px solid #404040", background: "#0a0a0a", color: "#fff", padding: "10px 12px" },
-  textarea: { width: "100%", minHeight: 90, boxSizing: "border-box", borderRadius: 12, border: "1px solid #404040", background: "#0a0a0a", color: "#fff", padding: "10px 12px" },
+  input: { width: "100%", boxSizing: "border-box", borderRadius: 14, border: "1px solid #353a40", background: "#0f1012", color: "#fff", padding: "11px 13px", outline: "none", fontSize: 15 },
+  textarea: { width: "100%", minHeight: 96, boxSizing: "border-box", borderRadius: 14, border: "1px solid #353a40", background: "#0f1012", color: "#fff", padding: "11px 13px", outline: "none", fontSize: 15 },
   metric: { background: "#0a0a0a", border: "1px solid #262626", borderRadius: 14, padding: 16 },
   metricValue: { fontSize: 26, fontWeight: 800, marginTop: 4 },
   adminHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 },
@@ -707,8 +723,9 @@ function Input({ label, value, onChange, type = "text" }) {
       <span style={styles.label}>{label}</span>
       <input
         style={styles.input}
-        type={type}
-        value={value}
+        type={type === "number" ? "text" : type}
+        inputMode={type === "number" ? "decimal" : undefined}
+        value={type === "number" ? inputNumber(value) : value}
         onChange={(e) => onChange(e.target.value)}
       />
     </label>
@@ -738,8 +755,9 @@ function AdminCell({ value, onChange }) {
     <td style={styles.tdRight}>
       <input
         style={styles.adminInput}
-        type="number"
-        value={value}
+        type="text"
+        inputMode="decimal"
+        value={inputNumber(value)}
         onChange={(e) => onChange(e.target.value)}
       />
     </td>
