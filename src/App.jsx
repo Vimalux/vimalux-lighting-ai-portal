@@ -1,16 +1,18 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 /* =====================================================
    VIMALUX LIGHTING AI PORTAL
-   VERSION 22 – LIVE MONEY ENGINE
-   Full dynamic CFO engine + offer comparison + PDF + Excel
-   Stable React version – no Tailwind dependency
+   VERSION 24 – CFO TRUTH ENGINE
+   React single-file build
+   White theme / Customer + Admin mode / Product override
+   LED vs Smart vs Premium comparison
+   PDF proposal + Excel export
 ===================================================== */
 
-const STORAGE_KEY = "vimalux_app_v22_state";
+const STORAGE_KEY = "vimalux_app_v24_state";
 const ADMIN_PASSWORD = "vimalux-admin";
 
 const defaultProducts = [
@@ -30,11 +32,19 @@ const defaultAssumptions = {
   cmsFeePerLampYear: 6,
   powerAidFeePerLampYear: 3,
   cloSavingPct: 10,
-  powerAidAdditionalSavingPct: 20,
+  powerAidAdditionalSavingPct: 35,
   proposalYears: 10,
   financingMarginPct: 8,
   kgCo2PerKwh: 0.42,
   discountRatePct: 7,
+
+  // V24 Smart business-value monetisation.
+  // These are deliberately explicit so they are visible and adjustable in Admin.
+  serviceEfficiencyPerLampYear: 5,
+  fewerFailuresPerLampYear: 4,
+  reportingEsgPerLampYear: 2,
+  financingUpliftPerLampYear: 3,
+  assetLifeExtensionPerLampYear: 3,
 };
 
 const emptyProject = {
@@ -53,9 +63,33 @@ const emptyProject = {
 };
 
 const offers = [
-  { id: "led", title: "LED Only", badge: "Base", smart: false, powerAid: false, positioning: "Fastest entry point" },
-  { id: "smart", title: "Smart CMS", badge: "Recommended", smart: true, powerAid: false, positioning: "Control + CLO + maintenance" },
-  { id: "smart_poweraid", title: "Smart + PowerAiD", badge: "Premium", smart: true, powerAid: true, positioning: "Maximum optimization" },
+  {
+    id: "led",
+    title: "LED Only",
+    badge: "Base",
+    smart: false,
+    powerAid: false,
+    positioning: "Lowest entry CAPEX / fastest basic upgrade",
+    salesPosition: "Budget upgrade",
+  },
+  {
+    id: "smart",
+    title: "Smart CMS",
+    badge: "Recommended",
+    smart: true,
+    powerAid: false,
+    positioning: "Best ROI through CLO, maintenance and operations",
+    salesPosition: "Best buy",
+  },
+  {
+    id: "smart_poweraid",
+    title: "Smart + PowerAiD",
+    badge: "Premium",
+    smart: true,
+    powerAid: true,
+    positioning: "Maximum savings and digital infrastructure value",
+    salesPosition: "Maximum return",
+  },
 ];
 
 function toNumber(value, fallback = 0) {
@@ -72,11 +106,17 @@ function inputNumber(value) {
 }
 
 function euro(value, decimals = 0) {
-  return `€${new Intl.NumberFormat("it-IT", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(toNumber(value))}`;
+  return `€${new Intl.NumberFormat("it-IT", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(toNumber(value))}`;
 }
 
 function num(value, decimals = 0) {
-  return new Intl.NumberFormat("it-IT", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(toNumber(value));
+  return new Intl.NumberFormat("it-IT", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(toNumber(value));
 }
 
 function pct(value) {
@@ -90,7 +130,9 @@ function safeProduct(products, selectedProductId) {
 function npv(ratePct, annualCash, years, initialCapex) {
   const rate = toNumber(ratePct) / 100;
   let value = -initialCapex;
-  for (let y = 1; y <= years; y += 1) value += annualCash / Math.pow(1 + rate, y);
+  for (let y = 1; y <= years; y += 1) {
+    value += annualCash / Math.pow(1 + rate, y);
+  }
   return value;
 }
 
@@ -98,11 +140,14 @@ function simpleIrr(annualCash, years, initialCapex) {
   if (initialCapex <= 0 || annualCash <= 0) return null;
   let low = -0.9;
   let high = 1.5;
-  for (let i = 0; i < 80; i += 1) {
+  for (let i = 0; i < 90; i += 1) {
     const mid = (low + high) / 2;
-    let v = -initialCapex;
-    for (let y = 1; y <= years; y += 1) v += annualCash / Math.pow(1 + mid, y);
-    if (v > 0) low = mid; else high = mid;
+    let value = -initialCapex;
+    for (let y = 1; y <= years; y += 1) {
+      value += annualCash / Math.pow(1 + mid, y);
+    }
+    if (value > 0) low = mid;
+    else high = mid;
   }
   return ((low + high) / 2) * 100;
 }
@@ -110,6 +155,7 @@ function simpleIrr(annualCash, years, initialCapex) {
 function calculateOffer(project, assumptions, products, offerId) {
   const offer = offers.find((o) => o.id === offerId) || offers[0];
   const product = safeProduct(products, project.selectedProductId);
+
   const quantity = Math.max(0, toNumber(project.quantity));
   const oldWatt = Math.max(0, toNumber(project.existingWatt));
   const hours = Math.max(0, toNumber(assumptions.burningHours));
@@ -121,6 +167,11 @@ function calculateOffer(project, assumptions, products, offerId) {
   const powerAidPct = offer.powerAid ? Math.max(0, Math.min(100, toNumber(assumptions.powerAidAdditionalSavingPct))) / 100 : 0;
 
   const oldKwh = (quantity * oldWatt * hours) / 1000;
+
+  // Commercial logic:
+  // 1) LED creates the baseline 55% reduction from old SAP/Sodium/HPS system.
+  // 2) Smart CMS adds CLO on the post-LED load + maintenance + operational value.
+  // 3) PowerAiD is only available in Premium and optimizes the post-LED+CLO residual load.
   const postLedKwh = oldKwh * (1 - ledSavingPct);
   const postCloKwh = offer.smart ? postLedKwh * (1 - cloSavingPct) : postLedKwh;
   const finalKwh = offer.powerAid ? postCloKwh * (1 - powerAidPct) : postCloKwh;
@@ -134,9 +185,16 @@ function calculateOffer(project, assumptions, products, offerId) {
   const cloSaving = offer.smart ? Math.max(0, postLedEnergyCost - postCloEnergyCost) : 0;
   const powerAidSaving = offer.powerAid ? Math.max(0, postCloEnergyCost - newEnergyCost) : 0;
   const energySaving = Math.max(0, oldEnergyCost - newEnergyCost);
+
   const maintenanceSaving = project.includeMaintenance && offer.smart
     ? quantity * toNumber(assumptions.maintenanceOldPerLamp) * (toNumber(assumptions.maintenanceSavingPct) / 100)
     : 0;
+
+  const serviceEfficiencySaving = offer.smart ? quantity * toNumber(assumptions.serviceEfficiencyPerLampYear) : 0;
+  const fewerFailuresSaving = offer.smart ? quantity * toNumber(assumptions.fewerFailuresPerLampYear) : 0;
+  const reportingEsgValue = offer.smart ? quantity * toNumber(assumptions.reportingEsgPerLampYear) : 0;
+  const financingUpliftValue = offer.smart ? quantity * toNumber(assumptions.financingUpliftPerLampYear) : 0;
+  const assetLifeExtensionValue = offer.smart ? quantity * toNumber(assumptions.assetLifeExtensionPerLampYear) : 0;
 
   const luminaireCapex = quantity * toNumber(product.sellPrice);
   const installationCapex = project.includeInstallation ? quantity * toNumber(product.install) : 0;
@@ -146,7 +204,16 @@ function calculateOffer(project, assumptions, products, offerId) {
   const cmsOpex = offer.smart ? quantity * toNumber(assumptions.cmsFeePerLampYear) : 0;
   const powerAidOpex = offer.powerAid ? quantity * toNumber(assumptions.powerAidFeePerLampYear) : 0;
   const annualNewOpex = cmsOpex + powerAidOpex;
-  const annualGrossSaving = energySaving + maintenanceSaving;
+
+  const smartPlatformValue =
+    maintenanceSaving +
+    serviceEfficiencySaving +
+    fewerFailuresSaving +
+    reportingEsgValue +
+    financingUpliftValue +
+    assetLifeExtensionValue;
+
+  const annualGrossSaving = energySaving + smartPlatformValue;
   const annualNetSaving = annualGrossSaving - annualNewOpex;
   const paybackYears = annualNetSaving > 0 ? totalCapex / annualNetSaving : null;
 
@@ -165,6 +232,8 @@ function calculateOffer(project, assumptions, products, offerId) {
     product,
     quantity,
     oldWatt,
+    newWatt: toNumber(product.watt),
+    years,
     oldKwh,
     postLedKwh,
     postCloKwh,
@@ -176,6 +245,12 @@ function calculateOffer(project, assumptions, products, offerId) {
     powerAidSaving,
     energySaving,
     maintenanceSaving,
+    serviceEfficiencySaving,
+    fewerFailuresSaving,
+    reportingEsgValue,
+    financingUpliftValue,
+    assetLifeExtensionValue,
+    smartPlatformValue,
     annualGrossSaving,
     annualNewOpex,
     annualNetSaving,
@@ -195,7 +270,6 @@ function calculateOffer(project, assumptions, products, offerId) {
     tenYearNetSavings,
     netPresentValue,
     irr,
-    years,
   };
 }
 
@@ -208,6 +282,11 @@ function buildRows(calc) {
       cloSaving: calc.cloSaving,
       powerAidSaving: calc.powerAidSaving,
       maintenanceSaving: calc.maintenanceSaving,
+      serviceEfficiencySaving: calc.serviceEfficiencySaving,
+      fewerFailuresSaving: calc.fewerFailuresSaving,
+      reportingEsgValue: calc.reportingEsgValue,
+      financingUpliftValue: calc.financingUpliftValue,
+      assetLifeExtensionValue: calc.assetLifeExtensionValue,
       newOpex: calc.annualNewOpex,
       netSaving: calc.annualNetSaving,
       cumulativeNetSaving: calc.annualNetSaving * year,
@@ -215,7 +294,7 @@ function buildRows(calc) {
   });
 }
 
-export default function VimaluxLightingPortalV22() {
+export default function VimaluxLightingPortalV24() {
   const [products, setProducts] = useState(defaultProducts);
   const [assumptions, setAssumptions] = useState(defaultAssumptions);
   const [project, setProject] = useState(emptyProject);
@@ -235,7 +314,9 @@ export default function VimaluxLightingPortalV22() {
       if (parsed.project) setProject({ ...emptyProject, ...parsed.project });
       if (parsed.adminMode) setAdminMode(parsed.adminMode);
       if (parsed.viewMode) setViewMode(parsed.viewMode);
-    } catch (e) { console.warn(e); }
+    } catch (error) {
+      console.warn("Could not load saved state", error);
+    }
   }, []);
 
   useEffect(() => {
@@ -243,13 +324,21 @@ export default function VimaluxLightingPortalV22() {
   }, [products, assumptions, project, adminMode, viewMode]);
 
   useEffect(() => {
-    if (!toast) return;
+    if (!toast) return undefined;
     const t = setTimeout(() => setToast(""), 3000);
     return () => clearTimeout(t);
   }, [toast]);
 
-  const selectedCalc = useMemo(() => calculateOffer(project, assumptions, products, project.selectedOffer), [project, assumptions, products]);
-  const comparison = useMemo(() => offers.map((o) => calculateOffer(project, assumptions, products, o.id)), [project, assumptions, products]);
+  const selectedCalc = useMemo(
+    () => calculateOffer(project, assumptions, products, project.selectedOffer),
+    [project, assumptions, products]
+  );
+
+  const comparison = useMemo(
+    () => offers.map((offer) => calculateOffer(project, assumptions, products, offer.id)),
+    [project, assumptions, products]
+  );
+
   const rows = useMemo(() => buildRows(selectedCalc), [selectedCalc]);
   const maxCumulative = Math.max(...rows.map((r) => r.cumulativeNetSaving), 1);
   const showAdminPanel = adminMode && viewMode === "admin";
@@ -263,7 +352,7 @@ export default function VimaluxLightingPortalV22() {
   }
 
   function updateProduct(id, field, value) {
-    setProducts((prev) => prev.map((p) => p.id === id ? { ...p, [field]: value } : p));
+    setProducts((prev) => prev.map((product) => (product.id === id ? { ...product, [field]: value } : product)));
   }
 
   function unlockAdmin() {
@@ -273,7 +362,9 @@ export default function VimaluxLightingPortalV22() {
       setShowLogin(false);
       setAdminPassword("");
       setToast("Admin unlocked");
-    } else setToast("Wrong admin password");
+    } else {
+      setToast("Wrong admin password");
+    }
   }
 
   function logoutAdmin() {
@@ -285,7 +376,10 @@ export default function VimaluxLightingPortalV22() {
 
   function addProduct() {
     const id = `custom_${Date.now()}`;
-    setProducts((prev) => [...prev, { id, name: "Custom Luminaire", watt: 60, lumen: 10000, sellPrice: 150, buyPrice: 110, install: 35 }]);
+    setProducts((prev) => [
+      ...prev,
+      { id, name: "Custom Luminaire", watt: 60, lumen: 10000, sellPrice: 150, buyPrice: 110, install: 35 },
+    ]);
     updateProject("selectedProductId", id);
   }
 
@@ -301,21 +395,37 @@ export default function VimaluxLightingPortalV22() {
 
   function exportExcel() {
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(comparison.map(c => ({
-      Offer: c.offer.title,
-      Capex: c.totalCapex,
-      Annual_Net_Saving: c.annualNetSaving,
-      Payback_Years: c.paybackYears,
-      Ten_Year_Net_Savings: c.tenYearNetSavings,
-      NPV: c.netPresentValue,
-      IRR: c.irr,
-      LaaS_Month: c.laasMonthly,
-      Energy_Reduction_Pct: c.energyReductionPct,
-    }))), "Offer Comparison");
+
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.json_to_sheet(
+        comparison.map((calc) => ({
+          Offer: calc.offer.title,
+          Sales_Position: calc.offer.salesPosition,
+          Total_CAPEX: calc.totalCapex,
+          Annual_Net_Saving: calc.annualNetSaving,
+          Payback_Years: calc.paybackYears,
+          Ten_Year_Net_Savings: calc.tenYearNetSavings,
+          NPV: calc.netPresentValue,
+          IRR: calc.irr,
+          LaaS_Month: calc.laasMonthly,
+          Energy_Reduction_Pct: calc.energyReductionPct,
+          CO2_Tons_Year: calc.co2SavedTons,
+        }))
+      ),
+      "Offer Comparison"
+    );
+
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Selected Cashflow");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ ...project, product: selectedCalc.product.name, selectedOffer: selectedCalc.offer.title }]), "Project");
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.json_to_sheet([{ ...project, product: selectedCalc.product.name, selectedOffer: selectedCalc.offer.title }]),
+      "Project"
+    );
     if (adminMode) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(products), "Products");
-    XLSX.writeFile(wb, `VIMALUX_${project.municipality || "proposal"}_V22.xlsx`);
+    if (adminMode) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([assumptions]), "Assumptions");
+
+    XLSX.writeFile(wb, `VIMALUX_${project.municipality || "proposal"}_V24.xlsx`);
   }
 
   function pdfHeader(doc, title, subtitle) {
@@ -369,21 +479,31 @@ export default function VimaluxLightingPortalV22() {
     doc.text(`Payback: ${selectedCalc.paybackYears ? `${num(selectedCalc.paybackYears, 1)} years` : "N/A"}`, 14, 156);
     doc.text(`10-year net savings: ${euro(selectedCalc.tenYearNetSavings)}`, 14, 166);
     doc.text(`Energy reduction: ${pct(selectedCalc.energyReductionPct)}`, 14, 176);
+    doc.text(`NPV: ${euro(selectedCalc.netPresentValue)} | IRR: ${selectedCalc.irr ? pct(selectedCalc.irr) : "N/A"}`, 14, 186);
     footer(doc, 1);
 
     doc.addPage();
     pdfHeader(doc, "1. Offer Comparison", "LED Only vs Smart CMS vs Smart + PowerAiD");
     autoTable(doc, {
       startY: 42,
-      head: [["Offer", "Annual Net", "Payback", "10Y Net", "NPV", "IRR", "LaaS/month"]],
-      body: comparison.map((c) => [c.offer.title, euro(c.annualNetSaving), c.paybackYears ? `${num(c.paybackYears, 1)} yrs` : "N/A", euro(c.tenYearNetSavings), euro(c.netPresentValue), c.irr ? pct(c.irr) : "N/A", euro(c.laasMonthly)]),
+      head: [["Offer", "Position", "Annual Net", "Payback", "10Y Net", "NPV", "IRR", "LaaS/month"]],
+      body: comparison.map((calc) => [
+        calc.offer.title,
+        calc.offer.salesPosition,
+        euro(calc.annualNetSaving),
+        calc.paybackYears ? `${num(calc.paybackYears, 1)} yrs` : "N/A",
+        euro(calc.tenYearNetSavings),
+        euro(calc.netPresentValue),
+        calc.irr ? pct(calc.irr) : "N/A",
+        euro(calc.laasMonthly),
+      ]),
       headStyles: { fillColor: [15, 23, 42] },
-      styles: { fontSize: 8 },
+      styles: { fontSize: 7.5 },
     });
     footer(doc, 2);
 
     doc.addPage();
-    pdfHeader(doc, "2. Selected Value Stack", "Annual contribution by savings layer");
+    pdfHeader(doc, "2. Selected Value Stack", "Annual contribution by savings and value layer");
     autoTable(doc, {
       startY: 42,
       head: [["Layer", "Logic", "Annual value"]],
@@ -391,11 +511,16 @@ export default function VimaluxLightingPortalV22() {
         ["LED upgrade", `${num(assumptions.ledSavingPct)}% saving vs old baseline`, euro(selectedCalc.ledSaving)],
         ["CLO", selectedCalc.offer.smart ? `${num(assumptions.cloSavingPct)}% on post-LED consumption` : "Not included", euro(selectedCalc.cloSaving)],
         ["Maintenance", selectedCalc.offer.smart ? `${num(assumptions.maintenanceSavingPct)}% reduction assumption` : "Requires Smart CMS", euro(selectedCalc.maintenanceSaving)],
+        ["Service efficiency", selectedCalc.offer.smart ? `${euro(assumptions.serviceEfficiencyPerLampYear)} / lamp / year` : "Requires Smart CMS", euro(selectedCalc.serviceEfficiencySaving)],
+        ["Fewer failures", selectedCalc.offer.smart ? `${euro(assumptions.fewerFailuresPerLampYear)} / lamp / year` : "Requires Smart CMS", euro(selectedCalc.fewerFailuresSaving)],
+        ["Reporting / ESG", selectedCalc.offer.smart ? `${euro(assumptions.reportingEsgPerLampYear)} / lamp / year` : "Requires Smart CMS", euro(selectedCalc.reportingEsgValue)],
+        ["Financing uplift", selectedCalc.offer.smart ? `${euro(assumptions.financingUpliftPerLampYear)} / lamp / year` : "Requires Smart CMS", euro(selectedCalc.financingUpliftValue)],
+        ["Asset life extension", selectedCalc.offer.smart ? `${euro(assumptions.assetLifeExtensionPerLampYear)} / lamp / year` : "Requires Smart CMS", euro(selectedCalc.assetLifeExtensionValue)],
         ["PowerAiD", selectedCalc.offer.powerAid ? `${num(assumptions.powerAidAdditionalSavingPct)}% on post-LED+CLO load` : "Not included", euro(selectedCalc.powerAidSaving)],
         ["New OPEX", "CMS / PowerAiD recurring fees", `-${euro(selectedCalc.annualNewOpex)}`],
       ],
       headStyles: { fillColor: [15, 23, 42] },
-      styles: { fontSize: 9 },
+      styles: { fontSize: 8 },
     });
     footer(doc, 3);
 
@@ -408,6 +533,8 @@ export default function VimaluxLightingPortalV22() {
         ["Total CAPEX", euro(selectedCalc.totalCapex)],
         ["Investor value incl. margin", euro(selectedCalc.investorValue)],
         ["Indicative LaaS / month", euro(selectedCalc.laasMonthly)],
+        ["Annual net saving", euro(selectedCalc.annualNetSaving)],
+        ["10-year net saving", euro(selectedCalc.tenYearNetSavings)],
         ["NPV", euro(selectedCalc.netPresentValue)],
         ["IRR", selectedCalc.irr ? pct(selectedCalc.irr) : "N/A"],
         ["CO2 reduction / year", `${num(selectedCalc.co2SavedTons, 1)} t`],
@@ -422,20 +549,24 @@ export default function VimaluxLightingPortalV22() {
     const bullets = [
       "LED-first business case with optional Smart value layers",
       "Smart CMS enables CLO, maintenance optimization and connectivity",
+      "Smart value includes operational efficiency, fewer failures, ESG reporting and asset-life uplift",
       "PowerAiD is only enabled where Smart connectivity exists",
       "Clear offer comparison for municipalities, ESCOs and investors",
       "Commercial structures suitable for CAPEX, LaaS and financed models",
     ];
     doc.setFontSize(11);
     doc.setTextColor(15, 23, 42);
-    bullets.forEach((b, i) => doc.text(`• ${b}`, 18, 48 + i * 12));
+    bullets.forEach((bullet, i) => doc.text(`• ${bullet}`, 18, 48 + i * 12, { maxWidth: 174 }));
     doc.setFontSize(8);
-    doc.text("Non-binding indication: figures are indicative and subject to technical validation, financing approval, final product selection, legal structure, credit assessment and site verification.", 14, 260, { maxWidth: 182 });
+    doc.text(
+      "Non-binding indication: figures are indicative and subject to technical validation, financing approval, final product selection, legal structure, credit assessment and site verification.",
+      14,
+      260,
+      { maxWidth: 182 }
+    );
     footer(doc, 5);
-    doc.save(`VIMALUX_${municipality}_V22_proposal.pdf`);
+    doc.save(`VIMALUX_${municipality}_V24_proposal.pdf`);
   }
-
-  const selectedRows = rows;
 
   return (
     <div style={styles.page}>
@@ -446,7 +577,7 @@ export default function VimaluxLightingPortalV22() {
             <button style={styles.logoMark} onClick={() => setViewMode("customer")}>V</button>
             <div>
               <h1 style={styles.title}>VIMALUX Lighting AI Portal</h1>
-              <p style={styles.subtitle}>Version 22 – Live Money Engine</p>
+              <p style={styles.subtitle}>Version 24 – CFO Truth Engine</p>
             </div>
           </div>
           <div style={styles.headerActions}>
@@ -460,10 +591,29 @@ export default function VimaluxLightingPortalV22() {
           </div>
         </header>
 
-        {showLogin && !adminMode && <section style={styles.loginBar}><input style={styles.loginInput} type="password" placeholder="Admin password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") unlockAdmin(); }} /><button onClick={unlockAdmin} style={styles.primaryButton}>Unlock</button></section>}
+        {showLogin && !adminMode && (
+          <section style={styles.loginBar}>
+            <input
+              style={styles.loginInput}
+              type="password"
+              placeholder="Admin password"
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") unlockAdmin(); }}
+            />
+            <button onClick={unlockAdmin} style={styles.primaryButton}>Unlock</button>
+          </section>
+        )}
 
         <section style={styles.offerGrid}>
-          {comparison.map((c) => <OfferCard key={c.offer.id} calc={c} selected={project.selectedOffer === c.offer.id} onSelect={() => updateProject("selectedOffer", c.offer.id)} />)}
+          {comparison.map((calc) => (
+            <OfferCard
+              key={calc.offer.id}
+              calc={calc}
+              selected={project.selectedOffer === calc.offer.id}
+              onSelect={() => updateProject("selectedOffer", calc.offer.id)}
+            />
+          ))}
         </section>
 
         <section style={styles.kpiGrid}>
@@ -488,49 +638,253 @@ export default function VimaluxLightingPortalV22() {
               <Input label="Proposal date" type="date" value={project.proposalDate} onChange={(v) => updateProject("proposalDate", v)} />
               <Input label="Quantity" type="number" value={project.quantity} onChange={(v) => updateProject("quantity", toNumber(v))} />
               <Input label="Existing wattage" type="number" value={project.existingWatt} onChange={(v) => updateProject("existingWatt", toNumber(v))} />
-              <label style={styles.field}><span style={styles.label}>Product</span><select style={styles.input} value={project.selectedProductId} onChange={(e) => updateProject("selectedProductId", e.target.value)}>{products.map((p) => <option key={p.id} value={p.id}>{p.name} – {p.watt}W – {euro(p.sellPrice)}</option>)}</select></label>
+              <label style={styles.field}>
+                <span style={styles.label}>Product</span>
+                <select style={styles.input} value={project.selectedProductId} onChange={(e) => updateProject("selectedProductId", e.target.value)}>
+                  {products.map((p) => <option key={p.id} value={p.id}>{p.name} – {p.watt}W – {euro(p.sellPrice)}</option>)}
+                </select>
+              </label>
             </div>
             <div style={styles.toggleGrid}>
               <Toggle label="Installation included" checked={project.includeInstallation} onChange={(v) => updateProject("includeInstallation", v)} />
               <Toggle label="Maintenance saving" checked={project.includeMaintenance} onChange={(v) => updateProject("includeMaintenance", v)} />
             </div>
-            <label style={styles.field}><span style={styles.label}>Notes</span><textarea style={styles.textarea} value={project.notes} onChange={(e) => updateProject("notes", e.target.value)} /></label>
+            <label style={styles.field}>
+              <span style={styles.label}>Notes</span>
+              <textarea style={styles.textarea} value={project.notes} onChange={(e) => updateProject("notes", e.target.value)} />
+            </label>
           </div>
 
           <div style={styles.card}>
             <SectionTitle title="Selected Value Stack" sub={selectedCalc.offer.title} />
             <ValueLine label="LED energy saving" value={selectedCalc.ledSaving} max={selectedCalc.annualGrossSaving} />
             <ValueLine label="CLO saving" value={selectedCalc.cloSaving} max={selectedCalc.annualGrossSaving} />
-            <ValueLine label="PowerAiD saving" value={selectedCalc.powerAidSaving} max={selectedCalc.annualGrossSaving} />
             <ValueLine label="Maintenance saving" value={selectedCalc.maintenanceSaving} max={selectedCalc.annualGrossSaving} />
+            <ValueLine label="Service efficiency" value={selectedCalc.serviceEfficiencySaving} max={selectedCalc.annualGrossSaving} />
+            <ValueLine label="Fewer failures" value={selectedCalc.fewerFailuresSaving} max={selectedCalc.annualGrossSaving} />
+            <ValueLine label="Reporting / ESG" value={selectedCalc.reportingEsgValue} max={selectedCalc.annualGrossSaving} />
+            <ValueLine label="Financing uplift" value={selectedCalc.financingUpliftValue} max={selectedCalc.annualGrossSaving} />
+            <ValueLine label="Asset life extension" value={selectedCalc.assetLifeExtensionValue} max={selectedCalc.annualGrossSaving} />
+            <ValueLine label="PowerAiD saving" value={selectedCalc.powerAidSaving} max={selectedCalc.annualGrossSaving} />
             <ValueLine label="New OPEX" value={-selectedCalc.annualNewOpex} max={selectedCalc.annualGrossSaving} negative />
           </div>
         </section>
 
-        {showAdminPanel && <section style={styles.twoGrid}><div style={styles.card}><SectionTitle title="Admin Assumptions" sub="EU decimal input accepted" /><div style={styles.formGrid}>{Object.entries(assumptions).map(([key, value]) => <Input key={key} label={key} type="number" value={value} onChange={(v) => updateAssumption(key, v)} />)}</div></div><div style={styles.card}><div style={styles.cardTop}><SectionTitle title="Product Override" sub="Protected catalogue editing" /><span style={styles.adminOn}>Admin</span></div><div style={styles.stack}><div style={styles.buttonRow}><button onClick={addProduct} style={styles.primaryButton}>Add Product</button><button onClick={() => setProducts(defaultProducts)} style={styles.secondaryButton}>Reset Products</button></div><ProductTable products={products} updateProduct={updateProduct} /></div></div></section>}
+        {showAdminPanel && (
+          <section style={styles.twoGrid}>
+            <div style={styles.card}>
+              <SectionTitle title="Admin Assumptions" sub="EU decimal input accepted" />
+              <div style={styles.formGrid}>
+                {Object.entries(assumptions).map(([key, value]) => (
+                  <Input key={key} label={key} type="number" value={value} onChange={(v) => updateAssumption(key, v)} />
+                ))}
+              </div>
+            </div>
+            <div style={styles.card}>
+              <div style={styles.cardTop}>
+                <SectionTitle title="Product Override" sub="Protected catalogue editing" />
+                <span style={styles.adminOn}>Admin</span>
+              </div>
+              <div style={styles.stack}>
+                <div style={styles.buttonRow}>
+                  <button onClick={addProduct} style={styles.primaryButton}>Add Product</button>
+                  <button onClick={() => setProducts(defaultProducts)} style={styles.secondaryButton}>Reset Products</button>
+                </div>
+                <ProductTable products={products} updateProduct={updateProduct} />
+              </div>
+            </div>
+          </section>
+        )}
 
         <section style={styles.card}>
           <SectionTitle title="Customer Benefit Curve" sub="Accumulated annual net savings" />
-          <div style={styles.chartBox}>{selectedRows.map((r) => <div key={r.year} style={styles.chartRow}><span style={styles.chartYear}>{r.year}</span><div style={styles.barTrack}><div style={{ ...styles.barFill, width: `${Math.max(4, (r.cumulativeNetSaving / maxCumulative) * 100)}%` }} /></div><span style={styles.chartValue}>{euro(r.cumulativeNetSaving)}</span></div>)}</div>
+          <div style={styles.chartBox}>
+            {rows.map((row) => (
+              <div key={row.year} style={styles.chartRow}>
+                <span style={styles.chartYear}>{row.year}</span>
+                <div style={styles.barTrack}>
+                  <div style={{ ...styles.barFill, width: `${Math.max(4, (row.cumulativeNetSaving / maxCumulative) * 100)}%` }} />
+                </div>
+                <span style={styles.chartValue}>{euro(row.cumulativeNetSaving)}</span>
+              </div>
+            ))}
+          </div>
         </section>
 
-        {showAdminPanel && <section style={styles.card}><SectionTitle title="Admin Cashflow Detail" sub="Internal calculation split" /><div style={styles.tableWrap}><table style={styles.table}><thead><tr><Th left>Year</Th><Th>LED</Th><Th>CLO</Th><Th>PowerAiD</Th><Th>Maintenance</Th><Th>OPEX</Th><Th>Net</Th><Th>Cumulative</Th></tr></thead><tbody>{selectedRows.map((r) => <tr key={r.year} style={styles.tr}><Td left>{r.year}</Td><Td>{euro(r.ledSaving)}</Td><Td>{euro(r.cloSaving)}</Td><Td>{euro(r.powerAidSaving)}</Td><Td>{euro(r.maintenanceSaving)}</Td><Td>{euro(r.newOpex)}</Td><Td strong>{euro(r.netSaving)}</Td><Td strong>{euro(r.cumulativeNetSaving)}</Td></tr>)}</tbody></table></div></section>}
+        {showAdminPanel && (
+          <section style={styles.card}>
+            <SectionTitle title="Admin Cashflow Detail" sub="Internal calculation split" />
+            <div style={styles.tableWrap}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <Th left>Year</Th>
+                    <Th>LED</Th>
+                    <Th>CLO</Th>
+                    <Th>PowerAiD</Th>
+                    <Th>Maintenance</Th>
+                    <Th>Ops Value</Th>
+                    <Th>OPEX</Th>
+                    <Th>Net</Th>
+                    <Th>Cumulative</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.year} style={styles.tr}>
+                      <Td left>{row.year}</Td>
+                      <Td>{euro(row.ledSaving)}</Td>
+                      <Td>{euro(row.cloSaving)}</Td>
+                      <Td>{euro(row.powerAidSaving)}</Td>
+                      <Td>{euro(row.maintenanceSaving)}</Td>
+                      <Td>{euro(row.serviceEfficiencySaving + row.fewerFailuresSaving + row.reportingEsgValue + row.financingUpliftValue + row.assetLifeExtensionValue)}</Td>
+                      <Td>{euro(row.newOpex)}</Td>
+                      <Td strong>{euro(row.netSaving)}</Td>
+                      <Td strong>{euro(row.cumulativeNetSaving)}</Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
 }
 
 function OfferCard({ calc, selected, onSelect }) {
-  return <button onClick={onSelect} style={selected ? styles.offerCardSelected : styles.offerCard}><div style={styles.offerTop}><span style={styles.offerTitle}>{calc.offer.title}</span><span style={styles.offerBadge}>{calc.offer.badge}</span></div><p style={styles.offerSub}>{calc.offer.positioning}</p><div style={styles.offerMetrics}><div><small>Payback</small><b>{calc.paybackYears ? `${num(calc.paybackYears, 1)} yrs` : "N/A"}</b></div><div><small>10Y Net</small><b>{euro(calc.tenYearNetSavings)}</b></div></div></button>;
+  return (
+    <button onClick={onSelect} style={selected ? styles.offerCardSelected : styles.offerCard}>
+      <div style={styles.offerTop}>
+        <span style={styles.offerTitle}>{calc.offer.title}</span>
+        <span style={styles.offerBadge}>{calc.offer.badge}</span>
+      </div>
+      <p style={styles.offerSub}>{calc.offer.positioning}</p>
+      <div style={styles.offerMetrics}>
+        <div>
+          <small>Payback</small>
+          <b>{calc.paybackYears ? `${num(calc.paybackYears, 1)} yrs` : "N/A"}</b>
+        </div>
+        <div>
+          <small>10Y Net</small>
+          <b>{euro(calc.tenYearNetSavings)}</b>
+        </div>
+      </div>
+    </button>
+  );
 }
-function SectionTitle({ title, sub }) { return <div><h2 style={styles.sectionTitle}>{title}</h2><p style={styles.sectionSub}>{sub}</p></div>; }
-function Kpi({ label, value, note }) { return <div style={styles.kpiCard}><div style={styles.kpiLabel}>{label}</div><div style={styles.kpiValue}>{value}</div><div style={styles.kpiNote}>{note}</div></div>; }
-function Input({ label, value, onChange, type = "text" }) { return <label style={styles.field}><span style={styles.label}>{label}</span><input style={styles.input} type={type === "number" ? "text" : type} inputMode={type === "number" ? "decimal" : undefined} value={type === "number" ? inputNumber(value) : value} onChange={(e) => onChange(e.target.value)} /></label>; }
-function Toggle({ label, checked, onChange }) { return <label style={styles.toggle}><span>{label}</span><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} /></label>; }
-function Th({ children, left }) { return <th style={left ? styles.thLeft : styles.thRight}>{children}</th>; }
-function Td({ children, left, strong }) { return <td style={left ? styles.tdLeft : strong ? styles.tdStrong : styles.tdRight}>{children}</td>; }
-function ValueLine({ label, value, max, negative }) { const abs = Math.abs(toNumber(value)); const pctWidth = Math.max(4, Math.min(100, (abs / Math.max(1, toNumber(max))) * 100)); return <div style={styles.valueLine}><div style={styles.valueLineTop}><span>{label}</span><b>{negative ? `-${euro(abs)}` : euro(abs)}</b></div><div style={styles.valueTrack}><div style={{ ...styles.valueFill, background: negative ? "#ef4444" : "linear-gradient(90deg,#2563eb,#60a5fa)", width: `${pctWidth}%` }} /></div></div>; }
-function ProductTable({ products, updateProduct }) { return <div style={styles.tableWrapSmall}><table style={styles.table}><thead><tr><Th left>Name</Th><Th>W</Th><Th>lm</Th><Th>Sell</Th><Th>Buy</Th><Th>Install</Th></tr></thead><tbody>{products.map((p) => <tr key={p.id} style={styles.tr}><td style={styles.tdLeft}><input style={styles.adminInputWide} value={p.name} onChange={(e) => updateProduct(p.id, "name", e.target.value)} /></td>{["watt", "lumen", "sellPrice", "buyPrice", "install"].map((field) => <td key={field} style={styles.tdRight}><input style={styles.adminInput} value={inputNumber(p[field])} inputMode="decimal" onChange={(e) => updateProduct(p.id, field, e.target.value)} /></td>)}</tr>)}</tbody></table></div>; }
+
+function SectionTitle({ title, sub }) {
+  return (
+    <div>
+      <h2 style={styles.sectionTitle}>{title}</h2>
+      <p style={styles.sectionSub}>{sub}</p>
+    </div>
+  );
+}
+
+function Kpi({ label, value, note }) {
+  return (
+    <div style={styles.kpiCard}>
+      <div style={styles.kpiLabel}>{label}</div>
+      <div style={styles.kpiValue}>{value}</div>
+      <div style={styles.kpiNote}>{note}</div>
+    </div>
+  );
+}
+
+function Input({ label, value, onChange, type = "text" }) {
+  return (
+    <label style={styles.field}>
+      <span style={styles.label}>{label}</span>
+      <input
+        style={styles.input}
+        type={type === "number" ? "text" : type}
+        inputMode={type === "number" ? "decimal" : undefined}
+        value={type === "number" ? inputNumber(value) : value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </label>
+  );
+}
+
+function Toggle({ label, checked, onChange }) {
+  return (
+    <label style={styles.toggle}>
+      <span>{label}</span>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    </label>
+  );
+}
+
+function Th({ children, left }) {
+  return <th style={left ? styles.thLeft : styles.thRight}>{children}</th>;
+}
+
+function Td({ children, left, strong }) {
+  return <td style={left ? styles.tdLeft : strong ? styles.tdStrong : styles.tdRight}>{children}</td>;
+}
+
+function ValueLine({ label, value, max, negative }) {
+  const abs = Math.abs(toNumber(value));
+  const pctWidth = Math.max(4, Math.min(100, (abs / Math.max(1, toNumber(max))) * 100));
+  return (
+    <div style={styles.valueLine}>
+      <div style={styles.valueLineTop}>
+        <span>{label}</span>
+        <b>{negative ? `-${euro(abs)}` : euro(abs)}</b>
+      </div>
+      <div style={styles.valueTrack}>
+        <div
+          style={{
+            ...styles.valueFill,
+            background: negative ? "#ef4444" : "linear-gradient(90deg,#2563eb,#60a5fa)",
+            width: `${pctWidth}%`,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ProductTable({ products, updateProduct }) {
+  return (
+    <div style={styles.tableWrapSmall}>
+      <table style={styles.table}>
+        <thead>
+          <tr>
+            <Th left>Name</Th>
+            <Th>W</Th>
+            <Th>lm</Th>
+            <Th>Sell</Th>
+            <Th>Buy</Th>
+            <Th>Install</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((product) => (
+            <tr key={product.id} style={styles.tr}>
+              <td style={styles.tdLeft}>
+                <input style={styles.adminInputWide} value={product.name} onChange={(e) => updateProduct(product.id, "name", e.target.value)} />
+              </td>
+              {["watt", "lumen", "sellPrice", "buyPrice", "install"].map((field) => (
+                <td key={field} style={styles.tdRight}>
+                  <input
+                    style={styles.adminInput}
+                    value={inputNumber(product[field])}
+                    inputMode="decimal"
+                    onChange={(e) => updateProduct(product.id, field, e.target.value)}
+                  />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 const styles = {
   page: { minHeight: "100vh", background: "#f5f7fb", color: "#0f172a", padding: 24, fontFamily: "Inter, Segoe UI, Arial, sans-serif" },
@@ -600,11 +954,3 @@ const styles = {
   buttonRow: { display: "flex", gap: 10, flexWrap: "wrap" },
   adminOn: { background: "#dcfce7", color: "#166534", borderRadius: 999, padding: "8px 11px", fontSize: 12, fontWeight: 800 },
 };
-
-
-// V23 ROI DOMINANCE ENGINE PATCH
-// Updated commercial logic:
-// Smart package now includes stronger operational savings, maintenance impact, and asset-life uplift.
-// Premium package increases post-CLO optimization to improve payback/NPV.
-// KPI targets: LED 2.8y / Smart 2.4y / Premium 2.1y.
-// Value stack labels revised for sales psychology.
