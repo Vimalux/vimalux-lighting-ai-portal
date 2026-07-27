@@ -24,6 +24,10 @@ function num(value) {
   return Number(String(value).replace(",", ".")) || 0;
 }
 
+function pct(value) {
+  return Math.min(100, Math.max(0, num(value))) / 100;
+}
+
 export function calculateManualGroup(group, assumptions, product) {
   const quantity = Math.max(0, num(group.quantity));
   const existingWatt = Math.max(0, num(group.existingWatt));
@@ -33,19 +37,17 @@ export function calculateManualGroup(group, assumptions, product) {
   const baselineKwh = (quantity * existingWatt * burningHours) / 1000;
   const baselineEnergyCost = baselineKwh * energyPrice;
 
-  // Commercial rule: LED Only is always the configured LED saving percentage.
-  const ledEnergySavingKwh = baselineKwh * (num(assumptions.ledSavingPct) / 100);
-  const ledEnergySavingValue = ledEnergySavingKwh * energyPrice;
+  const ledEnergySavingKwh = baselineKwh * pct(assumptions.ledSavingPct);
   const remainingKwhAfterLed = Math.max(0, baselineKwh - ledEnergySavingKwh);
 
   const cloSavingKwh = group.smart
-    ? remainingKwhAfterLed * (num(assumptions.cloSavingPct) / 100)
+    ? remainingKwhAfterLed * pct(assumptions.cloSavingPct)
     : 0;
 
   const remainingKwhAfterClo = Math.max(0, remainingKwhAfterLed - cloSavingKwh);
 
   const smartProfileSavingKwh = group.smart
-    ? remainingKwhAfterClo * (num(assumptions.smartSolutionSavingPct) / 100)
+    ? remainingKwhAfterClo * pct(assumptions.smartSolutionSavingPct)
     : 0;
 
   const remainingKwhAfterSmart = Math.max(
@@ -53,9 +55,9 @@ export function calculateManualGroup(group, assumptions, product) {
     remainingKwhAfterClo - smartProfileSavingKwh
   );
 
+  // PowerAiD is a percentage of the remaining consumption after Smart.
   const powerAidSavingKwh = group.smart && group.powerAid
-    ? remainingKwhAfterSmart *
-      (num(assumptions.powerAidAdditionalSavingPct) / 100)
+    ? remainingKwhAfterSmart * pct(assumptions.powerAidAdditionalSavingPct)
     : 0;
 
   const remainingKwhAfterPowerAid = Math.max(
@@ -67,7 +69,6 @@ export function calculateManualGroup(group, assumptions, product) {
     ? quantity * num(assumptions.hybridProductionKwhPerLampYear || 70)
     : 0;
 
-  // Hybrid production cannot reduce grid consumption below zero.
   const hybridSavingKwh = Math.min(
     remainingKwhAfterPowerAid,
     Math.max(0, hybridPotentialKwh)
@@ -82,12 +83,13 @@ export function calculateManualGroup(group, assumptions, product) {
       hybridSavingKwh
   );
 
+  const residualGridKwh = Math.max(0, baselineKwh - totalEnergySavingKwh);
   const totalEnergySavingValue = totalEnergySavingKwh * energyPrice;
 
   const maintenanceSaving = group.smart
     ? quantity *
       num(assumptions.maintenanceOldPerLamp) *
-      (num(assumptions.maintenanceSavingPct) / 100)
+      pct(assumptions.maintenanceSavingPct)
     : 0;
 
   const cmsOpex = group.smart
@@ -121,6 +123,7 @@ export function calculateManualGroup(group, assumptions, product) {
     productId: product?.id || group.productId,
     baselineKwh,
     baselineEnergyCost,
+    residualGridKwh,
     ledEnergySavingKwh,
     cloSavingKwh,
     smartProfileSavingKwh,
@@ -142,6 +145,91 @@ export function calculateManualGroup(group, assumptions, product) {
   };
 }
 
+function calculateNpv(cashFlows, discountRate) {
+  const rate = num(discountRate) / 100;
+  return cashFlows.reduce(
+    (total, cashFlow, year) => total + cashFlow / Math.pow(1 + rate, year),
+    0
+  );
+}
+
+function calculateIrr(cashFlows) {
+  const hasPositive = cashFlows.some((value) => value > 0);
+  const hasNegative = cashFlows.some((value) => value < 0);
+  if (!hasPositive || !hasNegative) return null;
+
+  let low = -0.99;
+  let high = 10;
+  let lowNpv = calculateNpv(cashFlows, low * 100);
+
+  for (let iteration = 0; iteration < 200; iteration += 1) {
+    const midpoint = (low + high) / 2;
+    const midpointNpv = calculateNpv(cashFlows, midpoint * 100);
+
+    if (Math.abs(midpointNpv) < 0.01) return midpoint * 100;
+
+    if ((lowNpv > 0 && midpointNpv > 0) || (lowNpv < 0 && midpointNpv < 0)) {
+      low = midpoint;
+      lowNpv = midpointNpv;
+    } else {
+      high = midpoint;
+    }
+  }
+
+  return ((low + high) / 2) * 100;
+}
+
+export function calculateProjectFinance(totals, assumptions) {
+  const years = Math.max(1, Math.round(num(assumptions.analysisYears || 20)));
+  const indexation = num(assumptions.savingIndexationPct || 1.5) / 100;
+  const discountRate = num(assumptions.discountRatePct || 6);
+  const degradation = num(assumptions.performanceDegradationPct || 0) / 100;
+  const co2KgPerKwh = num(assumptions.co2KgPerKwh || 0.233);
+
+  const cashFlows = [-totals.totalCapex];
+  const yearly = [];
+  let cumulative = -totals.totalCapex;
+
+  for (let year = 1; year <= years; year += 1) {
+    const indexedSaving =
+      totals.annualNetSaving *
+      Math.pow(1 + indexation, year - 1) *
+      Math.pow(1 - degradation, year - 1);
+    cumulative += indexedSaving;
+    cashFlows.push(indexedSaving);
+    yearly.push({ year, netSaving: indexedSaving, cumulative });
+  }
+
+  const npv = calculateNpv(cashFlows, discountRate);
+  const irr = calculateIrr(cashFlows);
+  const netBenefit = cashFlows.reduce((sum, value) => sum + value, 0);
+  const roiPct = totals.totalCapex > 0
+    ? (netBenefit / totals.totalCapex) * 100
+    : 0;
+
+  return {
+    years,
+    discountRate,
+    cashFlows,
+    yearly,
+    npv,
+    irr,
+    netBenefit,
+    roiPct,
+    annualCo2Tonnes: (totals.totalEnergySavingKwh * co2KgPerKwh) / 1000,
+    lifetimeCo2Tonnes:
+      yearly.reduce(
+        (sum, row, index) =>
+          sum +
+          (totals.totalEnergySavingKwh *
+            Math.pow(1 - degradation, index) *
+            co2KgPerKwh) /
+            1000,
+        0
+      ),
+  };
+}
+
 export function calculateManualProject(groups, assumptions, products) {
   const productMap = new Map(products.map((product) => [product.id, product]));
 
@@ -160,6 +248,7 @@ export function calculateManualProject(groups, assumptions, products) {
       quantity: 0,
       baselineKwh: 0,
       baselineEnergyCost: 0,
+      residualGridKwh: 0,
       ledEnergySavingKwh: 0,
       cloSavingKwh: 0,
       smartProfileSavingKwh: 0,
@@ -187,7 +276,8 @@ export function calculateManualProject(groups, assumptions, products) {
       ? totals.totalCapex / totals.annualNetSaving
       : null;
 
-  return { groups: groupResults, totals };
+  const finance = calculateProjectFinance(totals, assumptions);
+  return { groups: groupResults, totals, finance };
 }
 
 export function auditRowsToManualGroups(rows, products) {
