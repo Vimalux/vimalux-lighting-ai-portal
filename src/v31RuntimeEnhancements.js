@@ -20,7 +20,6 @@ function installStyles(doc = document) {
     .vimalux-cashflow-legend { display:flex; gap:18px; margin-top:8px; font-size:11px; color:#52696c; }
     .vimalux-cashflow-legend i { display:inline-block; width:18px; height:3px; margin-right:6px; vertical-align:middle; border-radius:2px; }
     .vimalux-view-cashflow { margin-top:14px; padding:9px 12px; border:1px solid #cad6d8; border-radius:8px; background:#fff; color:#17363a; font-weight:700; cursor:pointer; }
-    .vimalux-assumption-note { margin:0 0 16px; padding:11px 13px; border:1px solid #d7e4e5; border-radius:9px; background:#f7fbfb; color:#52696c; font-size:12px; line-height:1.45; }
   `;
   doc.head.appendChild(style);
 }
@@ -33,27 +32,6 @@ function alignBranding() {
   copy.classList.add("vimalux-brand-copy");
   const subtitle = copy.querySelector("span");
   if (subtitle && subtitle.textContent?.trim() !== "Intelligence") subtitle.textContent = "Intelligence";
-}
-
-function alignProjectAssumptions() {
-  const settingsButton = Array.from(document.querySelectorAll("aside button"))
-    .find((button) => ["Settings", "Project assumptions"].includes(button.textContent?.trim()));
-  if (settingsButton) settingsButton.textContent = "Project assumptions";
-
-  const commercialHeading = Array.from(document.querySelectorAll("h2"))
-    .find((heading) => heading.textContent?.trim() === "Commercial assumptions");
-  const technicalHeading = Array.from(document.querySelectorAll("h2"))
-    .find((heading) => heading.textContent?.trim() === "Technical assumptions");
-  if (commercialHeading) commercialHeading.textContent = "Project commercial assumptions";
-  if (technicalHeading) technicalHeading.textContent = "Project technical assumptions";
-
-  const firstCard = commercialHeading?.closest("section");
-  if (firstCard && !firstCard.querySelector(".vimalux-assumption-note")) {
-    const note = document.createElement("div");
-    note.className = "vimalux-assumption-note";
-    note.textContent = "These are the active project values. They are used consistently in Pricing, Finance, Customer Case, Internal Approval and the generated quotation.";
-    commercialHeading.insertAdjacentElement("afterend", note);
-  }
 }
 
 function selectedWattFromButton(button) {
@@ -197,6 +175,18 @@ function addFinanceCashflowShortcut() {
   card.appendChild(button);
 }
 
+function removeDuplicateEnergyPriceFromPricing() {
+  const activeNav = Array.from(document.querySelectorAll("aside button")).find((button) => {
+    const background = getComputedStyle(button).backgroundColor;
+    return background === "rgb(201, 241, 90)" || button.textContent?.trim() === "Pricing" && button.getAttribute("aria-current") === "page";
+  });
+  if (activeNav?.textContent?.trim() !== "Pricing") return;
+  Array.from(document.querySelectorAll("label")).forEach((label) => {
+    const caption = label.querySelector("span")?.textContent?.trim().toLowerCase() || "";
+    if (caption.includes("energy price") || caption.includes("electricity price")) label.remove();
+  });
+}
+
 function enhanceQuotationWindow(win) {
   if (!win) return;
   let attempts = 0;
@@ -209,9 +199,9 @@ function enhanceQuotationWindow(win) {
         applyVisibleNumberFormatting(doc);
         restoreCashflowChart(doc);
       }
-      if (attempts > 30 || win.closed) window.clearInterval(timer);
+      if (attempts > 20 || win.closed) window.clearInterval(timer);
     } catch (error) {
-      if (attempts > 30) window.clearInterval(timer);
+      if (attempts > 20) window.clearInterval(timer);
     }
   }, 100);
 }
@@ -230,12 +220,12 @@ function patchWindowOpen() {
 function applyEnhancements() {
   installStyles();
   alignBranding();
-  alignProjectAssumptions();
   enhanceRecommendationButtons();
   installLocalizedNumericInputs();
   applyVisibleNumberFormatting();
   restoreCashflowChart();
   addFinanceCashflowShortcut();
+  removeDuplicateEnergyPriceFromPricing();
   patchWindowOpen();
 }
 
