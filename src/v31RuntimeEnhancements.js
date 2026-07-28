@@ -102,14 +102,72 @@ function enhanceRecommendationButtons() {
     });
 }
 
+function normalizeLocalizedNumber(value) {
+  const raw = String(value ?? "").trim().replace(/\s/g, "");
+  if (!raw) return "0";
+  if (raw.includes(",")) return raw.replace(/\./g, "").replace(",", ".");
+  return raw;
+}
+
+function installLocalizedNumericInputs() {
+  if (window.__vimaluxLocalizedInputsInstalled) return;
+  window.__vimaluxLocalizedInputsInstalled = true;
+
+  document.addEventListener("input", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    if (input.inputMode !== "decimal" || input.dataset.vimaluxCommit === "true") return;
+
+    input.dataset.vimaluxRawValue = input.value;
+    event.stopImmediatePropagation();
+  }, true);
+
+  document.addEventListener("blur", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || input.inputMode !== "decimal") return;
+
+    const raw = input.dataset.vimaluxRawValue ?? input.value;
+    const normalized = normalizeLocalizedNumber(raw);
+    input.dataset.vimaluxCommit = "true";
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(input, normalized);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    delete input.dataset.vimaluxCommit;
+    delete input.dataset.vimaluxRawValue;
+  }, true);
+}
+
+function formatIntegerEuroText(value) {
+  return value.replace(/(^|[^\d.,])(-?\d{4,})(\s*€)/g, (match, prefix, digits, suffix) => {
+    const formatted = Number(digits).toLocaleString("it-IT", { maximumFractionDigits: 0 });
+    return `${prefix}${formatted}${suffix}`;
+  });
+}
+
+function applyVisibleNumberFormatting() {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach((node) => {
+    const parent = node.parentElement;
+    if (!parent || parent.closest("input, textarea, script, style")) return;
+    const current = node.nodeValue || "";
+    if (!/\d{4,}\s*€/.test(current)) return;
+    const formatted = formatIntegerEuroText(current);
+    if (formatted !== current) node.nodeValue = formatted;
+  });
+}
+
 function applyEnhancements() {
   installStyles();
   alignBranding();
   enhanceRecommendationButtons();
+  installLocalizedNumericInputs();
+  applyVisibleNumberFormatting();
 }
 
 if (typeof document !== "undefined") {
   applyEnhancements();
   const observer = new MutationObserver(applyEnhancements);
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
 }
