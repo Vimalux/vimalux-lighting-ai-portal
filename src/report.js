@@ -95,7 +95,7 @@ export function generateCustomerPdf(project, result) {
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 14,
     theme: "striped",
-    body: rows([[t("baseline"), `${formatNumber(result.baselineKwh, lang)} kWh`], [t("final"), `${formatNumber(result.finalKwh, lang)} kWh`], [t("energyReduction"), percent(result.energyReductionPercent)], [t("co2Reduction"), `${formatNumber(result.co2ReductionKg / 1000, lang, 1)} ${it ? "t/anno" : "t/year"}`], [t("maintenanceSaving"), money(result.maintenanceSaving)], [t("annualOpex"), money(result.totalAnnualOpex)], [t("monthlyPayment"), money(result.monthlyPayment)], [it ? "Pagamento annuo" : "Annual payment", money(result.annualPayment)], [t("npv"), money(result.npv)], [`${t("lifecycle")} - ${result.analysisPeriod} ${t("years")}`, money(result.lifecycleResult)]]),
+    body: rows([[t("baseline"), `${formatNumber(result.baselineKwh, lang)} kWh`], [t("final"), `${formatNumber(result.finalKwh, lang)} kWh`], [t("energyReduction"), percent(result.energyReductionPercent)], [it ? "Riduzione CO2" : "CO2 reduction", `${formatNumber(result.co2ReductionKg / 1000, lang, 1)} ${it ? "t/anno" : "t/year"}`], [t("maintenanceSaving"), money(result.maintenanceSaving)], [t("annualOpex"), money(result.totalAnnualOpex)], [t("monthlyPayment"), money(result.monthlyPayment)], [it ? "Pagamento annuo" : "Annual payment", money(result.annualPayment)], [t("npv"), money(result.npv)], [`${t("lifecycle")} - ${result.analysisPeriod} ${t("years")}`, money(result.lifecycleResult)]]),
     styles: { fontSize: 7.5, cellPadding: 1.05 },
   });
 
@@ -103,11 +103,10 @@ export function generateCustomerPdf(project, result) {
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 14,
     margin: { bottom: 18 },
-    pageBreak: "avoid",
     head: [[it ? "Voce" : "Item", it ? "Importo" : "Amount"]],
     body: rows([[it ? "Apparecchi LED" : "LED luminaires", money(result.ledCapex)], ["LCU", money(result.smartHardwareCapex)], [it ? "Implementazione" : "Implementation", money(result.implementationCapex)], ["Gateway", money(result.gatewayCapex)], [it ? "Antenne" : "Antennas", money(result.antennaCapex)], [it ? "Contatori" : "Meters", money(result.meterCapex)], [it ? "Trasporto" : "Freight", money(result.freight)], [t("capex"), money(result.totalCapex)], ["CMS", money(result.cmsOpex)], ["Gateway OPEX", money(result.gatewayOpex)], ["PowerAiD fee", money(result.powerAidFee)], [t("annualOpex"), money(result.totalAnnualOpex)]]),
     headStyles: { fillColor: [15, 118, 110] },
-    styles: { fontSize: 7.3, cellPadding: 1.05 },
+    styles: { fontSize: 7.1, cellPadding: 0.9 },
   });
 
   doc.addPage();
@@ -145,7 +144,7 @@ export function generateCustomerPdf(project, result) {
     doc.setFontSize(7);
     doc.setTextColor(100);
     doc.text(`${project.project.businessCaseId}  |  ${project.project.date}  |  VIMALUX Intelligence`, 14, 286);
-    doc.text(`${it ? "Pagina" : "Page"} ${page} ${it ? "di" : "of"} ${pages}  |  v1.1`, 196, 286, { align: "right" });
+    doc.text(`${it ? "Pagina" : "Page"} ${page} ${it ? "di" : "of"} ${pages}  |  v1.2`, 164, 286);
   }
   doc.save(`VIMALUX_${project.project.businessCaseId || "Business_Case"}.pdf`);
 }
