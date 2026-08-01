@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import AppBusinessCaseV1 from "./AppBusinessCaseV1.jsx";
+import "./safeLanguageSelector.js";
 
 // Remove only invalid cached JSON before the application initializes.
 for (const key of ["vml-bc-led", "vml-bc-smart", "vml-bc-projects"]) {
