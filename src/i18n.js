@@ -1,0 +1,25 @@
+const translations = {
+  it: {
+    app: "VIMALUX Intelligence", projects: "Progetti", catalogue: "Catalogo Prodotti", priceAdmin: "Amministrazione Prezzi", reset: "Reset dati locali",
+    customer: "Cliente e Progetto", existing: "Illuminazione Esistente", solution: "Soluzione", pricing: "Prezzi di Progetto", assumptions: "Assunzioni", business: "Analisi Economica", report: "Rapporto",
+    save: "Salvato automaticamente", add: "Aggiungi gruppo", remove: "Rimuovi", generate: "Genera PDF", italian: "Italiano", english: "English",
+    preliminary: "Valutazione preliminare", capex: "CAPEX", annualOpex: "OPEX annuo", monthlyPayment: "Pagamento Mensile", annualNet: "Beneficio Netto Annuo", payback: "Tempo di Ritorno", npv: "VAN", lifecycle: "Risultato ciclo di vita", energyReduction: "Riduzione dei Consumi", co2Reduction: "Riduzione CO₂",
+    baseline: "Consumo di riferimento", final: "Consumo finale", ledSaving: "Risparmio LED", cloSaving: "Risparmio CLO", powerSaving: "Risparmio PowerAiD", maintenanceSaving: "Risparmio manutenzione",
+    yes: "Sì", no: "No", enabled: "Attivo", disabled: "Disattivo", units: "unità", years: "anni", notAvailable: "n/d",
+    GO: "Il progetto appare economicamente sostenibile sulla base delle ipotesi dichiarate.", REVIEW: "Il progetto richiede un'ottimizzazione commerciale o tecnica.", NO_GO: "Il progetto non è economicamente sostenibile con le ipotesi attuali.",
+  },
+  en: {
+    app: "VIMALUX Intelligence", projects: "Projects", catalogue: "Product Catalogue", priceAdmin: "Price Administration", reset: "Reset local data",
+    customer: "Customer & Project", existing: "Existing Lighting", solution: "Solution", pricing: "Project Pricing", assumptions: "Assumptions", business: "Business Case", report: "Report",
+    save: "Saved automatically", add: "Add group", remove: "Remove", generate: "Generate PDF", italian: "Italiano", english: "English",
+    preliminary: "Preliminary assessment", capex: "CAPEX", annualOpex: "Annual OPEX", monthlyPayment: "Monthly Payment", annualNet: "Annual Net Benefit", payback: "Payback", npv: "NPV", lifecycle: "Lifecycle result", energyReduction: "Energy Reduction", co2Reduction: "CO₂ Reduction",
+    baseline: "Baseline consumption", final: "Final consumption", ledSaving: "LED saving", cloSaving: "CLO saving", powerSaving: "PowerAiD saving", maintenanceSaving: "Maintenance saving",
+    yes: "Yes", no: "No", enabled: "Enabled", disabled: "Disabled", units: "units", years: "years", notAvailable: "n/a",
+    GO: "The project appears economically sustainable based on the stated assumptions.", REVIEW: "The project requires commercial or technical optimisation.", NO_GO: "The project is not economically sustainable under the current assumptions.",
+  },
+};
+export const useT = (language) => (key) => translations[language]?.[key] ?? translations.en[key] ?? key;
+export const locale = (language) => language === "it" ? "it-IT" : "en-IE";
+export const formatMoney = (value, language, currency = "EUR", digits = 0) => new Intl.NumberFormat(locale(language), { style: "currency", currency, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(value) || 0);
+export const formatNumber = (value, language, digits = 0) => new Intl.NumberFormat(locale(language), { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(value) || 0);
+export const formatPercent = (value, language) => `${formatNumber(value, language, 1)}%`;
