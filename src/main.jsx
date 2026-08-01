@@ -1,10 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import AppFeasibilityEngine from "./AppFeasibilityEngine.jsx";
-import "./v34FeasibilityCommercialInputs.js";
+import AppBusinessCaseV1 from "./AppBusinessCaseV1.jsx";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <AppFeasibilityEngine />
+    <AppBusinessCaseV1 />
   </React.StrictMode>
 );
