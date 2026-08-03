@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatMoney, formatNumber, formatPercent, useT } from "./i18n.js";
+import { aggregateReplacementRows } from "./reportSummary.js";
 
 export function generateCustomerPdf(project, result) {
   const lang = project.language;
@@ -83,13 +84,25 @@ export function generateCustomerPdf(project, result) {
 
   doc.addPage();
   section(it ? "Soluzione proposta" : "Proposed solution summary", 18);
+  const replacementRows = aggregateReplacementRows(result.groupRows);
   autoTable(doc, {
     startY: 23,
-    head: [[it ? "Componente" : "Component", it ? "Quantità" : "Quantity", it ? "Prodotto" : "Product"]],
-    body: [...result.groupRows.map((group) => ["LED", formatNumber(group.quantity, lang), group.product.name || "-"]), ...[result.smartEnabled ? ["LCU", formatNumber(result.lcuQuantity, lang), result.hardware.lcu.name || "-"] : null, result.smartEnabled ? ["Gateway", formatNumber(result.hardware.gatewayQty, lang), result.hardware.gateway.name || "-"] : null, result.smartEnabled ? ["Antenna", formatNumber(result.hardware.antennaQty, lang), result.hardware.antenna.name || "-"] : null, result.smartEnabled ? [it ? "Contatore" : "Energy meter", formatNumber(result.hardware.meterQty, lang), result.hardware.meter.name || "-"] : null].filter(Boolean)],
+    head: [[it ? "Tecnologia esistente" : "Existing technology", it ? "Potenza esistente" : "Existing wattage", it ? "Quantità" : "Quantity", it ? "Nuovo prodotto LED" : "New LED product"]],
+    body: replacementRows.map((row) => [row.technology, `${formatNumber(row.existingWattage, lang)} W`, formatNumber(row.quantity, lang), row.productName]),
     headStyles: { fillColor: [15, 118, 110] },
     styles: { fontSize: 8 },
   });
+
+  if (result.smartEnabled) {
+    section(it ? "Hardware Smart Lighting" : "Smart Lighting hardware", doc.lastAutoTable.finalY + 9);
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 14,
+      head: [[it ? "Componente" : "Component", it ? "Quantità" : "Quantity", it ? "Prodotto" : "Product"]],
+      body: [["LCU", formatNumber(result.lcuQuantity, lang), result.hardware.lcu.name || "-"], ["Gateway", formatNumber(result.hardware.gatewayQty, lang), result.hardware.gateway.name || "-"], ["Antenna", formatNumber(result.hardware.antennaQty, lang), result.hardware.antenna.name || "-"], [it ? "Contatore" : "Energy meter", formatNumber(result.hardware.meterQty, lang), result.hardware.meter.name || "-"]],
+      headStyles: { fillColor: [15, 118, 110] },
+      styles: { fontSize: 8 },
+    });
+  }
 
   section(it ? "Risultato energetico ed economico" : "Energy and economic result", doc.lastAutoTable.finalY + 9);
   autoTable(doc, {
