@@ -54,6 +54,11 @@ export function calculateBusinessCase(project) {
   const implementationCapex = lcuQuantity * price(lcu, "implementationSalesPrice");
   const gatewayCapex = gatewayQty * price(gateway), antennaCapex = antennaQty * price(antenna), meterCapex = meterQty * price(meter);
   const freight = totalQuantity * positive(a.freightSalesPerLamp);
+  const smartHardwareCost = lcuQuantity * positive(lcu.costPrice);
+  const implementationCost = lcuQuantity * positive(lcu.implementationCost);
+  const gatewayCost = gatewayQty * positive(gateway.costPrice), antennaCost = antennaQty * positive(antenna.costPrice), meterCost = meterQty * positive(meter.costPrice);
+  const freightCost = totalQuantity * positive(a.freightCostPerLamp);
+  const capexDirectCost = ledCost + smartHardwareCost + implementationCost + gatewayCost + antennaCost + meterCost + freightCost;
   const totalCapex = ledCapex + smartHardwareCapex + implementationCapex + gatewayCapex + antennaCapex + meterCapex + freight;
   const cmsOpex = cmsEnabled ? lcuQuantity * price(lcu, "annualSalesPrice") : 0;
   const gatewayOpex = smartEnabled ? gatewayQty * price(gateway, "annualSalesPrice") : 0;
@@ -61,6 +66,7 @@ export function calculateBusinessCase(project) {
   const ledSavingKwh = Math.max(0, baselineKwh - ledKwh);
   const powerAidGrossSaving = powerAidSavingKwh * positive(a.energyPrice);
   const powerAidFee = powerAidEnabled ? powerAidGrossSaving * positive(a.powerAidSharePercent) / 100 : 0;
+  const annualOpexDirectCost = (cmsEnabled ? lcuQuantity * positive(lcu.annualCost) : 0) + (smartEnabled ? gatewayQty * positive(gateway.annualCost) : 0) + powerAidFee;
   const totalAnnualOpex = cmsOpex + gatewayOpex + powerAidFee;
   const maintenanceSaving = totalQuantity * Math.max(0, positive(a.existingMaintenance) - positive(a.newMaintenance));
   const grossBenefit = energySaving + maintenanceSaving;
@@ -71,6 +77,20 @@ export function calculateBusinessCase(project) {
   const monthlyPayment = financed ? (monthlyRate ? principal * monthlyRate / (1 - Math.pow(1 + monthlyRate, -months)) : principal / months) : 0;
   const annualPayment = monthlyPayment * 12;
   const customerAnnualNetBenefit = grossBenefit - totalAnnualOpex - annualPayment;
+  const contractYears = Math.max(1, Math.round(positive(a.contractYears)));
+  const escalatingTotal = (annual, rate) => Array.from({ length: contractYears }, (_, index) => annual * Math.pow(1 + n(rate) / 100, index)).reduce((sum, value) => sum + value, 0);
+  const capexContractRevenue = financed ? positive(a.upfrontPayment) + annualPayment * contractYears : totalCapex;
+  const contractOpexRevenue = escalatingTotal(totalAnnualOpex, a.opexEscalation);
+  const contractOpexCost = escalatingTotal(annualOpexDirectCost, a.opexEscalation);
+  const totalContractRevenue = capexContractRevenue + contractOpexRevenue;
+  const commissionCost = totalContractRevenue * positive(a.commissionPercent) / 100;
+  const warrantyReserve = totalCapex * positive(a.warrantyReservePercent) / 100;
+  const fundingRate = positive(a.fundingCostPercent) / 1200;
+  const fundingPayment = financed ? (fundingRate ? principal * fundingRate / (1 - Math.pow(1 + fundingRate, -months)) : principal / months) : 0;
+  const financingCost = financed ? Math.max(0, fundingPayment * months - principal) : 0;
+  const totalDirectCosts = capexDirectCost + contractOpexCost + commissionCost + warrantyReserve + financingCost + positive(a.otherDirectCosts);
+  const netProjectProfit = totalContractRevenue - totalDirectCosts;
+  const netProjectMarginPercent = totalContractRevenue ? netProjectProfit / totalContractRevenue * 100 : 0;
   const analysisPeriod = Math.max(1, Math.round(positive(a.analysisPeriod)));
   let cumulative = financed ? -positive(a.upfrontPayment) : -totalCapex, npv = cumulative;
   const cashFlowRows = [];
@@ -90,10 +110,13 @@ export function calculateBusinessCase(project) {
   const lifecycleResult = cumulative;
   const energyReductionPercent = baselineKwh ? (baselineKwh - finalKwh) / baselineKwh * 100 : 0;
   const co2ReductionKg = (baselineKwh - finalKwh) * positive(a.co2KgPerKwh);
-  const decisionStatus = npv > 0 && customerAnnualNetBenefit >= 0 ? "GO" : npv > 0 || customerAnnualNetBenefit >= 0 ? "REVIEW" : "NO_GO";
+  const customerDecisionStatus = npv > 0 && customerAnnualNetBenefit >= 0 ? "GO" : npv > 0 || customerAnnualNetBenefit >= 0 ? "REVIEW" : "NO_GO";
+  const minimumMarginPercent = positive(a.minimumMarginPercent || 30);
+  const decisionStatus = netProjectMarginPercent >= minimumMarginPercent && customerDecisionStatus === "GO" ? "GO" : netProjectMarginPercent >= 20 && customerDecisionStatus !== "NO_GO" ? "REVIEW" : "NO_GO";
   return { totalQuantity, smartQuantity, lcuQuantity, baselineKwh, ledKwh, ledSavingKwh, cloSavingKwh, powerAidSavingKwh, finalKwh,
     ledCapex, ledCost, smartHardwareCapex, implementationCapex, gatewayCapex, antennaCapex, meterCapex, freight, totalCapex,
     cmsOpex, gatewayOpex, powerAidFee, totalAnnualOpex, energySaving, maintenanceSaving, grossBenefit, monthlyPayment, annualPayment,
-    customerAnnualNetBenefit, payback, npv, lifecycleResult, analysisPeriod, energyReductionPercent, co2ReductionKg, decisionStatus,
+    customerAnnualNetBenefit, payback, npv, lifecycleResult, analysisPeriod, energyReductionPercent, co2ReductionKg, decisionStatus, customerDecisionStatus,
+    smartHardwareCost, implementationCost, gatewayCost, antennaCost, meterCost, freightCost, capexDirectCost, annualOpexDirectCost, contractOpexRevenue, contractOpexCost, capexContractRevenue, totalContractRevenue, commissionCost, warrantyReserve, financingCost, totalDirectCosts, netProjectProfit, netProjectMarginPercent, minimumMarginPercent,
     cashFlowRows, groupRows, hardware: { lcu, gateway, antenna, meter, gatewayQty, antennaQty, meterQty }, powerAidEnabled, cmsEnabled, smartEnabled };
 }

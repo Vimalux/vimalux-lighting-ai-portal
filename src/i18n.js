@@ -1,6 +1,6 @@
 const translations = {
   it: {
-    app: "VIMALUX Intelligence", projects: "Progetti", catalogue: "Catalogo Prodotti", priceAdmin: "Amministrazione Prezzi", reset: "Reset dati locali",
+    app: "VIMALUX Intelligence", projects: "Progetti", catalogue: "Catalogo Prodotti", priceAdmin: "Amministrazione Prezzi", internalReport: "Rapporto Interno", reset: "Reset dati locali",
     customer: "Cliente e Progetto", existing: "Illuminazione Esistente", solution: "Soluzione", pricing: "Prezzi di Progetto", assumptions: "Assunzioni", business: "Analisi Economica", report: "Rapporto",
     save: "Salvato automaticamente", add: "Aggiungi gruppo", remove: "Rimuovi", generate: "Genera PDF", italian: "Italiano", english: "English",
     preliminary: "Valutazione preliminare", capex: "CAPEX", annualOpex: "OPEX annuo", monthlyPayment: "Pagamento Mensile", annualNet: "Beneficio Netto Annuo", payback: "Tempo di Ritorno", npv: "VAN", lifecycle: "Risultato ciclo di vita", energyReduction: "Riduzione dei Consumi", co2Reduction: "Riduzione CO₂",
@@ -13,7 +13,7 @@ const translations = {
     GO: "Il progetto appare economicamente sostenibile sulla base delle ipotesi dichiarate.", REVIEW: "Il progetto richiede un'ottimizzazione commerciale o tecnica.", NO_GO: "Il progetto non è economicamente sostenibile con le ipotesi attuali.",
   },
   en: {
-    app: "VIMALUX Intelligence", projects: "Projects", catalogue: "Product Catalogue", priceAdmin: "Price Administration", reset: "Reset local data",
+    app: "VIMALUX Intelligence", projects: "Projects", catalogue: "Product Catalogue", priceAdmin: "Price Administration", internalReport: "Internal Report", reset: "Reset local data",
     customer: "Customer & Project", existing: "Existing Lighting", solution: "Solution", pricing: "Project Pricing", assumptions: "Assumptions", business: "Business Case", report: "Report",
     save: "Saved automatically", add: "Add group", remove: "Remove", generate: "Generate PDF", italian: "Italiano", english: "English",
     preliminary: "Preliminary assessment", capex: "CAPEX", annualOpex: "Annual OPEX", monthlyPayment: "Monthly Payment", annualNet: "Annual Net Benefit", payback: "Payback", npv: "NPV", lifecycle: "Lifecycle result", energyReduction: "Energy Reduction", co2Reduction: "CO₂ Reduction",

@@ -44,14 +44,14 @@ export function generateCustomerPdf(project, result) {
     startY: 57,
     theme: "grid",
     head: [[t("preliminary"), t("capex"), t("monthlyPayment"), t("annualOpex"), `${t("annualNet")}*`, paybackLabel]],
-    body: [[result.decisionStatus.replace("_", "-"), money(result.totalCapex), money(result.monthlyPayment), money(result.totalAnnualOpex), money(result.customerAnnualNetBenefit), result.payback == null ? t("notAvailable") : `${formatNumber(result.payback, lang, 1)} ${t("years")}`]],
+    body: [[result.customerDecisionStatus.replace("_", "-"), money(result.totalCapex), money(result.monthlyPayment), money(result.totalAnnualOpex), money(result.customerAnnualNetBenefit), result.payback == null ? t("notAvailable") : `${formatNumber(result.payback, lang, 1)} ${t("years")}`]],
     headStyles: { fillColor: [15, 118, 110] },
     styles: { font: "helvetica", fontSize: 6.9, cellPadding: 1.8, valign: "middle" },
     columnStyles: { 0: { halign: "left" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
     didParseCell: alignTableHeaders("left", "right", "right", "right", "right", "right"),
   });
   doc.setFontSize(10);
-  doc.text(t(result.decisionStatus), 14, doc.lastAutoTable.finalY + 8, { maxWidth: 182 });
+  doc.text(t(result.customerDecisionStatus), 14, doc.lastAutoTable.finalY + 8, { maxWidth: 182 });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   doc.setTextColor(71, 85, 105);
