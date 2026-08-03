@@ -43,7 +43,8 @@ export function generateCustomerPdf(project, result) {
     head: [[t("preliminary"), t("capex"), t("monthlyPayment"), t("annualOpex"), `${t("annualNet")}*`, paybackLabel]],
     body: [[result.decisionStatus.replace("_", "-"), money(result.totalCapex), money(result.monthlyPayment), money(result.totalAnnualOpex), money(result.customerAnnualNetBenefit), result.payback == null ? t("notAvailable") : `${formatNumber(result.payback, lang, 1)} ${t("years")}`]],
     headStyles: { fillColor: [15, 118, 110] },
-    styles: { fontSize: 6.9, cellPadding: 1.8 },
+    styles: { font: "helvetica", fontSize: 6.9, cellPadding: 1.8, valign: "middle" },
+    columnStyles: { 0: { halign: "left" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
   });
   doc.setFontSize(10);
   doc.text(t(result.decisionStatus), 14, doc.lastAutoTable.finalY + 8, { maxWidth: 182 });
@@ -51,7 +52,8 @@ export function generateCustomerPdf(project, result) {
   doc.setFontSize(7.5);
   doc.setTextColor(71, 85, 105);
   doc.text(it ? "* Beneficio netto annuo = beneficio lordo - OPEX annuo - pagamento annuo del finanziamento." : "* Annual net benefit = gross benefit - annual OPEX - annual financing payment.", 14, doc.lastAutoTable.finalY + 14, { maxWidth: 182 });
-  doc.text(`${t("energyReduction")}: ${percent(result.energyReductionPercent)}   |   ${t("co2Reduction")}: ${formatNumber(result.co2ReductionKg / 1000, lang, 1)} t/${it ? "anno" : "year"}`, 14, doc.lastAutoTable.finalY + 19, { maxWidth: 182 });
+  doc.setFont("helvetica", "normal");
+  doc.text(`${t("energyReduction")}: ${percent(result.energyReductionPercent)}   |   ${it ? "Riduzione CO2" : "CO2 reduction"}: ${formatNumber(result.co2ReductionKg / 1000, lang, 1)} t/${it ? "anno" : "year"}`, 14, doc.lastAutoTable.finalY + 19, { maxWidth: 182 });
   doc.setTextColor(15, 23, 42);
 
   section(it ? "Cliente e progetto" : "Customer and project", doc.lastAutoTable.finalY + 33);
@@ -60,7 +62,7 @@ export function generateCustomerPdf(project, result) {
     theme: "plain",
     body: rows([[it ? "Cliente" : "Customer", project.customer.name], [it ? "Provincia" : "Province", project.customer.province], [it ? "Regione" : "Region", project.customer.region], [it ? "Contatto" : "Contact", project.customer.contact], ["Email", project.customer.email], [it ? "Telefono" : "Telephone", project.customer.telephone], [it ? "Progetto" : "Project", project.project.name], [it ? "Consulente" : "Consultant", project.project.consultant], [it ? "Data" : "Date", project.project.date]]),
     columnStyles: { 0: { fontStyle: "bold", cellWidth: 48 } },
-    styles: { fontSize: 9, cellPadding: 1.4 },
+    styles: { font: "helvetica", fontSize: 9, cellPadding: 1.4, halign: "left" },
   });
 
   section(it ? "Assunzioni principali" : "Key assumptions", doc.lastAutoTable.finalY + 8);
@@ -94,7 +96,8 @@ export function generateCustomerPdf(project, result) {
       ["CLO", percent(result.smartEnabled ? project.assumptions.cloPercent : 0)],
       result.powerAidEnabled ? [it ? "Riduzione PowerAiD" : "PowerAiD reduction", percent(project.assumptions.powerAidPercent)] : null,
     ]),
-    styles: { fontSize: 7.3, cellPadding: 1.05 },
+    styles: { font: "helvetica", fontSize: 7.3, cellPadding: 1.05 },
+    columnStyles: { 0: { halign: "left", cellWidth: 98 }, 1: { halign: "left" } },
   });
 
   doc.addPage();
@@ -105,7 +108,8 @@ export function generateCustomerPdf(project, result) {
     head: [[it ? "Tecnologia esistente" : "Existing technology", it ? "Potenza esistente" : "Existing wattage", it ? "Quantità" : "Quantity", it ? "Nuovo prodotto LED" : "New LED product"]],
     body: replacementRows.map((row) => [row.technology, `${formatNumber(row.existingWattage, lang)} W`, formatNumber(row.quantity, lang), row.productName]),
     headStyles: { fillColor: [15, 118, 110] },
-    styles: { fontSize: 8 },
+    styles: { font: "helvetica", fontSize: 8, valign: "middle" },
+    columnStyles: { 0: { halign: "left" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "left" } },
   });
 
   if (result.smartEnabled) {
@@ -115,7 +119,8 @@ export function generateCustomerPdf(project, result) {
       head: [[it ? "Componente" : "Component", it ? "Quantità" : "Quantity", it ? "Prodotto" : "Product"]],
       body: [["LCU", formatNumber(result.lcuQuantity, lang), result.hardware.lcu.name || "-"], ["Gateway", formatNumber(result.hardware.gatewayQty, lang), result.hardware.gateway.name || "-"], ["Antenna", formatNumber(result.hardware.antennaQty, lang), result.hardware.antenna.name || "-"], [it ? "Contatore" : "Energy meter", formatNumber(result.hardware.meterQty, lang), result.hardware.meter.name || "-"]],
       headStyles: { fillColor: [15, 118, 110] },
-      styles: { fontSize: 8 },
+      styles: { font: "helvetica", fontSize: 8, valign: "middle" },
+      columnStyles: { 0: { halign: "left" }, 1: { halign: "right" }, 2: { halign: "left" } },
     });
   }
 
@@ -124,7 +129,8 @@ export function generateCustomerPdf(project, result) {
     startY: doc.lastAutoTable.finalY + 14,
     theme: "striped",
     body: rows([[t("baseline"), `${formatNumber(result.baselineKwh, lang)} kWh`], [t("final"), `${formatNumber(result.finalKwh, lang)} kWh`], [t("energyReduction"), percent(result.energyReductionPercent)], [it ? "Riduzione CO2" : "CO2 reduction", `${formatNumber(result.co2ReductionKg / 1000, lang, 1)} ${it ? "t/anno" : "t/year"}`], [t("maintenanceSaving"), money(result.maintenanceSaving)], [t("annualOpex"), money(result.totalAnnualOpex)], [t("monthlyPayment"), money(result.monthlyPayment)], [it ? "Pagamento annuo" : "Annual payment", money(result.annualPayment)], [t("npv"), money(result.npv)], [`${t("lifecycle")} - ${result.analysisPeriod} ${t("years")}`, money(result.lifecycleResult)]]),
-    styles: { fontSize: 7.5, cellPadding: 1.05 },
+    styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.05 },
+    columnStyles: { 0: { halign: "left" }, 1: { halign: "right" } },
   });
 
   section(it ? "Dettaglio CAPEX e OPEX" : "CAPEX and OPEX breakdown", doc.lastAutoTable.finalY + 9);
@@ -134,7 +140,8 @@ export function generateCustomerPdf(project, result) {
     head: [[it ? "Voce" : "Item", it ? "Importo" : "Amount"]],
     body: rows([[it ? "Apparecchi LED" : "LED luminaires", money(result.ledCapex)], ["LCU", money(result.smartHardwareCapex)], [it ? "Implementazione" : "Implementation", money(result.implementationCapex)], ["Gateway", money(result.gatewayCapex)], [it ? "Antenne" : "Antennas", money(result.antennaCapex)], [it ? "Contatori" : "Meters", money(result.meterCapex)], [it ? "Trasporto" : "Freight", money(result.freight)], [t("capex"), money(result.totalCapex)], ["CMS", money(result.cmsOpex)], ["Gateway OPEX", money(result.gatewayOpex)], ["PowerAiD fee", money(result.powerAidFee)], [t("annualOpex"), money(result.totalAnnualOpex)]]),
     headStyles: { fillColor: [15, 118, 110] },
-    styles: { fontSize: 7.1, cellPadding: 0.9 },
+    styles: { font: "helvetica", fontSize: 7.1, cellPadding: 0.9 },
+    columnStyles: { 0: { halign: "left" }, 1: { halign: "right" } },
   });
 
   doc.addPage();
@@ -147,7 +154,8 @@ export function generateCustomerPdf(project, result) {
     head: [[it ? "Anno" : "Year", it ? "Beneficio lordo" : "Gross benefit", "OPEX", it ? "Pagamento" : "Payment", it ? "Flusso netto" : "Net cash flow", it ? "Cumulato" : "Cumulative"]],
     body: result.cashFlowRows.map((row) => [row.year, money(row.grossBenefit), money(row.opex), money(row.payment), money(row.netCashFlow), money(row.cumulative)]),
     headStyles: { fillColor: [15, 118, 110] },
-    styles: { fontSize: 7.3, cellPadding: 1.5 },
+    styles: { font: "helvetica", fontSize: 7.3, cellPadding: 1.5, valign: "middle" },
+    columnStyles: { 0: { halign: "center" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
   });
 
   let y = doc.lastAutoTable.finalY + 9;
