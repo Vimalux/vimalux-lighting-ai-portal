@@ -13,6 +13,9 @@ export function generateCustomerPdf(project, result) {
   const projectType = projectTypeLabels[project.assumptions.financingModel] || projectTypeLabels.cash;
   const financed = project.assumptions.financingModel !== "cash";
   const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const alignTableHeaders = (...alignments) => (data) => {
+    if (data.section === "head") data.cell.styles.halign = alignments[data.column.index] || "left";
+  };
   const section = (text, y) => {
     doc.setTextColor(15, 118, 110);
     doc.setFont("helvetica", "bold");
@@ -45,6 +48,7 @@ export function generateCustomerPdf(project, result) {
     headStyles: { fillColor: [15, 118, 110] },
     styles: { font: "helvetica", fontSize: 6.9, cellPadding: 1.8, valign: "middle" },
     columnStyles: { 0: { halign: "left" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
+    didParseCell: alignTableHeaders("left", "right", "right", "right", "right", "right"),
   });
   doc.setFontSize(10);
   doc.text(t(result.decisionStatus), 14, doc.lastAutoTable.finalY + 8, { maxWidth: 182 });
@@ -110,6 +114,7 @@ export function generateCustomerPdf(project, result) {
     headStyles: { fillColor: [15, 118, 110] },
     styles: { font: "helvetica", fontSize: 8, valign: "middle" },
     columnStyles: { 0: { halign: "left" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "left" } },
+    didParseCell: alignTableHeaders("left", "right", "right", "left"),
   });
 
   if (result.smartEnabled) {
@@ -120,7 +125,8 @@ export function generateCustomerPdf(project, result) {
       body: [["LCU", formatNumber(result.lcuQuantity, lang), result.hardware.lcu.name || "-"], ["Gateway", formatNumber(result.hardware.gatewayQty, lang), result.hardware.gateway.name || "-"], ["Antenna", formatNumber(result.hardware.antennaQty, lang), result.hardware.antenna.name || "-"], [it ? "Contatore" : "Energy meter", formatNumber(result.hardware.meterQty, lang), result.hardware.meter.name || "-"]],
       headStyles: { fillColor: [15, 118, 110] },
       styles: { font: "helvetica", fontSize: 8, valign: "middle" },
-      columnStyles: { 0: { halign: "left" }, 1: { halign: "right" }, 2: { halign: "left" } },
+      columnStyles: { 0: { halign: "left" }, 1: { halign: "right", cellWidth: 32 }, 2: { halign: "left" } },
+      didParseCell: alignTableHeaders("left", "right", "left"),
     });
   }
 
@@ -141,7 +147,8 @@ export function generateCustomerPdf(project, result) {
     body: rows([[it ? "Apparecchi LED" : "LED luminaires", money(result.ledCapex)], ["LCU", money(result.smartHardwareCapex)], [it ? "Implementazione" : "Implementation", money(result.implementationCapex)], ["Gateway", money(result.gatewayCapex)], [it ? "Antenne" : "Antennas", money(result.antennaCapex)], [it ? "Contatori" : "Meters", money(result.meterCapex)], [it ? "Trasporto" : "Freight", money(result.freight)], [t("capex"), money(result.totalCapex)], ["CMS", money(result.cmsOpex)], ["Gateway OPEX", money(result.gatewayOpex)], ["PowerAiD fee", money(result.powerAidFee)], [t("annualOpex"), money(result.totalAnnualOpex)]]),
     headStyles: { fillColor: [15, 118, 110] },
     styles: { font: "helvetica", fontSize: 7.1, cellPadding: 0.9 },
-    columnStyles: { 0: { halign: "left" }, 1: { halign: "right" } },
+    columnStyles: { 0: { halign: "left" }, 1: { halign: "right", cellWidth: 46 } },
+    didParseCell: alignTableHeaders("left", "right"),
   });
 
   doc.addPage();
@@ -156,6 +163,7 @@ export function generateCustomerPdf(project, result) {
     headStyles: { fillColor: [15, 118, 110] },
     styles: { font: "helvetica", fontSize: 7.3, cellPadding: 1.5, valign: "middle" },
     columnStyles: { 0: { halign: "center" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
+    didParseCell: alignTableHeaders("center", "right", "right", "right", "right", "right"),
   });
 
   let y = doc.lastAutoTable.finalY + 9;
