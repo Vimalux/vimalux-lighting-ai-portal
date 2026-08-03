@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { mergeProjectStates } from "./projectSync.js";
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -8,9 +9,9 @@ export const supabase = supabaseConfigured
   ? createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } })
   : null;
 
-export async function loadCloudState(localProjects) {
+export async function loadCloudState(localProjects, includeLocalProjects = true) {
   const [{ data: projectRows, error: projectError }, { data: catalogue, error: catalogueError }] = await Promise.all([
-    supabase.from("intelligence_projects").select("id,data").order("updated_at", { ascending: true }),
+    supabase.from("intelligence_projects").select("id,data,updated_at").order("updated_at", { ascending: true }),
     supabase.from("intelligence_catalogue").select("led,smart").eq("id", "master").maybeSingle(),
   ]);
   if (projectError) throw projectError;
@@ -20,7 +21,8 @@ export async function loadCloudState(localProjects) {
     return localProjects;
   }
   const masterCatalogue = catalogue ? { led: catalogue.led || [], smart: catalogue.smart || [] } : null;
-  return projectRows.map((row) => ({ ...row.data, id: row.id, ...(masterCatalogue ? { catalogue: masterCatalogue } : {}) }));
+  const cloudProjects = projectRows.map((row) => ({ ...row.data, id: row.id, updatedAt: row.data?.updatedAt || row.updated_at, ...(masterCatalogue ? { catalogue: masterCatalogue } : {}) }));
+  return mergeProjectStates(includeLocalProjects ? localProjects : [], cloudProjects).map((project) => masterCatalogue ? { ...project, catalogue: masterCatalogue } : project);
 }
 
 export async function saveCloudState(projects) {

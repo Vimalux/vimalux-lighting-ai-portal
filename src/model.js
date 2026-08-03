@@ -4,7 +4,7 @@ export const today = () => new Date().toISOString().slice(0, 10);
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
 export const defaultProject = () => ({
-  id: uid(), version: 1, language: "it", name: "Nuovo progetto", createdAt: today(),
+  id: uid(), version: 1, language: "it", name: "Nuovo progetto", createdAt: today(), updatedAt: new Date().toISOString(),
   customer: { name: "", province: "", region: "", country: "Italia", contact: "", title: "", email: "", telephone: "" },
   project: { name: "Nuovo progetto", businessCaseId: `BC-${Date.now().toString().slice(-6)}`, consultant: "", date: today(), currency: "EUR" },
   groups: [{ id: uid(), name: "Gruppo 1", quantity: 100, technology: "SAP", existingWattage: 100, proposedProductId: "led-40", smartAssigned: true, powerAidAssigned: true }],
@@ -29,7 +29,9 @@ const merge = (base, saved) => {
 };
 
 export function migrateProject(saved) {
+  const previousUpdatedAt = saved?.updatedAt || saved?.createdAt || "";
   const project = merge(defaultProject(), saved && typeof saved === "object" ? saved : {});
+  project.updatedAt = previousUpdatedAt;
   project.language = project.language === "en" ? "en" : "it";
   project.groups = (Array.isArray(project.groups) ? project.groups : []).map((g) => ({ ...g, id: g.id || uid() }));
   return project;

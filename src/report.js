@@ -49,11 +49,12 @@ export function generateCustomerPdf(project, result) {
   doc.setFontSize(7.5);
   doc.setTextColor(71, 85, 105);
   doc.text(it ? "* Beneficio netto annuo = beneficio lordo - OPEX annuo - pagamento annuo del finanziamento." : "* Annual net benefit = gross benefit - annual OPEX - annual financing payment.", 14, doc.lastAutoTable.finalY + 14, { maxWidth: 182 });
+  doc.text(`${t("energyReduction")}: ${percent(result.energyReductionPercent)}   |   ${t("co2Reduction")}: ${formatNumber(result.co2ReductionKg / 1000, lang, 1)} t/${it ? "anno" : "year"}`, 14, doc.lastAutoTable.finalY + 19, { maxWidth: 182 });
   doc.setTextColor(15, 23, 42);
 
-  section(it ? "Cliente e progetto" : "Customer and project", doc.lastAutoTable.finalY + 28);
+  section(it ? "Cliente e progetto" : "Customer and project", doc.lastAutoTable.finalY + 33);
   autoTable(doc, {
-    startY: doc.lastAutoTable.finalY + 33,
+    startY: doc.lastAutoTable.finalY + 38,
     theme: "plain",
     body: rows([[it ? "Cliente" : "Customer", project.customer.name], [it ? "Provincia" : "Province", project.customer.province], [it ? "Regione" : "Region", project.customer.region], [it ? "Contatto" : "Contact", project.customer.contact], ["Email", project.customer.email], [it ? "Telefono" : "Telephone", project.customer.telephone], [it ? "Progetto" : "Project", project.project.name], [it ? "Consulente" : "Consultant", project.project.consultant], [it ? "Data" : "Date", project.project.date]]),
     columnStyles: { 0: { fontStyle: "bold", cellWidth: 48 } },
@@ -62,12 +63,18 @@ export function generateCustomerPdf(project, result) {
 
   section(it ? "Assunzioni principali" : "Key assumptions", doc.lastAutoTable.finalY + 8);
   const technology = [...new Set(project.groups.map((group) => group.technology))].join(", ");
+  const averageExistingWattage = result.totalQuantity ? result.groupRows.reduce((sum, group) => sum + group.quantity * Number(group.existingWattage || 0), 0) / result.totalQuantity : 0;
+  const proposedProducts = [...new Set(result.groupRows.map((group) => group.product?.name).filter(Boolean))].join(", ");
+  const proposedWattages = [...new Set(result.groupRows.map((group) => Number(group.product?.wattage || 0)).filter(Boolean))].sort((a, b) => a - b).map((value) => `${formatNumber(value, lang)} W`).join(", ");
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 13,
     theme: "striped",
     body: rows([
       [it ? "Numero apparecchi" : "Number of luminaires", formatNumber(result.totalQuantity, lang)],
       [it ? "Tecnologia esistente" : "Existing technology", technology],
+      [it ? "Potenza media esistente" : "Average existing wattage", `${formatNumber(averageExistingWattage, lang, 1)} W`],
+      [it ? "Prodotto LED proposto" : "Proposed LED product", proposedProducts],
+      [it ? "Potenza LED proposta" : "Proposed LED wattage", proposedWattages],
       [it ? "Ore operative" : "Operating hours", formatNumber(project.assumptions.operatingHours, lang)],
       [it ? "Prezzo energia" : "Energy price", `${formatMoney(project.assumptions.energyPrice, lang, project.project.currency, 2)}/kWh`],
       [it ? "Periodo contrattuale" : "Contract period", `${project.assumptions.contractYears} ${t("years")}`],
@@ -83,6 +90,7 @@ export function generateCustomerPdf(project, result) {
       ["CMS", result.cmsEnabled ? t("yes") : t("no")],
       ["PowerAiD", result.powerAidEnabled ? t("yes") : t("no")],
       ["CLO", percent(result.smartEnabled ? project.assumptions.cloPercent : 0)],
+      result.powerAidEnabled ? [it ? "Riduzione PowerAiD" : "PowerAiD reduction", percent(project.assumptions.powerAidPercent)] : null,
     ]),
     styles: { fontSize: 7.3, cellPadding: 1.05 },
   });
@@ -162,7 +170,7 @@ export function generateCustomerPdf(project, result) {
     doc.setFontSize(7);
     doc.setTextColor(100);
     doc.text(`${project.project.businessCaseId}  |  ${project.project.date}  |  VIMALUX Intelligence`, 14, 286);
-    doc.text(`${it ? "Pagina" : "Page"} ${page} ${it ? "di" : "of"} ${pages}  |  v1.2`, 164, 286);
+    doc.text(`${it ? "Pagina" : "Page"} ${page} ${it ? "di" : "of"} ${pages}  |  v1.0`, 164, 286);
   }
   doc.save(`VIMALUX_${project.project.businessCaseId || "Business_Case"}.pdf`);
 }

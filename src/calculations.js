@@ -20,7 +20,7 @@ export function calculateBusinessCase(project) {
   const ledById = Object.fromEntries(project.catalogue.led.map((p) => [p.id, p]));
   const smartById = Object.fromEntries(project.catalogue.smart.map((p) => [p.id, p]));
   const factor = { SAP: n(a.sapFactor), MH: n(a.mhFactor), MERCURY: n(a.mercuryFactor), LED: 1, OTHER: 1 };
-  let totalQuantity = 0, smartQuantity = 0, baselineKwh = 0, ledKwh = 0, ledCapex = 0, ledCost = 0;
+  let totalQuantity = 0, smartQuantity = 0, baselineKwh = 0, ledKwh = 0, smartLedKwh = 0, powerAidLedKwh = 0, ledCapex = 0, ledCost = 0;
   const groupRows = project.groups.map((g) => {
     const quantity = positive(g.quantity);
     const product = ledById[g.proposedProductId] || {};
@@ -29,14 +29,19 @@ export function calculateBusinessCase(project) {
     const groupLed = quantity * positive(product.wattage) * positive(a.operatingHours) / 1000;
     const sale = g.projectLedPrice == null ? positive(product.salesPrice) : positive(g.projectLedPrice);
     totalQuantity += quantity;
-    if (smartEnabled && g.smartAssigned) smartQuantity += quantity;
+    if (smartEnabled && g.smartAssigned) {
+      smartQuantity += quantity;
+      smartLedKwh += groupLed;
+      if (powerAidEnabled && g.powerAidAssigned) powerAidLedKwh += groupLed;
+    }
     baselineKwh += groupBaseline; ledKwh += groupLed; ledCapex += quantity * sale; ledCost += quantity * positive(product.costPrice);
     return { ...g, quantity, product, existingSystemWattage, baselineKwh: groupBaseline, ledKwh: groupLed, salesTotal: quantity * sale };
   });
   const lcuQuantity = smartEnabled ? smartQuantity : 0;
-  const cloSavingKwh = smartEnabled ? ledKwh * positive(a.cloPercent) / 100 : 0;
+  const cloSavingKwh = smartEnabled ? smartLedKwh * positive(a.cloPercent) / 100 : 0;
   const afterCloKwh = Math.max(0, ledKwh - cloSavingKwh);
-  const powerAidSavingKwh = powerAidEnabled ? afterCloKwh * positive(a.powerAidPercent) / 100 : 0;
+  const powerAidEligibleAfterCloKwh = Math.max(0, powerAidLedKwh * (1 - positive(a.cloPercent) / 100));
+  const powerAidSavingKwh = powerAidEnabled ? powerAidEligibleAfterCloKwh * positive(a.powerAidPercent) / 100 : 0;
   const finalKwh = Math.max(0, afterCloKwh - powerAidSavingKwh);
   const getSmart = (id) => smartById[id] || {};
   const price = (product, key = "salesPrice") => project.pricing.overrides[product.id]?.[key] ?? positive(product[key]);
