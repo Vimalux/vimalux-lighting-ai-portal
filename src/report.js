@@ -38,17 +38,22 @@ export function generateCustomerPdf(project, result) {
   autoTable(doc, {
     startY: 57,
     theme: "grid",
-    head: [[t("preliminary"), t("capex"), t("monthlyPayment"), t("annualNet"), paybackLabel]],
-    body: [[result.decisionStatus.replace("_", "-"), money(result.totalCapex), money(result.monthlyPayment), money(result.customerAnnualNetBenefit), result.payback == null ? t("notAvailable") : `${formatNumber(result.payback, lang, 1)} ${t("years")}`]],
+    head: [[t("preliminary"), t("capex"), t("monthlyPayment"), t("annualOpex"), `${t("annualNet")}*`, paybackLabel]],
+    body: [[result.decisionStatus.replace("_", "-"), money(result.totalCapex), money(result.monthlyPayment), money(result.totalAnnualOpex), money(result.customerAnnualNetBenefit), result.payback == null ? t("notAvailable") : `${formatNumber(result.payback, lang, 1)} ${t("years")}`]],
     headStyles: { fillColor: [15, 118, 110] },
-    styles: { fontSize: 7.6, cellPadding: 2.2 },
+    styles: { fontSize: 6.9, cellPadding: 1.8 },
   });
   doc.setFontSize(10);
   doc.text(t(result.decisionStatus), 14, doc.lastAutoTable.finalY + 8, { maxWidth: 182 });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text(it ? "* Beneficio netto annuo = beneficio lordo - OPEX annuo - pagamento annuo del finanziamento." : "* Annual net benefit = gross benefit - annual OPEX - annual financing payment.", 14, doc.lastAutoTable.finalY + 14, { maxWidth: 182 });
+  doc.setTextColor(15, 23, 42);
 
-  section(it ? "Cliente e progetto" : "Customer and project", doc.lastAutoTable.finalY + 23);
+  section(it ? "Cliente e progetto" : "Customer and project", doc.lastAutoTable.finalY + 28);
   autoTable(doc, {
-    startY: doc.lastAutoTable.finalY + 28,
+    startY: doc.lastAutoTable.finalY + 33,
     theme: "plain",
     body: rows([[it ? "Cliente" : "Customer", project.customer.name], [it ? "Provincia" : "Province", project.customer.province], [it ? "Regione" : "Region", project.customer.region], [it ? "Contatto" : "Contact", project.customer.contact], ["Email", project.customer.email], [it ? "Telefono" : "Telephone", project.customer.telephone], [it ? "Progetto" : "Project", project.project.name], [it ? "Consulente" : "Consultant", project.project.consultant], [it ? "Data" : "Date", project.project.date]]),
     columnStyles: { 0: { fontStyle: "bold", cellWidth: 48 } },
