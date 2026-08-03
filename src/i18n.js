@@ -20,6 +20,6 @@ const translations = {
 };
 export const useT = (language) => (key) => translations[language]?.[key] ?? translations.en[key] ?? key;
 export const locale = (language) => language === "it" ? "it-IT" : "en-IE";
-export const formatMoney = (value, language, currency = "EUR", digits = 0) => new Intl.NumberFormat(locale(language), { style: "currency", currency, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(value) || 0);
-export const formatNumber = (value, language, digits = 0) => new Intl.NumberFormat(locale(language), { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(value) || 0);
+export const formatMoney = (value, language, currency = "EUR", digits = 0) => new Intl.NumberFormat(locale(language), { style: "currency", currency, useGrouping: "always", minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(value) || 0);
+export const formatNumber = (value, language, digits = 0) => new Intl.NumberFormat(locale(language), { useGrouping: "always", minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(value) || 0);
 export const formatPercent = (value, language) => `${formatNumber(value, language, 1)}%`;
