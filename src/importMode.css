@@ -1,0 +1,1 @@
+.import-mode{display:flex;gap:12px;margin:16px 0}.import-mode label{display:flex;align-items:center;gap:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:11px 14px}.import-mode input{width:16px}@media(max-width:720px){.import-mode{flex-direction:column}}

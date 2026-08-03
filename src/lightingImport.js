@@ -7,12 +7,13 @@ const aliases = {
   wattage: ["wattage", "watt", "watts", "power", "potenza", "potenza w", "effekt", "w"],
   quantity: ["quantity", "qty", "count", "number", "numero", "quantita", "quantità", "antal", "number of lamps", "numero lampade"],
   name: ["group", "group name", "name", "street", "location", "gruppo", "nome", "via", "strada", "gruppe", "gade"],
+  assetId: ["asset id", "asset_id", "pole id", "pole_id", "lamp id", "luminaire id", "id lampada", "id palo", "matricola"],
 };
 
 const clean = (value) => String(value ?? "").trim().toLowerCase().replace(/[_/()-]+/g, " ").replace(/\s+/g, " ");
 
 export function guessLightingMapping(headers) {
-  const mapping = { technology: "", wattage: "", quantity: "", name: "" };
+  const mapping = { technology: "", wattage: "", quantity: "", name: "", assetId: "" };
   Object.keys(mapping).forEach((field) => {
     const index = headers.findIndex((header) => aliases[field].some((alias) => clean(header) === alias || clean(header).includes(alias)));
     if (index >= 0) mapping[field] = String(index);
@@ -71,16 +72,17 @@ function parseCsv(text) {
   return rows;
 }
 
-export function buildImportedGroups(rows, mapping, ledProducts, language = "it") {
+export function buildImportedGroups(rows, mapping, ledProducts, language = "it", mode = "grouped") {
   const wattageIndex = Number(mapping.wattage);
   const technologyIndex = mapping.technology === "" ? null : Number(mapping.technology);
   const quantityIndex = mapping.quantity === "" ? null : Number(mapping.quantity);
   const nameIndex = mapping.name === "" ? null : Number(mapping.name);
+  const assetIdIndex = mapping.assetId === "" || mapping.assetId == null ? null : Number(mapping.assetId);
   const firstProduct = ledProducts.find((product) => product.active)?.id || ledProducts[0]?.id || "";
   const grouped = new Map();
   let skipped = 0;
 
-  rows.forEach((row) => {
+  rows.forEach((row, rowIndex) => {
     const wattage = numberValue(row[wattageIndex]);
     const quantity = quantityIndex == null ? 1 : numberValue(row[quantityIndex]);
     if (!(wattage > 0) || !(quantity > 0)) {
@@ -89,6 +91,16 @@ export function buildImportedGroups(rows, mapping, ledProducts, language = "it")
     }
     const technology = technologyIndex == null ? "OTHER" : normalizeTechnology(row[technologyIndex]);
     const suppliedName = nameIndex == null ? "" : String(row[nameIndex] ?? "").trim();
+    const assetId = assetIdIndex == null ? "" : String(row[assetIdIndex] ?? "").trim();
+    if (mode === "individual") {
+      const count = Math.max(1, Math.round(quantity));
+      for (let item = 0; item < count; item += 1) {
+        const suffix = count > 1 ? ` #${item + 1}` : "";
+        const fallback = suppliedName ? `${suppliedName}${suffix || ` #${rowIndex + 1}`}` : `${language === "it" ? "Lampada" : "Luminaire"} ${rowIndex + 1}${suffix}`;
+        grouped.set(`individual-${rowIndex}-${item}`, { id: uid(), name: assetId ? `${assetId}${suffix}` : fallback, quantity: 1, technology, existingWattage: wattage, proposedProductId: firstProduct, smartAssigned: true, powerAidAssigned: true });
+      }
+      return;
+    }
     const key = `${suppliedName.toLowerCase()}|${technology}|${wattage}`;
     const existing = grouped.get(key);
     if (existing) existing.quantity += quantity;
