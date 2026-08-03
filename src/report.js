@@ -9,7 +9,9 @@ export function generateCustomerPdf(project, result) {
   const it = lang === "it";
   const money = (value) => formatMoney(value, lang, project.project.currency);
   const percent = (value) => formatPercent(value, lang);
-  const financed = project.assumptions.financingModel === "laas";
+  const projectTypeLabels = { finance: "Finance solution", laas: "LaaS", cash: "Cash Deal", ppp: "PPP" };
+  const projectType = projectTypeLabels[project.assumptions.financingModel] || projectTypeLabels.cash;
+  const financed = project.assumptions.financingModel !== "cash";
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const section = (text, y) => {
     doc.setTextColor(15, 118, 110);
@@ -78,7 +80,7 @@ export function generateCustomerPdf(project, result) {
       [it ? "Ore operative" : "Operating hours", formatNumber(project.assumptions.operatingHours, lang)],
       [it ? "Prezzo energia" : "Energy price", `${formatMoney(project.assumptions.energyPrice, lang, project.project.currency, 2)}/kWh`],
       [it ? "Periodo contrattuale" : "Contract period", `${project.assumptions.contractYears} ${t("years")}`],
-      [it ? "Finanziamento" : "Financing", financed ? "Lighting as a Service" : (it ? "Acquisto diretto" : "Cash Purchase")],
+      [it ? "Tipo di progetto" : "Project type", projectType],
       financed ? [it ? "Tasso di interesse" : "Interest rate", percent(project.assumptions.interestRate)] : null,
       financed ? [it ? "Anticipo cliente" : "Customer upfront payment", money(project.assumptions.upfrontPayment)] : null,
       [it ? "Aumento prezzo energia" : "Energy escalation", percent(project.assumptions.energyEscalation)],

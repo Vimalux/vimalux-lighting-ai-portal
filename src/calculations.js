@@ -64,7 +64,7 @@ export function calculateBusinessCase(project) {
   const totalAnnualOpex = cmsOpex + gatewayOpex + powerAidFee;
   const maintenanceSaving = totalQuantity * Math.max(0, positive(a.existingMaintenance) - positive(a.newMaintenance));
   const grossBenefit = energySaving + maintenanceSaving;
-  const financed = project.assumptions.financingModel === "laas";
+  const financed = ["finance", "laas", "ppp"].includes(project.assumptions.financingModel);
   const principal = Math.max(0, totalCapex - positive(a.upfrontPayment));
   const months = Math.max(1, Math.round(positive(a.contractYears) * 12));
   const monthlyRate = positive(a.interestRate) / 1200;
