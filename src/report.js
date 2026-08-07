@@ -43,8 +43,8 @@ export function generateCustomerPdf(project, result) {
   autoTable(doc, {
     startY: 57,
     theme: "grid",
-    head: [[t("preliminary"), t("capex"), t("monthlyPayment"), t("annualOpex"), `${t("annualNet")}*`, paybackLabel]],
-    body: [[result.customerDecisionStatus.replace("_", "-"), money(result.totalCapex), money(result.monthlyPayment), money(result.totalAnnualOpex), money(result.customerAnnualNetBenefit), result.payback == null ? t("notAvailable") : `${formatNumber(result.payback, lang, 1)} ${t("years")}`]],
+    head: [[t("preliminary"), t("capex"), t("monthlyPayment"), t("annualOpex"), `${t("annualNet")}*`, t("roi"), paybackLabel]],
+    body: [[result.customerDecisionStatus.replace("_", "-"), money(result.totalCapex), money(result.monthlyPayment), money(result.totalAnnualOpex), money(result.customerAnnualNetBenefit), percent(result.roiPercent), result.payback == null ? t("notAvailable") : `${formatNumber(result.payback, lang, 1)} ${t("years")}`]],
     headStyles: { fillColor: [15, 118, 110] },
     styles: { font: "helvetica", fontSize: 6.9, cellPadding: 1.8, valign: "middle" },
     columnStyles: { 0: { halign: "left" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },

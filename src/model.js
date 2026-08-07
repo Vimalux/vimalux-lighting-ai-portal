@@ -7,6 +7,7 @@ export const defaultProject = () => ({
   id: uid(), version: 1, language: "it", name: "Nuovo progetto", createdAt: today(), updatedAt: new Date().toISOString(),
   customer: { name: "", province: "", region: "", country: "Italia", contact: "", title: "", email: "", telephone: "" },
   project: { name: "Nuovo progetto", businessCaseId: `BC-${Date.now().toString().slice(-6)}`, consultant: "", date: today(), currency: "EUR" },
+  crm: { status: "lead", closingProbability: 25, totalContractValue: null },
   groups: [{ id: uid(), name: "Gruppo 1", quantity: 100, technology: "SAP", existingWattage: 100, proposedProductId: "led-40", smartAssigned: true, powerAidAssigned: true }],
   solution: { smartEnabled: true, cmsEnabled: true, powerAidEnabled: false, lcuProductId: "lcu-1", gatewayProductId: "gateway-1", gatewayQuantity: 1, antennaProductId: "antenna-1", antennaQuantity: 1, meterProductId: "meter-1", meterQuantity: 1 },
   assumptions: { operatingHours: 4200, energyPrice: .25, sapFactor: 1.2, mhFactor: 1.15, mercuryFactor: 1.15, co2KgPerKwh: .233, cloPercent: 10, powerAidPercent: 40, powerAidSharePercent: 20, existingMaintenance: 25, newMaintenance: 5, financingModel: "cash", contractYears: 10, interestRate: 5, upfrontPayment: 0, energyEscalation: 2, opexEscalation: 2, discountRate: 5, analysisPeriod: 20, freightCostPerLamp: 4, freightSalesPerLamp: 6, commissionPercent: 0, warrantyReservePercent: 0, fundingCostPercent: 0, otherDirectCosts: 0, minimumMarginPercent: 30 },
@@ -32,7 +33,7 @@ export function migrateProject(saved) {
   const previousUpdatedAt = saved?.updatedAt || saved?.createdAt || "";
   const project = merge(defaultProject(), saved && typeof saved === "object" ? saved : {});
   project.updatedAt = previousUpdatedAt;
-  project.language = project.language === "en" ? "en" : "it";
+  project.language = ["it", "en", "da"].includes(project.language) ? project.language : "it";
   project.groups = (Array.isArray(project.groups) ? project.groups : []).map((g) => ({ ...g, id: g.id || uid() }));
   return project;
 }

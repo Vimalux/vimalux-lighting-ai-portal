@@ -60,14 +60,18 @@ export function calculateBusinessCase(project) {
   const freightCost = totalQuantity * positive(a.freightCostPerLamp);
   const capexDirectCost = ledCost + smartHardwareCost + implementationCost + gatewayCost + antennaCost + meterCost + freightCost;
   const totalCapex = ledCapex + smartHardwareCapex + implementationCapex + gatewayCapex + antennaCapex + meterCapex + freight;
-  const cmsOpex = cmsEnabled ? lcuQuantity * price(lcu, "annualSalesPrice") : 0;
-  const gatewayOpex = smartEnabled ? gatewayQty * price(gateway, "annualSalesPrice") : 0;
+  const cmsRevenue = cmsEnabled ? lcuQuantity * price(lcu, "annualSalesPrice") : 0;
+  const gatewayRecurringRevenue = smartEnabled ? gatewayQty * price(gateway, "annualSalesPrice") : 0;
   const energySaving = (baselineKwh - finalKwh) * positive(a.energyPrice);
   const ledSavingKwh = Math.max(0, baselineKwh - ledKwh);
   const powerAidGrossSaving = powerAidSavingKwh * positive(a.energyPrice);
-  const powerAidFee = powerAidEnabled ? powerAidGrossSaving * positive(a.powerAidSharePercent) / 100 : 0;
-  const annualOpexDirectCost = (cmsEnabled ? lcuQuantity * positive(lcu.annualCost) : 0) + (smartEnabled ? gatewayQty * positive(gateway.annualCost) : 0) + powerAidFee;
-  const totalAnnualOpex = cmsOpex + gatewayOpex + powerAidFee;
+  const savingsAsAServiceRevenue = powerAidEnabled ? powerAidGrossSaving * positive(a.powerAidSharePercent) / 100 : 0;
+  const recurringOpex = cmsRevenue + gatewayRecurringRevenue;
+  const annualRecurringRevenue = recurringOpex + savingsAsAServiceRevenue;
+  const cmsDirectCost = cmsEnabled ? lcuQuantity * positive(lcu.annualCost) : 0;
+  const gatewayRecurringCost = smartEnabled ? gatewayQty * positive(gateway.annualCost) : 0;
+  const annualOpexDirectCost = cmsDirectCost + gatewayRecurringCost;
+  const totalAnnualOpex = annualRecurringRevenue;
   const maintenanceSaving = totalQuantity * Math.max(0, positive(a.existingMaintenance) - positive(a.newMaintenance));
   const grossBenefit = energySaving + maintenanceSaving;
   const financed = ["finance", "laas", "ppp"].includes(project.assumptions.financingModel);
@@ -107,6 +111,7 @@ export function calculateBusinessCase(project) {
   }
   const annualOperationalBenefit = grossBenefit - totalAnnualOpex;
   const payback = annualOperationalBenefit > 0 ? totalCapex / annualOperationalBenefit : null;
+  const roiPercent = totalCapex > 0 ? annualOperationalBenefit / totalCapex * 100 : 0;
   const lifecycleResult = cumulative;
   const energyReductionPercent = baselineKwh ? (baselineKwh - finalKwh) / baselineKwh * 100 : 0;
   const co2ReductionKg = (baselineKwh - finalKwh) * positive(a.co2KgPerKwh);
@@ -115,8 +120,8 @@ export function calculateBusinessCase(project) {
   const decisionStatus = netProjectMarginPercent >= minimumMarginPercent && customerDecisionStatus === "GO" ? "GO" : netProjectMarginPercent >= 20 && customerDecisionStatus !== "NO_GO" ? "REVIEW" : "NO_GO";
   return { totalQuantity, smartQuantity, lcuQuantity, baselineKwh, ledKwh, ledSavingKwh, cloSavingKwh, powerAidSavingKwh, finalKwh,
     ledCapex, ledCost, smartHardwareCapex, implementationCapex, gatewayCapex, antennaCapex, meterCapex, freight, totalCapex,
-    cmsOpex, gatewayOpex, powerAidFee, totalAnnualOpex, energySaving, maintenanceSaving, grossBenefit, monthlyPayment, annualPayment,
-    customerAnnualNetBenefit, payback, npv, lifecycleResult, analysisPeriod, energyReductionPercent, co2ReductionKg, decisionStatus, customerDecisionStatus,
+    cmsOpex: cmsRevenue, cmsRevenue, gatewayOpex: gatewayRecurringRevenue, gatewayRecurringRevenue, powerAidFee: savingsAsAServiceRevenue, savingsAsAServiceRevenue, recurringOpex, annualRecurringRevenue, cmsDirectCost, gatewayRecurringCost, totalAnnualOpex, energySaving, maintenanceSaving, grossBenefit, monthlyPayment, annualPayment,
+    customerAnnualNetBenefit, payback, roiPercent, npv, lifecycleResult, analysisPeriod, energyReductionPercent, co2ReductionKg, decisionStatus, customerDecisionStatus,
     smartHardwareCost, implementationCost, gatewayCost, antennaCost, meterCost, freightCost, capexDirectCost, annualOpexDirectCost, contractOpexRevenue, contractOpexCost, capexContractRevenue, totalContractRevenue, commissionCost, warrantyReserve, financingCost, totalDirectCosts, netProjectProfit, netProjectMarginPercent, minimumMarginPercent,
     cashFlowRows, groupRows, hardware: { lcu, gateway, antenna, meter, gatewayQty, antennaQty, meterQty }, powerAidEnabled, cmsEnabled, smartEnabled };
 }
