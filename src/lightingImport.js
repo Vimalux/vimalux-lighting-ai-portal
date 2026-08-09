@@ -111,3 +111,55 @@ export function buildImportedGroups(rows, mapping, ledProducts, language = "it",
   const totalQuantity = groups.reduce((sum, group) => sum + group.quantity, 0);
   return { groups, skipped, totalQuantity, message: language === "it" ? `${groups.length} gruppi, ${totalQuantity} apparecchi` : `${groups.length} groups, ${totalQuantity} luminaires` };
 }
+
+const crmImportNumberFields = new Set([
+  "lamps","capex","contract_years","financing_years","saas_years","maintenance_opex_annual",
+  "cms_connectivity_annual","saas_poweraid_annual","total_opex_annual","customer_cost_financed_annual",
+  "customer_cost_cash_annual","co2_saving_annual_tons","energy_reduction_pct","customer_roi_years"
+]);
+
+export function parseNoleggioWorkbook(sheets) {
+  const sheet = sheets.find(item => String(item.name || "").trim().toUpperCase() === "CRM_IMPORT");
+  if (!sheet) throw new Error("Workbook must contain a CRM_IMPORT sheet.");
+  const fieldIndex = sheet.headers.findIndex(value => clean(value) === "field");
+  const valueIndex = sheet.headers.findIndex(value => clean(value) === "value");
+  if (fieldIndex < 0 || valueIndex < 0) throw new Error("CRM_IMPORT must contain Field and Value columns.");
+  const values = {};
+  sheet.rows.forEach(row => {
+    const key = String(row[fieldIndex] ?? "").trim().toLowerCase();
+    if (!key) return;
+    values[key] = crmImportNumberFields.has(key) ? numberValue(row[valueIndex]) : String(row[valueIndex] ?? "").trim();
+  });
+  if (!values.project_name) throw new Error("CRM_IMPORT is missing project_name.");
+  if (!(values.capex > 0)) throw new Error("CRM_IMPORT is missing a valid CAPEX.");
+  const financingYears = Math.max(1, Math.round(values.financing_years || values.contract_years || 1));
+  const allInclusiveAnnualPayment = values.customer_cost_cash_annual
+    || (values.customer_cost_financed_annual + values.total_opex_annual);
+  if (!(allInclusiveAnnualPayment > 0)) throw new Error("CRM_IMPORT is missing the all-inclusive customer payment.");
+  const warnings = [];
+  if (values.contract_years && values.contract_years !== financingYears) {
+    warnings.push(`Contract period (${values.contract_years} years) differs from payment period (${financingYears} years). Noleggio TCV will use the payment period.`);
+  }
+  return {
+    source: "CRM_IMPORT",
+    projectName: values.project_name,
+    customerName: values.customer_name || values.project_name,
+    quotationId: values.quotation_id || "",
+    lamps: Math.max(0, Math.round(values.lamps || 0)),
+    capex: values.capex,
+    contractYears: financingYears,
+    financingYears,
+    serviceContractYears: Math.max(1, Math.round(values.contract_years || financingYears)),
+    allInclusiveAnnualPayment,
+    annualOpex: values.total_opex_annual || 0,
+    cmsAnnual: values.cms_connectivity_annual || 0,
+    maintenanceAnnual: values.maintenance_opex_annual || 0,
+    powerAidAnnual: values.saas_poweraid_annual || 0,
+    co2SavingTons: values.co2_saving_annual_tons || 0,
+    energyReductionPercent: (values.energy_reduction_pct || 0) * 100,
+    customerRoiYears: values.customer_roi_years || 0,
+    pdfFile: values.pdf_file || "",
+    warnings,
+    raw: values
+  };
+}
