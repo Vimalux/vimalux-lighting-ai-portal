@@ -41,7 +41,7 @@ test("individual mode expands a summarised quantity into separate rows", () => {
   assert.ok(result.groups.every((group) => group.quantity === 1));
 });
 
-test("Noleggio CRM_IMPORT maps official commercial values and warns on period mismatch", () => {
+test("Noleggio CRM_IMPORT fallback maps official commercial values and warns on period mismatch", () => {
   const sheets = [{ name: "CRM_IMPORT", headers: ["Field","Value","Source","Notes"], rows: [
     ["project_name","Comune di Larciano"],["customer_name","Comune di Larciano"],["lamps",1182],
     ["capex",388248],["contract_years",20],["financing_years",10],["total_opex_annual",32022],
@@ -52,4 +52,33 @@ test("Noleggio CRM_IMPORT maps official commercial values and warns on period mi
   assert.equal(result.allInclusiveAnnualPayment,92675.88);
   assert.equal(result.contractYears,10);
   assert.equal(result.warnings.length,1);
+});
+
+
+test("Larciano import validates stale CRM cache against the visible customer offer", () => {
+  const sheets = [
+    { name: "CRM_IMPORT", headers: ["Field","Value","Source","Notes"], rows: [
+      ["project_name","Comune di Larciano"],["customer_name","Comune di Larciano"],["quotation_id","21-5-2026_Comune di Larciano"],
+      ["lamps",1254],["capex",484848],["contract_years",20],["financing_years",10],
+      ["maintenance_opex_annual",17730],["cms_connectivity_annual",7524],["saas_poweraid_annual",7200],
+      ["total_opex_annual",32454],["customer_cost_financed_annual",80033.89667785246],
+      ["customer_cost_cash_annual",113207.89667785246]
+    ] },
+    { name: "Dashboard", headers: ["INPUT CELLS"], rows: [
+      ["**Contract period in years",9],["Finance / years (is=0;cash)",9],["Interest rate for customer",0.094]
+    ] },
+    { name: "QuotationCustomer_ITA", headers: ["Offerta"], rows: [
+      ["Totale pagamenti per il progetto",null,null,-1018871.0701006723]
+    ] }
+  ];
+  const result = parseNoleggioWorkbook(sheets);
+  assert.equal(result.lamps,1254);
+  assert.equal(result.capex,484848);
+  assert.equal(result.contractYears,9);
+  assert.equal(result.financingYears,9);
+  assert.equal(result.interestRate,9.4);
+  assert.equal(result.annualOpex,32454);
+  assert.equal(result.allInclusiveAnnualPayment,113207.9);
+  assert.equal(result.totalCustomerPayments,1018871.07);
+  assert.equal(result.warnings.length,2);
 });
