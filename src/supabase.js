@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { mergeProjectStates } from "./projectSync.js";
+import { calculateBusinessCase } from "./calculations.js";
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -32,7 +33,35 @@ export async function saveCloudState(projects) {
   const userId = userData.user?.id || null;
   const { error: catalogueError } = await supabase.from("intelligence_catalogue").upsert({ id: "master", led: catalogue.led, smart: catalogue.smart, updated_by: userId });
   if (catalogueError) throw catalogueError;
-  const rows = projects.map((project) => ({ id: project.id, data: project, updated_by: userId }));
+  const rows = projects.map((project) => {
+    const result = calculateBusinessCase(project);
+    const probability = project.crm?.status === "won" ? 100 : Math.min(100, Math.max(0, Number(project.crm?.closingProbability) || 0));
+    const commercialSnapshot = {
+      schemaVersion: 1,
+      calculatedAt: project.updatedAt || new Date().toISOString(),
+      dealType: result.dealType,
+      offerCapex: result.totalCapex,
+      annualRecurringRevenue: result.annualRecurringRevenue,
+      totalContractRevenue: result.totalContractRevenue,
+      weightedContractRevenue: result.totalContractRevenue * probability / 100,
+      customerAnnualPayment: result.customerAnnualPayment,
+      customerMonthlyPayment: result.customerMonthlyPayment,
+      financingAnnualPayment: result.financingAnnualPayment,
+      financingMonthlyPayment: result.financingMonthlyPayment,
+      allInclusiveAnnualPayment: result.allInclusiveAnnualPayment,
+      contractYears: Math.max(1, Math.round(Number(project.assumptions.contractYears) || 1)),
+      financingYears: result.financingYears,
+      interestRate: Number(project.assumptions.interestRate) || 0,
+      interestRateSnapshot: project.assumptions.interestRateSnapshot || null,
+      luminaires: result.totalQuantity,
+      lcus: result.lcuQuantity,
+      cmsAnnualRevenue: result.cmsRevenue,
+      gatewayAnnualRevenue: result.gatewayRecurringRevenue,
+      powerAidAnnualRevenue: result.savingsAsAServiceRevenue,
+      co2ReductionTons: result.co2ReductionKg / 1000
+    };
+    return { id: project.id, data: { ...project, commercialSnapshot }, updated_by: userId };
+  });
   const { error: projectsError } = await supabase.from("intelligence_projects").upsert(rows);
   if (projectsError) throw projectsError;
 }
