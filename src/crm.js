@@ -24,7 +24,7 @@ export function crmMetrics(project) {
   const crm = project.crm || {};
   const won = crm.status === "won";
   const probability = won ? 100 : normalizeProbability(crm.closingProbability);
-  const totalContractValue = crm.totalContractValue == null ? result.totalCapex : positive(crm.totalContractValue);
+  const totalContractValue = crm.totalContractValue == null ? result.totalContractRevenue : positive(crm.totalContractValue);
   const annualRecurringRevenue = result.annualRecurringRevenue;
   return {
     status: crm.status || "lead",
@@ -32,6 +32,9 @@ export function crmMetrics(project) {
     totalContractValue,
     probabilityFactor: probabilityFactor(probability),
     weightedTcv: calculateWeightedTcv(totalContractValue, probability),
+    dealType: result.dealType,
+    offerCapex: result.totalCapex,
+    customerAnnualPayment: result.customerAnnualPayment,
     annualRecurringRevenue,
     monthlyRecurringRevenue: annualRecurringRevenue / 12,
     cmsAnnualRevenue: result.cmsRevenue,
