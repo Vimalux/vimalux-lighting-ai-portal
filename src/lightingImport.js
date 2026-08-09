@@ -118,8 +118,28 @@ const crmImportNumberFields = new Set([
   "customer_cost_cash_annual","co2_saving_annual_tons","energy_reduction_pct","customer_roi_years"
 ]);
 
+const rowsWithHeaders = (sheet) => sheet ? [sheet.headers || [], ...(sheet.rows || [])] : [];
+
+function findLabeledNumber(sheet, labels) {
+  const wanted = labels.map(clean);
+  for (const row of rowsWithHeaders(sheet)) {
+    for (let index = 0; index < row.length; index += 1) {
+      const label = clean(row[index]);
+      if (!wanted.some(value => label === value || label.includes(value))) continue;
+      for (let valueIndex = index + 1; valueIndex < row.length; valueIndex += 1) {
+        const value = numberValue(row[valueIndex]);
+        if (Number.isFinite(value) && value !== 0) return value;
+      }
+    }
+  }
+  return 0;
+}
+
+const findSheet = (sheets, name) => sheets.find(item => clean(item.name) === clean(name));
+const cents = value => Math.round(numberValue(value) * 100) / 100;
+
 export function parseNoleggioWorkbook(sheets) {
-  const sheet = sheets.find(item => String(item.name || "").trim().toUpperCase() === "CRM_IMPORT");
+  const sheet = findSheet(sheets, "CRM_IMPORT");
   if (!sheet) throw new Error("Workbook must contain a CRM_IMPORT sheet.");
   const fieldIndex = sheet.headers.findIndex(value => clean(value) === "field");
   const valueIndex = sheet.headers.findIndex(value => clean(value) === "value");
@@ -132,29 +152,57 @@ export function parseNoleggioWorkbook(sheets) {
   });
   if (!values.project_name) throw new Error("CRM_IMPORT is missing project_name.");
   if (!(values.capex > 0)) throw new Error("CRM_IMPORT is missing a valid CAPEX.");
-  const financingYears = Math.max(1, Math.round(values.financing_years || values.contract_years || 1));
-  const allInclusiveAnnualPayment = values.customer_cost_cash_annual
-    || (values.customer_cost_financed_annual + values.total_opex_annual);
+
+  // CRM_IMPORT can contain stale cached formula values. The visible customer offer and
+  // Dashboard are authoritative for period/rate/payment and therefore validate/override it.
+  const dashboard = findSheet(sheets, "Dashboard");
+  const italianOffer = findSheet(sheets, "QuotationCustomer_ITA");
+  const englishOffer = findSheet(sheets, "QuotationCustomer_ENG");
+  const offer = italianOffer || englishOffer;
+  const dashboardContractYears = findLabeledNumber(dashboard, ["contract period in years"]);
+  const dashboardFinancingYears = findLabeledNumber(dashboard, ["finance / years"]);
+  const dashboardInterestDecimal = findLabeledNumber(dashboard, ["interest rate for customer"]);
+  const offerTotalPayments = Math.abs(findLabeledNumber(offer, ["totale pagamenti per il progetto", "total payments for the project"]));
+
+  const sourceContractYears = Math.max(1, Math.round(values.contract_years || 1));
+  const sourceFinancingYears = Math.max(1, Math.round(values.financing_years || sourceContractYears));
+  const contractYears = Math.max(1, Math.round(dashboardContractYears || sourceContractYears));
+  const financingYears = Math.max(1, Math.round(dashboardFinancingYears || sourceFinancingYears));
+  const interestRate = dashboardInterestDecimal > 0 && dashboardInterestDecimal < 1
+    ? dashboardInterestDecimal * 100
+    : dashboardInterestDecimal;
+
+  const rawAnnualPayment = offerTotalPayments > 0
+    ? offerTotalPayments / financingYears
+    : (values.customer_cost_cash_annual || (values.customer_cost_financed_annual + values.total_opex_annual));
+  const allInclusiveAnnualPayment = cents(rawAnnualPayment);
   if (!(allInclusiveAnnualPayment > 0)) throw new Error("CRM_IMPORT is missing the all-inclusive customer payment.");
+
   const warnings = [];
-  if (values.contract_years && values.contract_years !== financingYears) {
-    warnings.push(`Contract period (${values.contract_years} years) differs from payment period (${financingYears} years). Noleggio TCV will use the payment period.`);
+  if (sourceContractYears !== contractYears) warnings.push(`CRM_IMPORT contract period (${sourceContractYears}) was stale; customer offer uses ${contractYears} years.`);
+  if (sourceFinancingYears !== financingYears) warnings.push(`CRM_IMPORT financing period (${sourceFinancingYears}) was stale; customer offer uses ${financingYears} years.`);
+  if (offerTotalPayments > 0 && Math.abs((values.customer_cost_cash_annual || 0) * financingYears - offerTotalPayments) > 1) {
+    warnings.push("Annual payment was recalculated from the customer offer total.");
   }
+
   return {
-    source: "CRM_IMPORT",
+    source: "CRM_IMPORT + customer offer validation",
+    mappingVersion: 2,
     projectName: values.project_name,
     customerName: values.customer_name || values.project_name,
     quotationId: values.quotation_id || "",
     lamps: Math.max(0, Math.round(values.lamps || 0)),
-    capex: values.capex,
-    contractYears: financingYears,
+    capex: cents(values.capex),
+    contractYears,
     financingYears,
-    serviceContractYears: Math.max(1, Math.round(values.contract_years || financingYears)),
+    serviceContractYears: contractYears,
+    interestRate: cents(interestRate),
     allInclusiveAnnualPayment,
-    annualOpex: values.total_opex_annual || 0,
-    cmsAnnual: values.cms_connectivity_annual || 0,
-    maintenanceAnnual: values.maintenance_opex_annual || 0,
-    powerAidAnnual: values.saas_poweraid_annual || 0,
+    totalCustomerPayments: cents(offerTotalPayments || allInclusiveAnnualPayment * financingYears),
+    annualOpex: cents(values.total_opex_annual || 0),
+    cmsAnnual: cents(values.cms_connectivity_annual || 0),
+    maintenanceAnnual: cents(values.maintenance_opex_annual || 0),
+    powerAidAnnual: cents(values.saas_poweraid_annual || 0),
     co2SavingTons: values.co2_saving_annual_tons || 0,
     energyReductionPercent: (values.energy_reduction_pct || 0) * 100,
     customerRoiYears: values.customer_roi_years || 0,
