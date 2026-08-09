@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildImportedGroups, guessLightingMapping, normalizeTechnology } from "../src/lightingImport.js";
+import { buildImportedGroups, guessLightingMapping, normalizeTechnology, parseNoleggioWorkbook } from "../src/lightingImport.js";
 
 test("column mapping recognises common lighting headers", () => {
   assert.deepEqual(guessLightingMapping(["Asset_ID", "Street", "Lamp Type", "Wattage", "Quantity"]), { technology: "2", wattage: "3", quantity: "4", name: "1", assetId: "0" });
@@ -39,4 +39,17 @@ test("individual mode expands a summarised quantity into separate rows", () => {
   const result = buildImportedGroups([["Main Street", "HPS", 70, 3]], { assetId: "", name: "0", technology: "1", wattage: "2", quantity: "3" }, [{ id: "led-1", active: true }], "en", "individual");
   assert.equal(result.groups.length, 3);
   assert.ok(result.groups.every((group) => group.quantity === 1));
+});
+
+test("Noleggio CRM_IMPORT maps official commercial values and warns on period mismatch", () => {
+  const sheets = [{ name: "CRM_IMPORT", headers: ["Field","Value","Source","Notes"], rows: [
+    ["project_name","Comune di Larciano"],["customer_name","Comune di Larciano"],["lamps",1182],
+    ["capex",388248],["contract_years",20],["financing_years",10],["total_opex_annual",32022],
+    ["customer_cost_financed_annual",60653.88],["customer_cost_cash_annual",92675.88]
+  ] }];
+  const result = parseNoleggioWorkbook(sheets);
+  assert.equal(result.capex,388248);
+  assert.equal(result.allInclusiveAnnualPayment,92675.88);
+  assert.equal(result.contractYears,10);
+  assert.equal(result.warnings.length,1);
 });
