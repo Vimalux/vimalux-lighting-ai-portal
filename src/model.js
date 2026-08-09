@@ -10,7 +10,7 @@ export const defaultProject = () => ({
   crm: { status: "lead", closingProbability: 25, totalContractValue: null },
   groups: [{ id: uid(), name: "Gruppo 1", quantity: 100, technology: "SAP", existingWattage: 100, proposedProductId: "led-40", smartAssigned: true, powerAidAssigned: true }],
   solution: { smartEnabled: true, cmsEnabled: true, powerAidEnabled: false, lcuProductId: "lcu-1", gatewayProductId: "gateway-1", gatewayQuantity: 1, antennaProductId: "antenna-1", antennaQuantity: 1, meterProductId: "meter-1", meterQuantity: 1 },
-  assumptions: { operatingHours: 4200, energyPrice: .25, sapFactor: 1.2, mhFactor: 1.15, mercuryFactor: 1.15, co2KgPerKwh: .233, cloPercent: 10, powerAidPercent: 40, powerAidSharePercent: 20, existingMaintenance: 25, newMaintenance: 5, financingModel: "cash", contractYears: 10, interestRate: 5, upfrontPayment: 0, energyEscalation: 2, opexEscalation: 2, discountRate: 5, analysisPeriod: 20, freightCostPerLamp: 4, freightSalesPerLamp: 6, commissionPercent: 0, warrantyReservePercent: 0, fundingCostPercent: 0, otherDirectCosts: 0, minimumMarginPercent: 30 },
+  assumptions: { operatingHours: 4200, energyPrice: .25, sapFactor: 1.2, mhFactor: 1.15, mercuryFactor: 1.15, co2KgPerKwh: .233, cloPercent: 10, powerAidPercent: 40, powerAidSharePercent: 20, existingMaintenance: 25, newMaintenance: 5, financingModel: "cash", dealType: "cash", contractYears: 10, financingYears: 10, rateProfileId: "custom", interestRate: 5, interestRateSnapshot: { profileId: "custom", annualRate: 5, capturedAt: null }, allInclusiveAnnualPayment: 0, upfrontPayment: 0, energyEscalation: 2, opexEscalation: 2, discountRate: 5, analysisPeriod: 20, freightCostPerLamp: 4, freightSalesPerLamp: 6, commissionPercent: 0, warrantyReservePercent: 0, fundingCostPercent: 0, otherDirectCosts: 0, minimumMarginPercent: 30 },
   pricing: { overrides: {} },
   catalogue: {
     led: [{ id: "led-40", brand: "VIMALUX", name: "VIMA LED 40", wattage: 40, lumen: 6000, costPrice: 90, salesPrice: 150, active: true }, { id: "led-70", brand: "VIMALUX", name: "VIMA LED 70", wattage: 70, lumen: 10500, costPrice: 125, salesPrice: 210, active: true }],
@@ -35,6 +35,11 @@ export function migrateProject(saved) {
   project.updatedAt = previousUpdatedAt;
   project.language = ["it", "en", "da"].includes(project.language) ? project.language : "it";
   project.groups = (Array.isArray(project.groups) ? project.groups : []).map((g) => ({ ...g, id: g.id || uid() }));
+  const legacyDealType = project.assumptions.financingModel === "finance" ? "finance" : ["laas", "ppp"].includes(project.assumptions.financingModel) ? "noleggio_operativo" : "cash";
+  project.assumptions.dealType = ["cash", "noleggio_operativo", "finance"].includes(saved?.assumptions?.dealType) ? saved.assumptions.dealType : legacyDealType;
+  project.assumptions.financingYears = Math.max(1, Math.round(numberValue(project.assumptions.financingYears || project.assumptions.contractYears)));
+  project.assumptions.rateProfileId = project.assumptions.rateProfileId || "custom";
+  project.assumptions.interestRateSnapshot = project.assumptions.interestRateSnapshot || { profileId: project.assumptions.rateProfileId, annualRate: numberValue(project.assumptions.interestRate), capturedAt: null };
   return project;
 }
 
