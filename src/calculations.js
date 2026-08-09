@@ -59,7 +59,8 @@ export function calculateBusinessCase(project) {
   const gatewayCost = gatewayQty * positive(gateway.costPrice), antennaCost = antennaQty * positive(antenna.costPrice), meterCost = meterQty * positive(meter.costPrice);
   const freightCost = totalQuantity * positive(a.freightCostPerLamp);
   const capexDirectCost = ledCost + smartHardwareCost + implementationCost + gatewayCost + antennaCost + meterCost + freightCost;
-  const totalCapex = ledCapex + smartHardwareCapex + implementationCapex + gatewayCapex + antennaCapex + meterCapex + freight;
+  const calculatedCapex = ledCapex + smartHardwareCapex + implementationCapex + gatewayCapex + antennaCapex + meterCapex + freight;
+  const totalCapex = positive(a.officialOfferCapex) || calculatedCapex;
   const cmsRevenue = cmsEnabled ? lcuQuantity * price(lcu, "annualSalesPrice") : 0;
   const gatewayRecurringRevenue = smartEnabled ? gatewayQty * price(gateway, "annualSalesPrice") : 0;
   const energySaving = (baselineKwh - finalKwh) * positive(a.energyPrice);
@@ -67,7 +68,8 @@ export function calculateBusinessCase(project) {
   const powerAidGrossSaving = powerAidSavingKwh * positive(a.energyPrice);
   const savingsAsAServiceRevenue = powerAidEnabled ? powerAidGrossSaving * positive(a.powerAidSharePercent) / 100 : 0;
   const recurringOpex = cmsRevenue + gatewayRecurringRevenue;
-  const annualRecurringRevenue = recurringOpex + savingsAsAServiceRevenue;
+  const calculatedAnnualRecurringRevenue = recurringOpex + savingsAsAServiceRevenue;
+  const annualRecurringRevenue = positive(a.officialAnnualOpex) || calculatedAnnualRecurringRevenue;
   const cmsDirectCost = cmsEnabled ? lcuQuantity * positive(lcu.annualCost) : 0;
   const gatewayRecurringCost = smartEnabled ? gatewayQty * positive(gateway.annualCost) : 0;
   const annualOpexDirectCost = cmsDirectCost + gatewayRecurringCost;
@@ -134,7 +136,7 @@ export function calculateBusinessCase(project) {
   const minimumMarginPercent = positive(a.minimumMarginPercent || 30);
   const decisionStatus = netProjectMarginPercent >= minimumMarginPercent && customerDecisionStatus === "GO" ? "GO" : netProjectMarginPercent >= 20 && customerDecisionStatus !== "NO_GO" ? "REVIEW" : "NO_GO";
   return { totalQuantity, smartQuantity, lcuQuantity, baselineKwh, ledKwh, ledSavingKwh, cloSavingKwh, powerAidSavingKwh, finalKwh,
-    ledCapex, ledCost, smartHardwareCapex, implementationCapex, gatewayCapex, antennaCapex, meterCapex, freight, totalCapex,
+    ledCapex, ledCost, smartHardwareCapex, implementationCapex, gatewayCapex, antennaCapex, meterCapex, freight, calculatedCapex, totalCapex, calculatedAnnualRecurringRevenue,
     cmsOpex: cmsRevenue, cmsRevenue, gatewayOpex: gatewayRecurringRevenue, gatewayRecurringRevenue, powerAidFee: savingsAsAServiceRevenue, savingsAsAServiceRevenue, recurringOpex, annualRecurringRevenue, cmsDirectCost, gatewayRecurringCost, totalAnnualOpex, energySaving, maintenanceSaving, grossBenefit, monthlyPayment, annualPayment,
     dealType, financingYears, interestRateSnapshot: a.interestRateSnapshot || null, financingMonthlyPayment, financingAnnualPayment, allInclusiveAnnualPayment, allInclusiveContractRevenue, customerAnnualPayment, customerMonthlyPayment: monthlyPayment,
     customerAnnualNetBenefit, payback, roiPercent, npv, lifecycleResult, analysisPeriod, energyReductionPercent, co2ReductionKg, decisionStatus, customerDecisionStatus,
