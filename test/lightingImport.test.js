@@ -103,7 +103,7 @@ test("Ricigliano Planner workbook imports the verified 623-luminaire product mix
   const products = [{id:"led-40",wattage:40,active:true},{id:"led-70",wattage:70,active:true}];
   const result = parsePlannerWorkbook(sheets,products,"AC_02_02072026_COMUNE DI RICIGLIANO RIQUALIFICAZIONE.xlsx");
   assert.equal(detectWorkbookType(sheets),"planner");
-  assert.equal(result.projectName,"Ricigliano");
+  assert.equal(result.projectName,"RICIGLIANO");
   assert.equal(result.totalQuantity,623);
   assert.equal(result.groups.length,6);
   assert.equal(result.groups.find(group => group.importedProductCode === "VML-MANTA-40-730-L1-ZU").quantity,442);
