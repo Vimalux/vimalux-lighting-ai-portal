@@ -11,6 +11,7 @@ const aliases = {
 };
 
 const clean = (value) => String(value ?? "").trim().toLowerCase().replace(/[_/()-]+/g, " ").replace(/\s+/g, " ");
+const isTotalLabel = (value) => /^(grand total|hovedtotal|total|totale generale|totale complessivo|i alt)$/.test(clean(value));
 
 export function guessLightingMapping(headers) {
   const mapping = { technology: "", wattage: "", quantity: "", name: "", assetId: "" };
@@ -124,7 +125,7 @@ export function parsePlannerWorkbook(sheets, ledProducts, fileName = "") {
   let powerSumIndex = header.findIndex(value => /sum of pow w|somma.*pow/.test(clean(value)));
   const inferredRow = rows.find(row => {
     const label = String(row?.[0] ?? "").trim();
-    return label && !/grand total/i.test(label) && numberValue(row?.[1]) > 0;
+    return label && !isTotalLabel(label) && numberValue(row?.[1]) > 0;
   });
   if (pivot && (codeIndex < 0 || quantityIndex < 0) && inferredRow) {
     codeIndex = 0;
@@ -159,7 +160,7 @@ export function parsePlannerWorkbook(sheets, ledProducts, fileName = "") {
   const groups = (pivot ? pivot.rows : []).map(row => {
     const code = String(row[codeIndex] ?? "").trim();
     const quantity = Math.round(numberValue(row[quantityIndex]));
-    if (!code || /grand total/i.test(code) || !(quantity > 0)) return null;
+    if (!code || isTotalLabel(code) || !(quantity > 0)) return null;
     const technical = technicalByCode.get(code);
     const proposedWattage = technical?.proposedCount
       ? technical.proposedTotal / technical.proposedCount
