@@ -114,3 +114,15 @@ test("workbook type detection keeps Noleggio and generic imports separate", () =
   assert.equal(detectWorkbookType([{name:"CRM_IMPORT"}]),"noleggio");
   assert.equal(detectWorkbookType([{name:"Lighting data"}]),"lighting");
 });
+
+
+test("Planner PIVOT import infers columns when browser headers are generic", () => {
+  const sheets = [{name:"PIVOT",headers:["Column 1","Column 2","Column 3"],rows:[
+    ["VML-MANTA-40-730-L1-ZU",442,15850],
+    ["VML-MANTA-60-730-L1-ZU",58,3420],
+    ["Grand Total",500,19270]
+  ]}];
+  const result=parsePlannerWorkbook(sheets,[{id:"led-40",wattage:40,active:true},{id:"led-70",wattage:70,active:true}],"COMUNE DI TEST RIQUALIFICAZIONE.xlsx");
+  assert.equal(result.totalQuantity,500);
+  assert.equal(result.groups.length,2);
+});
