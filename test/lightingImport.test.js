@@ -50,8 +50,9 @@ test("Noleggio CRM_IMPORT fallback maps official commercial values and warns on 
   const result = parseNoleggioWorkbook(sheets);
   assert.equal(result.capex,388248);
   assert.equal(result.allInclusiveAnnualPayment,92675.88);
-  assert.equal(result.contractYears,10);
-  assert.equal(result.warnings.length,1);
+  assert.equal(result.contractYears,20);
+  assert.equal(result.financingYears,10);
+  assert.equal(result.warnings.length,0);
 });
 
 
