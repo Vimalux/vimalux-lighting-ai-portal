@@ -118,11 +118,20 @@ export function parsePlannerWorkbook(sheets, ledProducts, fileName = "") {
   if (!pivot && !centre) throw new Error("Planner workbook must contain PIVOT or Centro luminoso.");
 
   const rows = pivot ? [pivot.headers, ...pivot.rows] : [];
-  const header = rows.find(row => row.some(value => clean(value) === "row labels")) || pivot?.headers || [];
-  const codeIndex = header.findIndex(value => clean(value) === "row labels");
-  const quantityIndex = header.findIndex(value => /antal af numero lampade|count of numero lampade|quantita|quantità/.test(clean(value)));
-  const powerSumIndex = header.findIndex(value => /sum of pow w|somma.*pow/.test(clean(value)));
-  if (pivot && (codeIndex < 0 || quantityIndex < 0)) throw new Error("PIVOT is missing product code or luminaire quantity.");
+  const header = rows.find(row => row.some(value => /row labels|rækkeetiketter|etichette di riga/.test(clean(value)))) || pivot?.headers || [];
+  let codeIndex = header.findIndex(value => /row labels|rækkeetiketter|etichette di riga/.test(clean(value)));
+  let quantityIndex = header.findIndex(value => /antal af numero lampade|count of numero lampade|conteggio.*lampade|quantita|quantità/.test(clean(value)));
+  let powerSumIndex = header.findIndex(value => /sum of pow w|somma.*pow/.test(clean(value)));
+  const inferredRow = rows.find(row => {
+    const label = String(row?.[0] ?? "").trim();
+    return label && !/grand total/i.test(label) && numberValue(row?.[1]) > 0;
+  });
+  if (pivot && (codeIndex < 0 || quantityIndex < 0) && inferredRow) {
+    codeIndex = 0;
+    quantityIndex = 1;
+    if (powerSumIndex < 0 && inferredRow.length > 2) powerSumIndex = 2;
+  }
+  if (pivot && (codeIndex < 0 || quantityIndex < 0)) throw new Error("PIVOT does not contain readable product rows.");
 
   const centreRows = centre ? [centre.headers, ...centre.rows] : [];
   const centreHeader = centreRows[0] || [];
