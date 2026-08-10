@@ -23,6 +23,8 @@ export const defaultProject = () => ({
   },
 });
 
+const isImportedTotalGroup = (group) => /^(grand total|hovedtotal|total|totale generale|totale complessivo|i alt)$/i.test(String(group?.name ?? "").trim());
+
 const merge = (base, saved) => {
   if (Array.isArray(base)) return Array.isArray(saved) ? saved : base;
   if (base && typeof base === "object") return Object.fromEntries(Object.keys(base).map((key) => [key, merge(base[key], saved?.[key])]).concat(Object.keys(saved || {}).filter((key) => !(key in base)).map((key) => [key, saved[key]])));
@@ -34,7 +36,9 @@ export function migrateProject(saved) {
   const project = merge(defaultProject(), saved && typeof saved === "object" ? saved : {});
   project.updatedAt = previousUpdatedAt;
   project.language = ["it", "en", "da"].includes(project.language) ? project.language : "it";
-  project.groups = (Array.isArray(project.groups) ? project.groups : []).map((g) => ({ ...g, id: g.id || uid() }));
+  project.groups = (Array.isArray(project.groups) ? project.groups : [])
+    .filter((group) => !isImportedTotalGroup(group))
+    .map((g) => ({ ...g, id: g.id || uid() }));
   const legacyDealType = project.assumptions.financingModel === "finance" ? "finance" : ["laas", "ppp"].includes(project.assumptions.financingModel) ? "noleggio_operativo" : "cash";
   project.assumptions.dealType = ["cash", "noleggio_operativo", "finance"].includes(saved?.assumptions?.dealType) ? saved.assumptions.dealType : legacyDealType;
   project.assumptions.financingYears = Math.max(1, Math.round(numberValue(project.assumptions.financingYears || project.assumptions.contractYears)));
