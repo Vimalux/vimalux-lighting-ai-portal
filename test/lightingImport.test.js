@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildImportedGroups, guessLightingMapping, normalizeTechnology, parseNoleggioWorkbook } from "../src/lightingImport.js";
+import { buildImportedGroups, detectWorkbookType, guessLightingMapping, normalizeTechnology, parseNoleggioWorkbook, parsePlannerWorkbook } from "../src/lightingImport.js";
 
 test("column mapping recognises common lighting headers", () => {
   assert.deepEqual(guessLightingMapping(["Asset_ID", "Street", "Lamp Type", "Wattage", "Quantity"]), { technology: "2", wattage: "3", quantity: "4", name: "1", assetId: "0" });
@@ -81,4 +81,36 @@ test("Larciano import validates stale CRM cache against the visible customer off
   assert.equal(result.allInclusiveAnnualPayment,113207.9);
   assert.equal(result.totalCustomerPayments,1018871.07);
   assert.equal(result.warnings.length,2);
+});
+
+
+test("Ricigliano Planner workbook imports the verified 623-luminaire product mix", () => {
+  const sheets = [
+    { name: "PIVOT", headers: ["Row Labels","Antal af Numero Lampade","Sum of Pow W"], rows: [
+      ["VML-FL01-40-730-L1-ZU",2,80],
+      ["VML-MANTA-40-730-L1-ZU",442,15850],
+      ["VML-MANTA-60-730-L1-ZU",58,3420],
+      ["VML-OPERA-PE-40-730-ZU",18,425],
+      ["VML-OPERA-PT-40-730-ZU",53,956],
+      ["VML-RETRO-A-40-730-ZU",50,1110],
+      ["Grand Total",623,21841]
+    ] },
+    { name: "Centro luminoso", headers: ["IDELEM","POTM TOT","NEW CODE","CODIFICA ARMATURE","Pow W"], rows: [
+      [13500,78,"VML-MANTA-40-730-L1-ZU",1,35],
+      [13501,120,"VML-MANTA-60-730-L1-ZU",1,60]
+    ] }
+  ];
+  const products = [{id:"led-40",wattage:40,active:true},{id:"led-70",wattage:70,active:true}];
+  const result = parsePlannerWorkbook(sheets,products,"AC_02_02072026_COMUNE DI RICIGLIANO RIQUALIFICAZIONE.xlsx");
+  assert.equal(detectWorkbookType(sheets),"planner");
+  assert.equal(result.projectName,"Ricigliano");
+  assert.equal(result.totalQuantity,623);
+  assert.equal(result.groups.length,6);
+  assert.equal(result.groups.find(group => group.importedProductCode === "VML-MANTA-40-730-L1-ZU").quantity,442);
+  assert.equal(result.groups.find(group => group.importedProductCode === "VML-MANTA-60-730-L1-ZU").proposedProductId,"led-70");
+});
+
+test("workbook type detection keeps Noleggio and generic imports separate", () => {
+  assert.equal(detectWorkbookType([{name:"CRM_IMPORT"}]),"noleggio");
+  assert.equal(detectWorkbookType([{name:"Lighting data"}]),"lighting");
 });
