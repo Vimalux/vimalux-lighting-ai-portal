@@ -112,6 +112,95 @@ export function buildImportedGroups(rows, mapping, ledProducts, language = "it",
   return { groups, skipped, totalQuantity, message: language === "it" ? `${groups.length} gruppi, ${totalQuantity} apparecchi` : `${groups.length} groups, ${totalQuantity} luminaires` };
 }
 
+export function parsePlannerWorkbook(sheets, ledProducts, fileName = "") {
+  const pivot = sheets.find(item => clean(item.name) === "pivot");
+  const centre = sheets.find(item => clean(item.name) === "centro luminoso");
+  if (!pivot && !centre) throw new Error("Planner workbook must contain PIVOT or Centro luminoso.");
+
+  const rows = pivot ? [pivot.headers, ...pivot.rows] : [];
+  const header = rows.find(row => row.some(value => clean(value) === "row labels")) || pivot?.headers || [];
+  const codeIndex = header.findIndex(value => clean(value) === "row labels");
+  const quantityIndex = header.findIndex(value => /antal af numero lampade|count of numero lampade|quantita|quantità/.test(clean(value)));
+  const powerSumIndex = header.findIndex(value => /sum of pow w|somma.*pow/.test(clean(value)));
+  if (pivot && (codeIndex < 0 || quantityIndex < 0)) throw new Error("PIVOT is missing product code or luminaire quantity.");
+
+  const centreRows = centre ? [centre.headers, ...centre.rows] : [];
+  const centreHeader = centreRows[0] || [];
+  const centreCodeIndex = centreHeader.findIndex(value => ["new code","codifica armature"].includes(clean(value)));
+  const centreExistingPowerIndex = centreHeader.findIndex(value => clean(value) === "potm tot");
+  const centreProposedPowerIndex = centreHeader.findIndex(value => clean(value) === "pow w");
+  const technicalByCode = new Map();
+  if (centreCodeIndex >= 0) {
+    centreRows.slice(1).forEach(row => {
+      const code = String(row[centreCodeIndex] ?? "").trim();
+      if (!code || /^#|grand total/i.test(code)) return;
+      const existing = numberValue(row[centreExistingPowerIndex]);
+      const proposed = numberValue(row[centreProposedPowerIndex]);
+      const item = technicalByCode.get(code) || { count: 0, existingTotal: 0, existingCount: 0, proposedTotal: 0, proposedCount: 0 };
+      item.count += 1;
+      if (existing > 0) { item.existingTotal += existing; item.existingCount += 1; }
+      if (proposed > 0) { item.proposedTotal += proposed; item.proposedCount += 1; }
+      technicalByCode.set(code, item);
+    });
+  }
+
+  const activeProducts = ledProducts.filter(product => product.active);
+  const fallbackProducts = activeProducts.length ? activeProducts : ledProducts;
+  const closestProduct = wattage => [...fallbackProducts].sort((a,b) => Math.abs(numberValue(a.wattage)-wattage)-Math.abs(numberValue(b.wattage)-wattage))[0];
+  const groups = (pivot ? pivot.rows : []).map(row => {
+    const code = String(row[codeIndex] ?? "").trim();
+    const quantity = Math.round(numberValue(row[quantityIndex]));
+    if (!code || /grand total/i.test(code) || !(quantity > 0)) return null;
+    const technical = technicalByCode.get(code);
+    const proposedWattage = technical?.proposedCount
+      ? technical.proposedTotal / technical.proposedCount
+      : numberValue(row[powerSumIndex]) / quantity;
+    const existingWattage = technical?.existingCount
+      ? technical.existingTotal / technical.existingCount
+      : proposedWattage;
+    const product = closestProduct(proposedWattage);
+    return {
+      id: uid(),
+      name: code,
+      quantity,
+      technology: "OTHER",
+      existingWattage: Math.round(existingWattage * 10) / 10,
+      proposedProductId: product?.id || "",
+      projectLedPrice: null,
+      smartAssigned: true,
+      powerAidAssigned: false,
+      importedProductCode: code,
+      importedProposedWattage: Math.round(proposedWattage * 10) / 10
+    };
+  }).filter(Boolean);
+
+  if (!groups.length) throw new Error("No valid luminaires were found in the Planner workbook.");
+  const totalQuantity = groups.reduce((sum, group) => sum + group.quantity, 0);
+  const rawName = fileName.replace(/\.xlsx?$/i, "").replace(/^AC_\d+_\d+_/i, "").replace(/_/g, " ").trim();
+  const match = rawName.match(/COMUNE DI (.+?)(?: RIQUALIFICAZIONE|$)/i);
+  const projectName = match ? match[1].trim().replace(/\b\w/g, letter => letter.toUpperCase()) : rawName;
+  const warnings = [];
+  const rawMappedCount = [...technicalByCode.entries()].filter(([code]) => groups.some(group => group.importedProductCode === code)).reduce((sum,[,item]) => sum + item.count, 0);
+  if (rawMappedCount && rawMappedCount !== totalQuantity) warnings.push(`PIVOT total (${totalQuantity}) differs from mapped raw rows (${rawMappedCount}); PIVOT total was used.`);
+
+  return {
+    type: "planner",
+    source: pivot ? "Planner PIVOT + Centro luminoso" : "Centro luminoso",
+    projectName: projectName || "Imported Planner project",
+    customerName: projectName || "",
+    totalQuantity,
+    groups,
+    productMix: groups.map(group => ({ code: group.importedProductCode, quantity: group.quantity, proposedWattage: group.importedProposedWattage })),
+    warnings
+  };
+}
+
+export function detectWorkbookType(sheets) {
+  if (sheets.some(item => clean(item.name) === "crm import")) return "noleggio";
+  if (sheets.some(item => ["pivot","centro luminoso"].includes(clean(item.name)))) return "planner";
+  return "lighting";
+}
+
 const crmImportNumberFields = new Set([
   "lamps","capex","contract_years","financing_years","saas_years","maintenance_opex_annual",
   "cms_connectivity_annual","saas_poweraid_annual","total_opex_annual","customer_cost_financed_annual",
