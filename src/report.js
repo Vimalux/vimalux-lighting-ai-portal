@@ -1,7 +1,9 @@
+
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatMoney, formatNumber, formatPercent, useT } from "./i18n.js";
 import { aggregateReplacementRows } from "./reportSummary.js";
+import { reportCommercialContext } from "./reportCommercial.js";
 
 export function generateCustomerPdf(project, result) {
   const lang = project.language;
@@ -9,9 +11,8 @@ export function generateCustomerPdf(project, result) {
   const it = lang === "it";
   const money = (value) => formatMoney(value, lang, project.project.currency);
   const percent = (value) => formatPercent(value, lang);
-  const projectTypeLabels = { finance: "Finance solution", laas: "LaaS", cash: "Cash Deal", ppp: "PPP" };
-  const projectType = projectTypeLabels[project.assumptions.financingModel] || projectTypeLabels.cash;
-  const financed = project.assumptions.financingModel !== "cash";
+  const commercial = reportCommercialContext(project, result);
+  const { projectType, financed } = commercial;
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const alignTableHeaders = (...alignments) => (data) => {
     if (data.section === "head") data.cell.styles.halign = alignments[data.column.index] || "left";
@@ -32,7 +33,7 @@ export function generateCustomerPdf(project, result) {
   doc.setFontSize(20);
   doc.text("VIMALUX Intelligence", 14, 17);
   doc.setFontSize(14);
-  doc.text(it ? "Studio Preliminare di Fattibilità Economica" : "Preliminary Business Case", 14, 28);
+  doc.text(it ? "Studio Preliminare di FattibilitÃ  Economica" : "Preliminary Business Case", 14, 28);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.text(`${project.project.businessCaseId}  |  ${project.customer.name || "-"}  |  ${project.project.date}`, 14, 36);
@@ -55,7 +56,7 @@ export function generateCustomerPdf(project, result) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   doc.setTextColor(71, 85, 105);
-  doc.text(it ? "* Beneficio netto annuo = beneficio lordo - OPEX annuo - pagamento annuo del finanziamento." : "* Annual net benefit = gross benefit - annual OPEX - annual financing payment.", 14, doc.lastAutoTable.finalY + 14, { maxWidth: 182 });
+  doc.text(commercial.annualNetFootnote, 14, doc.lastAutoTable.finalY + 14, { maxWidth: 182 });
   doc.setFont("helvetica", "normal");
   doc.text(`${t("energyReduction")}: ${percent(result.energyReductionPercent)}   |   ${it ? "Riduzione CO2" : "CO2 reduction"}: ${formatNumber(result.co2ReductionKg / 1000, lang, 1)} t/${it ? "anno" : "year"}`, 14, doc.lastAutoTable.finalY + 19, { maxWidth: 182 });
   doc.setTextColor(15, 23, 42);
@@ -94,7 +95,7 @@ export function generateCustomerPdf(project, result) {
       [it ? "Tasso di attualizzazione" : "Discount rate", percent(project.assumptions.discountRate)],
       [it ? "Periodo di analisi" : "Analysis period", `${project.assumptions.analysisPeriod} ${t("years")}`],
       ["Smart Lighting", result.smartEnabled ? t("yes") : t("no")],
-      [it ? "Quantità LCU calcolata" : "Calculated LCU quantity", result.lcuQuantity],
+      [it ? "QuantitÃ  LCU calcolata" : "Calculated LCU quantity", result.lcuQuantity],
       ["CMS", result.cmsEnabled ? t("yes") : t("no")],
       ["PowerAiD", result.powerAidEnabled ? t("yes") : t("no")],
       ["CLO", percent(result.smartEnabled ? project.assumptions.cloPercent : 0)],
@@ -109,7 +110,7 @@ export function generateCustomerPdf(project, result) {
   const replacementRows = aggregateReplacementRows(result.groupRows);
   autoTable(doc, {
     startY: 23,
-    head: [[it ? "Tecnologia esistente" : "Existing technology", it ? "Potenza esistente" : "Existing wattage", it ? "Quantità" : "Quantity", it ? "Nuovo prodotto LED" : "New LED product"]],
+    head: [[it ? "Tecnologia esistente" : "Existing technology", it ? "Potenza esistente" : "Existing wattage", it ? "QuantitÃ " : "Quantity", it ? "Nuovo prodotto LED" : "New LED product"]],
     body: replacementRows.map((row) => [row.technology, `${formatNumber(row.existingWattage, lang)} W`, formatNumber(row.quantity, lang), row.productName]),
     headStyles: { fillColor: [15, 118, 110] },
     styles: { font: "helvetica", fontSize: 8, valign: "middle" },
@@ -121,7 +122,7 @@ export function generateCustomerPdf(project, result) {
     section(it ? "Hardware Smart Lighting" : "Smart Lighting hardware", doc.lastAutoTable.finalY + 9);
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 14,
-      head: [[it ? "Componente" : "Component", it ? "Quantità" : "Quantity", it ? "Prodotto" : "Product"]],
+      head: [[it ? "Componente" : "Component", it ? "QuantitÃ " : "Quantity", it ? "Prodotto" : "Product"]],
       body: [["LCU", formatNumber(result.lcuQuantity, lang), result.hardware.lcu.name || "-"], ["Gateway", formatNumber(result.hardware.gatewayQty, lang), result.hardware.gateway.name || "-"], ["Antenna", formatNumber(result.hardware.antennaQty, lang), result.hardware.antenna.name || "-"], [it ? "Contatore" : "Energy meter", formatNumber(result.hardware.meterQty, lang), result.hardware.meter.name || "-"]],
       headStyles: { fillColor: [15, 118, 110] },
       styles: { font: "helvetica", fontSize: 8, valign: "middle" },
@@ -159,7 +160,7 @@ export function generateCustomerPdf(project, result) {
     showHead: "everyPage",
     rowPageBreak: "avoid",
     head: [[it ? "Anno" : "Year", it ? "Beneficio lordo" : "Gross benefit", "OPEX", it ? "Pagamento" : "Payment", it ? "Flusso netto" : "Net cash flow", it ? "Cumulato" : "Cumulative"]],
-    body: result.cashFlowRows.map((row) => [row.year, money(row.grossBenefit), money(row.opex), money(row.payment), money(row.netCashFlow), money(row.cumulative)]),
+    body: result.cashFlowRows.map((row) => [row.year, money(row.grossBenefit), commercial.opexIncludedInPayment ? commercial.includedLabel : money(row.opex), money(row.payment), money(row.netCashFlow), money(row.cumulative)]),
     headStyles: { fillColor: [15, 118, 110] },
     styles: { font: "helvetica", fontSize: 7.3, cellPadding: 1.5, valign: "middle" },
     columnStyles: { 0: { halign: "center" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
@@ -175,7 +176,7 @@ export function generateCustomerPdf(project, result) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.text(it ? "Censimento GPS - classificazione UNI 11248 - progettazione illuminotecnica - assegnazione prodotti - proposta tecnica finale in VIMALUX Planner" : "GPS census - UNI 11248 classification - photometric design - product assignment - final technical proposal in VIMALUX Planner", 14, y + 6, { maxWidth: 182 });
-  const disclaimer = it ? "Questa analisi rappresenta una valutazione preliminare basata su quantità aggregate, potenze medie e ipotesi commerciali. Le quantità definitive, il censimento GPS, la classificazione stradale, le verifiche UNI 11248, la progettazione illuminotecnica e l'assegnazione finale dei prodotti saranno sviluppati tramite VIMALUX Planner." : "This analysis is a preliminary assessment based on aggregated quantities, average wattages and commercial assumptions. Final quantities, the GPS census, road classification, UNI 11248 verification, photometric design and final product assignment will be developed through VIMALUX Planner.";
+  const disclaimer = it ? "Questa analisi rappresenta una valutazione preliminare basata su quantitÃ  aggregate, potenze medie e ipotesi commerciali. Le quantitÃ  definitive, il censimento GPS, la classificazione stradale, le verifiche UNI 11248, la progettazione illuminotecnica e l'assegnazione finale dei prodotti saranno sviluppati tramite VIMALUX Planner." : "This analysis is a preliminary assessment based on aggregated quantities, average wattages and commercial assumptions. Final quantities, the GPS census, road classification, UNI 11248 verification, photometric design and final product assignment will be developed through VIMALUX Planner.";
   doc.setFontSize(8);
   doc.setTextColor(71, 85, 105);
   doc.text(disclaimer, 14, y + 18, { maxWidth: 182 });
