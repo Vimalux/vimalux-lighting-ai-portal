@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { mergeProjectStates } from "./projectSync.js";
 import { calculateBusinessCase } from "./calculations.js";
+import { deleteProjectRow } from "./cloudProjects.js";
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -64,4 +65,8 @@ export async function saveCloudState(projects) {
   });
   const { error: projectsError } = await supabase.from("intelligence_projects").upsert(rows);
   if (projectsError) throw projectsError;
+}
+
+export async function deleteCloudProject(projectId) {
+  return deleteProjectRow(supabase, projectId);
 }

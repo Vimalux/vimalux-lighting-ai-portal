@@ -20,6 +20,7 @@ import {
   readLightingWorkbook,
 } from "./lightingImport.js";
 import {
+  deleteCloudProject,
   loadCloudState,
   saveCloudState,
   supabase,
@@ -224,7 +225,7 @@ export default function App() {
     setActiveId(p.id);
     setView("customer");
   };
-  const removeProject = (id) => {
+  const removeProject = async (id) => {
     const target = projects.find((item) => item.id === id);
     if (!target) return;
     const label = target.project?.name || target.name || "project";
@@ -233,6 +234,23 @@ export default function App() {
         ? `Eliminare definitivamente il progetto "${label}"?`
         : `Delete project "${label}" permanently?`;
     if (!confirm(message)) return;
+    if (supabaseConfigured && session && cloudReady) {
+      try {
+        setSyncState("saving");
+        await deleteCloudProject(id);
+        setSyncState("saved");
+        setSyncError("");
+      } catch (error) {
+        setSyncState("error");
+        setSyncError(error.message);
+        alert(
+          project.language === "it"
+            ? `Impossibile eliminare il progetto dal cloud: ${error.message}`
+            : `The project could not be deleted from the cloud: ${error.message}`,
+        );
+        return;
+      }
+    }
     const remaining = projects.filter((item) => item.id !== id);
     const next = remaining.length ? remaining : [defaultProject()];
     setProjects(next);
