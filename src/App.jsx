@@ -1030,6 +1030,14 @@ function Existing({ p, update, t }) {
                     <input
                       type="checkbox"
                       checked={g.powerAidAssigned}
+                      disabled={!p.solution.powerAidEnabled}
+                      title={
+                        p.solution.powerAidEnabled
+                          ? "PowerAiD assigned to this group"
+                          : p.language === "it"
+                            ? "Attivare PowerAiD in Soluzione per abilitare l'assegnazione al gruppo"
+                            : "Enable PowerAiD under Solution to activate group assignment"
+                      }
                       onChange={(e) =>
                         update(
                           ["groups", i, "powerAidAssigned"],
