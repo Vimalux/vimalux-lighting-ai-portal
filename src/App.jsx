@@ -26,6 +26,7 @@ import {
   supabaseConfigured,
 } from "./supabase.js";
 import "./styles.css";
+import "./disabled-fields.css";
 import "./auth.css";
 import "./import.css";
 import "./importMode.css";
@@ -624,7 +625,7 @@ function setPath(object, path, value) {
   cursor[path.at(-1)] = value;
   return migrateProject(copy);
 }
-function NumericInput({ value, onChange, placeholder }) {
+function NumericInput({ value, onChange, placeholder, disabled = false }) {
   const [draft, setDraft] = useState(value == null ? "" : String(value));
   useEffect(() => setDraft(value == null ? "" : String(value)), [value]);
   return (
@@ -632,23 +633,25 @@ function NumericInput({ value, onChange, placeholder }) {
       inputMode="decimal"
       value={draft}
       placeholder={placeholder}
+      disabled={disabled}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => onChange(draft)}
     />
   );
 }
-const Field = ({ label, value, onChange, type = "text", children }) => (
-  <label>
+const Field = ({ label, value, onChange, type = "text", children, disabled = false }) => (
+  <label className={disabled ? "field-disabled" : ""}>
     <span>{label}</span>
     {children ? (
-      <select value={value} onChange={(e) => onChange(e.target.value)}>
+      <select disabled={disabled} value={value} onChange={(e) => onChange(e.target.value)}>
         {children}
       </select>
     ) : typeof value === "number" ? (
-      <NumericInput value={value} onChange={onChange} />
+      <NumericInput disabled={disabled} value={value} onChange={onChange} />
     ) : (
       <input
         type={type}
+        disabled={disabled}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -1738,6 +1741,10 @@ function Assumptions({ p, update }) {
                   key={k}
                   label={l}
                   value={p.assumptions[k]}
+                  disabled={
+                    !p.solution.powerAidEnabled &&
+                    ["powerAidPercent", "powerAidCustomerFeePercent", "powerAidSupplierSharePercent"].includes(k)
+                  }
                   onChange={(v) => update(["assumptions", k], v)}
                 />
               ))}
