@@ -86,7 +86,9 @@ export function generateCustomerPdf(project, result) {
       [it ? "Potenza LED proposta" : "Proposed LED wattage", proposedWattages],
       [it ? "Ore operative" : "Operating hours", formatNumber(project.assumptions.operatingHours, lang)],
       [it ? "Prezzo energia" : "Energy price", `${formatMoney(project.assumptions.energyPrice, lang, project.project.currency, 2)}/kWh`],
-      [it ? "Periodo contrattuale" : "Contract period", `${project.assumptions.contractYears} ${t("years")}`],
+      [it ? "Profilo dimmer esistente" : "Existing dimming profile", [...new Set(result.groupRows.map((g) => g.existingDimmingProfile === "fixed" ? `Fixed ${formatNumber(g.dimmingPercent, lang, 1)}%${g.existingDimmingNote ? ` (${g.existingDimmingNote})` : ""}` : "None"))].join(", ")],
+      [it ? "Periodo di finanziamento" : "Financing Period", `${result.financingPeriod} ${t("years")}`],
+      [it ? "Periodo accordo servizi" : "Service Agreement Period", `${result.serviceAgreementPeriod} ${t("years")}`],
       [it ? "Tipo di progetto" : "Project type", projectType],
       financed ? [it ? "Tasso di interesse" : "Interest rate", percent(project.assumptions.interestRate)] : null,
       financed ? [it ? "Anticipo cliente" : "Customer upfront payment", money(project.assumptions.upfrontPayment)] : null,
@@ -135,7 +137,7 @@ export function generateCustomerPdf(project, result) {
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 14,
     theme: "striped",
-    body: rows([[t("baseline"), `${formatNumber(result.baselineKwh, lang)} kWh`], [t("final"), `${formatNumber(result.finalKwh, lang)} kWh`], [t("energyReduction"), percent(result.energyReductionPercent)], [it ? "Riduzione CO2" : "CO2 reduction", `${formatNumber(result.co2ReductionKg / 1000, lang, 1)} ${it ? "t/anno" : "t/year"}`], [t("maintenanceSaving"), money(result.maintenanceSaving)], [t("annualOpex"), money(result.totalAnnualOpex)], [t("monthlyPayment"), money(result.monthlyPayment)], [it ? "Pagamento annuo" : "Annual payment", money(result.annualPayment)], [t("npv"), money(result.npv)], [`${t("lifecycle")} - ${result.analysisPeriod} ${t("years")}`, money(result.lifecycleResult)]]),
+    body: rows([[it ? "Consumo nominale di sistema" : "Nominal system consumption", `${formatNumber(result.nominalSystemKwh, lang)} kWh`], [it ? "Riduzione dimmer esistente" : "Existing fixed dimming reduction", `${formatNumber(result.existingDimmingSavingKwh, lang)} kWh`], [t("baseline"), `${formatNumber(result.baselineKwh, lang)} kWh`], [it ? "Consumo LED" : "LED consumption", `${formatNumber(result.ledKwh, lang)} kWh`], [t("ledSaving"), `${formatNumber(result.ledSavingKwh, lang)} kWh`], [t("cloSaving"), `${formatNumber(result.cloSavingKwh, lang)} kWh`], [it ? "Consumo dopo CLO" : "Consumption after CLO", `${formatNumber(result.afterCloKwh, lang)} kWh`], [t("powerSaving"), `${formatNumber(result.powerAidSavingKwh, lang)} kWh`], [t("final"), `${formatNumber(result.finalKwh, lang)} kWh`], [t("energyReduction"), percent(result.energyReductionPercent)], [it ? "Riduzione CO2" : "CO2 reduction", `${formatNumber(result.co2ReductionKg / 1000, lang, 1)} ${it ? "t/anno" : "t/year"}`], [t("maintenanceSaving"), money(result.maintenanceSaving)], [t("annualOpex"), money(result.totalAnnualOpex)], [t("npv"), money(result.npv)], [`${t("lifecycle")} - ${result.analysisPeriod} ${t("years")}`, money(result.lifecycleResult)]]),
     styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.05 },
     columnStyles: { 0: { halign: "left" }, 1: { halign: "right" } },
   });

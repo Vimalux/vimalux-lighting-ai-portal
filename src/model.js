@@ -8,9 +8,9 @@ export const defaultProject = () => ({
   customer: { name: "", province: "", region: "", country: "Italia", contact: "", title: "", email: "", telephone: "" },
   project: { name: "Nuovo progetto", businessCaseId: `BC-${Date.now().toString().slice(-6)}`, consultant: "", date: today(), currency: "EUR" },
   crm: { status: "lead", closingProbability: 25, totalContractValue: null },
-  groups: [{ id: uid(), name: "Gruppo 1", quantity: 100, technology: "SAP", existingWattage: 100, proposedProductId: "led-40", smartAssigned: true, powerAidAssigned: true }],
+  groups: [{ id: uid(), name: "Gruppo 1", quantity: 100, technology: "SAP", existingWattage: 100, existingDimmingProfile: "none", existingDimmingPercent: 0, existingDimmingNote: "", existingDriverType: "non_dimmable", proposedProductId: "led-40", smartAssigned: true, powerAidAssigned: true }],
   solution: { smartEnabled: true, cmsEnabled: true, powerAidEnabled: false, lcuProductId: "lcu-1", gatewayProductId: "gateway-1", gatewayQuantity: 1, antennaProductId: "antenna-1", antennaQuantity: 1, meterProductId: "meter-1", meterQuantity: 1 },
-  assumptions: { operatingHours: 4200, energyPrice: .25, sapFactor: 1.2, mhFactor: 1.15, mercuryFactor: 1.15, co2KgPerKwh: .233, cloPercent: 10, powerAidPercent: 40, powerAidSharePercent: 20, existingMaintenance: 25, newMaintenance: 5, financingModel: "cash", dealType: "cash", contractYears: 10, financingYears: 10, rateProfileId: "custom", interestRate: 5, interestRateSnapshot: { profileId: "custom", annualRate: 5, capturedAt: null }, allInclusiveAnnualPayment: 0, officialOfferCapex: 0, officialAnnualOpex: 0, upfrontPayment: 0, energyEscalation: 2, opexEscalation: 2, discountRate: 5, analysisPeriod: 20, freightCostPerLamp: 4, freightSalesPerLamp: 6, commissionPercent: 0, warrantyReservePercent: 0, fundingCostPercent: 0, otherDirectCosts: 0, minimumMarginPercent: 30 },
+  assumptions: { operatingHours: 4200, energyPrice: .25, sapFactor: 1.2, mhFactor: 1.15, mercuryFactor: 1.15, co2KgPerKwh: .233, cloPercent: 10, powerAidPercent: 40, powerAidCustomerFeePercent: 30, powerAidSupplierSharePercent: 70, existingMaintenance: 25, newMaintenance: 5, financingModel: "cash", dealType: "cash", financingPeriod: 5, serviceAgreementPeriod: 10, analysisPeriod: 20, contractYears: 10, financingYears: 5, rateProfileId: "custom", interestRate: 5, interestRateSnapshot: { profileId: "custom", annualRate: 5, capturedAt: null }, allInclusiveAnnualPayment: 0, officialOfferCapex: 0, officialAnnualOpex: 0, upfrontPayment: 0, energyEscalation: 2, opexEscalation: 2, discountRate: 5, freightCostPerLamp: 4, freightSalesPerLamp: 6, commissionPercent: 0, warrantyReservePercent: 0, fundingCostPercent: 0, otherDirectCosts: 0, minimumMarginPercent: 30 },
   pricing: { overrides: {} },
   catalogue: {
     led: [{ id: "led-40", brand: "VIMALUX", name: "VIMA LED 40", wattage: 40, lumen: 6000, costPrice: 90, salesPrice: 150, active: true }, { id: "led-70", brand: "VIMALUX", name: "VIMA LED 70", wattage: 70, lumen: 10500, costPrice: 125, salesPrice: 210, active: true }],
@@ -38,10 +38,18 @@ export function migrateProject(saved) {
   project.language = ["it", "en", "da"].includes(project.language) ? project.language : "it";
   project.groups = (Array.isArray(project.groups) ? project.groups : [])
     .filter((group) => !isImportedTotalGroup(group))
-    .map((g) => ({ ...g, id: g.id || uid() }));
+    .map((g) => ({ existingDimmingProfile: "none", existingDimmingPercent: 0, existingDimmingNote: "", existingDriverType: "non_dimmable", ...g, id: g.id || uid() }));
   const legacyDealType = project.assumptions.financingModel === "finance" ? "finance" : ["laas", "ppp"].includes(project.assumptions.financingModel) ? "noleggio_operativo" : "cash";
   project.assumptions.dealType = ["cash", "noleggio_operativo", "finance"].includes(saved?.assumptions?.dealType) ? saved.assumptions.dealType : legacyDealType;
-  project.assumptions.financingYears = Math.max(1, Math.round(numberValue(project.assumptions.financingYears || project.assumptions.contractYears)));
+  const legacyContractYears = numberValue(saved?.assumptions?.contractYears ?? saved?.assumptions?.years);
+  const savedFinancingPeriod = numberValue(saved?.assumptions?.financingPeriod);
+  const savedServicePeriod = numberValue(saved?.assumptions?.serviceAgreementPeriod);
+  project.assumptions.financingPeriod = Math.max(1, Math.round((savedFinancingPeriod !== 5 ? savedFinancingPeriod : numberValue(saved?.assumptions?.financingYears)) || legacyContractYears || 5));
+  project.assumptions.serviceAgreementPeriod = Math.max(1, Math.round((savedServicePeriod !== 10 ? savedServicePeriod : legacyContractYears) || 10));
+  project.assumptions.analysisPeriod = Math.max(1, Math.round(numberValue(saved?.assumptions?.analysisPeriod) || Math.max(legacyContractYears, 20)));
+  project.assumptions.financingYears = project.assumptions.financingPeriod;
+  project.assumptions.contractYears = project.assumptions.serviceAgreementPeriod;
+  if (saved?.assumptions?.powerAidCustomerFeePercent == null && saved?.assumptions?.powerAidSharePercent != null) project.assumptions.powerAidCustomerFeePercent = numberValue(saved.assumptions.powerAidSharePercent);
   project.assumptions.rateProfileId = project.assumptions.rateProfileId || "custom";
   project.assumptions.interestRateSnapshot = project.assumptions.interestRateSnapshot || { profileId: project.assumptions.rateProfileId, annualRate: numberValue(project.assumptions.interestRate), capturedAt: null };
   return project;
