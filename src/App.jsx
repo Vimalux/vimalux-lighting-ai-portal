@@ -2547,53 +2547,48 @@ function CustomerValueChart({ p, r, money }) {
     } : { future: row.futureOperatingCost, service: row.servicePayment, payment: row.investmentPayment, saving: row.customerSaving };
     return Object.entries(values).map(([key, value]) => ({ key, value, pct: row.currentOperatingCost ? value / row.currentOperatingCost * 100 : 0 }));
   };
-  const scenarios = [
-    { key: "current", label: it ? "Situazione attuale" : "Current situation", year: null, current: true, cost: first.currentOperatingCost },
-    { key: "contract", label: it ? "Nuova soluzione" : "New solution", parts: segments(first) },
-  ];
   const financingChanges = r.financingPeriod < r.analysisPeriod && rows[r.financingPeriod - 1]?.investmentPayment !== rows[r.financingPeriod]?.investmentPayment;
   const phaseStarts = [...new Set([1, financingChanges ? r.financingPeriod + 1 : null, r.serviceAgreementPeriod + 1].filter((year) => year && year <= r.analysisPeriod))].sort((a, b) => a - b);
   const phases = phaseStarts.map((start, index) => {
     const end = (phaseStarts[index + 1] || r.analysisPeriod + 1) - 1;
     const row = rows[start - 1];
-    return { start, end, row, financing: row.investmentPayment > 0, smart: start <= r.serviceAgreementPeriod };
+    return { start, end, row, financing: row.investmentPayment > 0, smart: start <= r.serviceAgreementPeriod, parts: segments(row) };
   });
   const partLabel = { future: it ? "Costo futuro" : "Future cost", service: "OPEX", payment: it ? "Investimento" : "Investment", saving: it ? "Risparmio cliente" : "Customer saving" };
   return (
     <section className="customer-value-chart">
-      <h3>{it ? "Confronto dei costi annuali - anno 1" : "Annual cost comparison - year 1"}</h3>
-      <p className="chart-intro">{it ? `Le colonne mostrano l'anno 1. La sequenza sottostante mostra l'intero periodo di analisi di ${r.analysisPeriod} anni.` : `The columns show year 1. The timeline below shows the full ${r.analysisPeriod}-year analysis period.`}</p>
-      <div className={`value-summary-plot scenarios-${scenarios.length}`}>
-        {scenarios.map((scenario) => (
-          <div className="value-summary-scenario" key={scenario.key}>
-            <div className="value-summary-bar">
-              {scenario.current ? (
-                <span className="value-current" style={{ height: "100%" }}><b>100%</b><small>{money(scenario.cost)}</small></span>
-              ) : scenario.parts.map((part) => part.value > 0 && (
-                <span key={part.key} className={`value-${part.key}`} style={{ height: `${Math.max(0, part.pct)}%` }} title={`${partLabel[part.key]}: ${money(part.value)}`}>
-                  {part.pct >= 8 && <><b>{Math.round(part.pct)}%</b><small>{money(part.value)}</small></>}
-                </span>
-              ))}
-            </div>
-            <strong>{scenario.label}</strong>
+      <h3>{it ? `Evoluzione dei costi e dei risparmi - ${r.analysisPeriod} anni` : `Cost and savings development - ${r.analysisPeriod} years`}</h3>
+      <p className="chart-intro">{it ? "La larghezza di ogni fase corrisponde alla sua durata. La linea superiore rappresenta il costo annuo attuale." : "Each phase width reflects its duration. The upper line represents the current annual cost."}</p>
+      <div className="value-period-plot">
+        <div className="value-period-current">
+          <div className="value-summary-bar"><span className="value-current" style={{ height: "100%" }}><b>100%</b><small>{money(first.currentOperatingCost)}</small></span></div>
+          <strong>{it ? "Situazione attuale" : "Current situation"}</strong>
+        </div>
+        <div className="value-period-timeline">
+          <div className="value-period-reference">100% · {money(first.currentOperatingCost)} / {it ? "anno" : "year"}</div>
+          <div className="value-period-phases">
+            {phases.map((phase) => (
+              <div className={`value-period-phase ${phase.smart ? "smart-active" : "smart-inactive"}`} style={{ flexGrow: phase.end - phase.start + 1 }} key={phase.start}>
+                <div className="value-summary-bar">
+                  {phase.parts.map((part) => part.value > 0 && (
+                    <span key={part.key} className={`value-${part.key}`} style={{ height: `${Math.max(0, part.pct)}%` }} title={`${partLabel[part.key]}: ${money(part.value)}`}>
+                      {part.pct >= 11 && <><b>{Math.round(part.pct)}%</b><small>{money(part.value)}</small></>}
+                    </span>
+                  ))}
+                </div>
+                <strong>{it ? "Anni" : "Years"} {phase.start}{phase.end > phase.start ? `–${phase.end}` : ""}</strong>
+                <span>{phase.financing ? (it ? "Finanziamento + Smart" : "Financing + Smart") : phase.smart ? (it ? "Smart senza finanziamento" : "Smart without financing") : (it ? "Dopo il contratto Smart" : "After the Smart contract")}</span>
+                <b>{money(phase.row.customerSaving)} / {it ? "anno" : "year"}</b>
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
       </div>
       <div className="value-chart-legend">
         <span><i className="value-future" />{it ? "Costo operativo post-upgrade" : "Post-upgrade operating cost"}</span>
         <span><i className="value-service" />{it ? "OPEX servizi" : "Service OPEX"}</span>
         <span><i className="value-payment" />{it ? "Pagamento contratto / investimento" : "Contract / investment payment"}</span>
         <span><i className="value-saving" />{it ? "Risparmio netto cliente" : "Customer net saving"}</span>
-      </div>
-      <div className="contract-phase-timeline">
-        {phases.map((phase) => (
-          <div className={`contract-phase ${phase.smart ? "smart-active" : "smart-inactive"}`} key={phase.start}>
-            <strong>{it ? "Anni" : "Years"} {phase.start}{phase.end > phase.start ? `–${phase.end}` : ""}</strong>
-            <span>{phase.financing ? (it ? "Finanziamento attivo" : "Financing active") : (it ? "Finanziamento concluso" : "Financing completed")}</span>
-            <span>{phase.smart ? "Smart / CMS attivo" : (it ? "Smart / CMS concluso" : "Smart / CMS ended")}</span>
-            <b>{it ? "Risparmio netto annuo" : "Annual net saving"}: {money(phase.row.customerSaving)}</b>
-          </div>
-        ))}
       </div>
       {r.cmsEnabled && postContract && (
         <div className="smart-continuation-callout">
