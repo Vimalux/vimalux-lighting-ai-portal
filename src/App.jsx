@@ -1914,7 +1914,42 @@ function Kpis({ p, r, t, money, num }) {
     ? p.language === "it"
       ? "Canone Mensile Tutto Incluso"
       : "All-inclusive Monthly Payment"
-    : t("monthlyPayment");
+    : p.language === "it"
+      ? "Rata mensile finanziamento"
+      : "Monthly financing payment";
+  const paymentKpis = allInclusive
+    ? [
+        [paymentLabel, money2(r.monthlyPayment)],
+        [
+          p.language === "it"
+            ? "Canone mensile per apparecchio"
+            : "Monthly payment per luminaire",
+          money2(r.monthlyPayment / luminaires),
+        ],
+      ]
+    : r.dealType === "finance"
+      ? [
+          [paymentLabel, money2(r.financingMonthlyPayment)],
+          [
+            p.language === "it"
+              ? "Rata finanziamento per apparecchio"
+              : "Financing payment per luminaire",
+            money2(r.financingMonthlyPayment / luminaires),
+          ],
+          [
+            p.language === "it"
+              ? "Pagamento cliente mensile totale"
+              : "Total monthly customer payment",
+            money2(r.monthlyPayment),
+          ],
+          [
+            p.language === "it"
+              ? "Pagamento totale per apparecchio"
+              : "Total payment per luminaire",
+            money2(r.monthlyPayment / luminaires),
+          ],
+        ]
+      : [];
   const list = [
     [t("capex"), money(r.totalCapex)],
     [opexLabel, money2(r.totalAnnualOpex / 12)],
@@ -1924,13 +1959,7 @@ function Kpis({ p, r, t, money, num }) {
         : "Monthly OPEX per luminaire",
       money2(r.totalAnnualOpex / 12 / luminaires),
     ],
-    [paymentLabel, money2(r.monthlyPayment)],
-    [
-      p.language === "it"
-        ? "Canone mensile per apparecchio"
-        : "Monthly payment per luminaire",
-      money2(r.monthlyPayment / luminaires),
-    ],
+    ...paymentKpis,
     [t("annualNet"), money(r.customerAnnualNetBenefit)],
     [
       t("payback"),
@@ -1970,8 +1999,11 @@ function Business({ p, r, t, money, num }) {
       ? "Canone annuo tutto incluso"
       : "All-inclusive annual payment"
     : p.language === "it"
-      ? "Pagamento annuo"
-      : "Annual payment";
+      ? "Rata annua finanziamento"
+      : "Annual financing payment";
+  const paymentValue = allInclusive
+    ? r.allInclusiveAnnualPayment
+    : r.financingAnnualPayment;
   const assessmentText =
     p.language === "it"
       ? `La valutazione cliente si basa sul beneficio netto annuo e sul VAN nel periodo di analisi di ${r.analysisPeriod} anni.`
@@ -2051,7 +2083,7 @@ function Business({ p, r, t, money, num }) {
                 r.grossBenefit,
               ],
               [opexLabel, 1, r.totalAnnualOpex],
-              [paymentLabel, 1, r.annualPayment],
+              ...(r.dealType === "cash" ? [] : [[paymentLabel, 1, paymentValue]]),
               [t("annualNet"), 1, r.customerAnnualNetBenefit],
             ]}
           />
