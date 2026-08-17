@@ -189,12 +189,12 @@ export function generateCustomerPdf(project, result) {
   const replacementRows = aggregateReplacementRows(result.groupRows.filter((group) => group.upgradeSelected));
   autoTable(doc, {
     startY: 23,
-    head: [[it ? "Tecnologia esistente" : "Existing technology", it ? "Potenza esistente" : "Existing wattage", it ? "Quantità" : "Quantity", it ? "Nuovo prodotto LED" : "New LED product"]],
-    body: replacementRows.map((row) => [row.technology, `${formatNumber(row.existingWattage, lang)} W`, formatNumber(row.quantity, lang), row.productName]),
+    head: [[it ? "Tecnologia esistente" : "Existing technology", it ? "Potenza esistente" : "Existing wattage", it ? "Quantità" : "Quantity", it ? "Nuovo prodotto LED" : "New LED product", it ? "Potenza impostata" : "Configured wattage"]],
+    body: replacementRows.map((row) => [row.technology, `${formatNumber(row.existingWattage, lang)} W`, formatNumber(row.quantity, lang), row.productName, `${formatNumber(row.configuredLedWattage, lang)} W`]),
     headStyles: { fillColor: [15, 118, 110] },
     styles: { font: "helvetica", fontSize: 8, valign: "middle" },
-    columnStyles: { 0: { halign: "left" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "left" } },
-    didParseCell: alignTableHeaders("left", "right", "right", "left"),
+    columnStyles: { 0: { halign: "left" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "left" }, 4: { halign: "right" } },
+    didParseCell: alignTableHeaders("left", "right", "right", "left", "right"),
   });
 
   if (result.smartEnabled) {

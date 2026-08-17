@@ -8,13 +8,14 @@ export function aggregateReplacementRows(groupRows = []) {
     const technology = text(group.technology) || "-";
     const existingWattage = Number(group.existingWattage) || 0;
     const productName = text(product.name) || "-";
+    const configuredLedWattage = Number(group.configuredLedWattage) || Number(product.wattage) || 0;
     const productKey = text(product.id) || `${productName}|${Number(product.wattage) || 0}`;
-    const key = `${technology}|${existingWattage}|${productKey}`;
+    const key = `${technology}|${existingWattage}|${productKey}|${configuredLedWattage}`;
     const quantity = Number(group.quantity) || 0;
     const current = aggregated.get(key);
 
     if (current) current.quantity += quantity;
-    else aggregated.set(key, { technology, existingWattage, quantity, productName });
+    else aggregated.set(key, { technology, existingWattage, quantity, productName, configuredLedWattage });
   });
 
   return [...aggregated.values()].sort((a, b) =>

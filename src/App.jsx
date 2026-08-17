@@ -57,6 +57,7 @@ const numeric = new Set([
   "existingFullPowerHours",
   "existingReducedHours",
   "existingReducedLoadPercent",
+  "projectLedWattage",
   "wattage",
   "lumen",
   "costPrice",
@@ -775,6 +776,7 @@ function Existing({ p, update, t }) {
           existingWattage: 0,
           upgradeSelected: true,
           proposedProductId: p.catalogue.led[0]?.id || "",
+          projectLedWattage: p.catalogue.led[0]?.wattage || null,
           smartAssigned: true,
           powerAidAssigned: true,
         },
@@ -803,11 +805,12 @@ function Existing({ p, update, t }) {
   ].sort((a, b) => Number(a) - Number(b));
   const applyProduct = () => {
     if (!bulkProduct || !visibleGroups.length) return;
+    const selected = p.catalogue.led.find((product) => product.id === bulkProduct);
     update(
       ["groups"],
       p.groups.map((group) =>
         matchesFilter(group)
-          ? { ...group, proposedProductId: bulkProduct }
+          ? { ...group, proposedProductId: bulkProduct, projectLedWattage: selected?.wattage ?? null }
           : group,
       ),
     );
@@ -971,6 +974,7 @@ function Existing({ p, update, t }) {
                     : "Existing wattage",
                   p.language === "it" ? "Da sostituire" : "Upgrade",
                   p.language === "it" ? "Prodotto LED" : "Proposed LED",
+                  p.language === "it" ? "Potenza impostata" : "Configured wattage",
                   "",
                 ].map((x) => (
                   <th key={x}>{x}</th>
@@ -1033,12 +1037,11 @@ function Existing({ p, update, t }) {
                     <select
                       value={g.proposedProductId}
                       disabled={g.upgradeSelected === false}
-                      onChange={(e) =>
-                        update(
-                          ["groups", i, "proposedProductId"],
-                          e.target.value,
-                        )
-                      }
+                      onChange={(e) => {
+                        const productId = e.target.value;
+                        const product = p.catalogue.led.find((item) => item.id === productId);
+                        update(["groups", i], { ...g, proposedProductId: productId, projectLedWattage: product?.wattage ?? null });
+                      }}
                     >
                       {p.catalogue.led
                         .filter((x) => x.active)
@@ -1048,6 +1051,16 @@ function Existing({ p, update, t }) {
                           </option>
                         ))}
                     </select>
+                  </td>
+                  <td>
+                    <div className="wattage-input">
+                      <NumericInput
+                        value={g.projectLedWattage ?? p.catalogue.led.find((item) => item.id === g.proposedProductId)?.wattage ?? ""}
+                        disabled={g.upgradeSelected === false}
+                        onChange={(v) => update(["groups", i, "projectLedWattage"], v)}
+                      />
+                      <span>W</span>
+                    </div>
                   </td>
                   <td>
                     <button className="danger" onClick={() => remove(g.id)}>

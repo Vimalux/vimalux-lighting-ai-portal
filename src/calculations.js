@@ -37,7 +37,8 @@ export function calculateBusinessCase(project) {
     const groupExistingDimmingSavingKwh = groupNominalSystemKwh * dimmingPercent / 100;
     const groupBaseline = groupNominalSystemKwh - groupExistingDimmingSavingKwh;
     const upgradeSelected = g.upgradeSelected !== false;
-    const proposedLedKwh = quantity * positive(product.wattage) * positive(a.operatingHours) / 1000;
+    const configuredLedWattage = positive(g.projectLedWattage) || positive(product.wattage);
+    const proposedLedKwh = quantity * configuredLedWattage * positive(a.operatingHours) / 1000;
     const groupLed = upgradeSelected ? proposedLedKwh : groupBaseline;
     const sale = g.projectLedPrice == null ? positive(product.salesPrice) : positive(g.projectLedPrice);
     totalQuantity += quantity;
@@ -52,7 +53,7 @@ export function calculateBusinessCase(project) {
       if (powerAidEnabled) powerAidLedKwh += groupLed;
     }
     nominalSystemKwh += groupNominalSystemKwh; existingDimmingSavingKwh += groupExistingDimmingSavingKwh; baselineKwh += groupBaseline; ledKwh += groupLed; ledCapex += upgradeSelected ? quantity * sale : 0; ledCost += upgradeSelected ? quantity * positive(product.costPrice) : 0;
-    return { ...g, upgradeSelected, quantity, product, systemFactor, existingSystemWattage, effectiveBaselineWattage, dimmingPercent, profileHoursTotal: positive(g.existingFullPowerHours) + positive(g.existingReducedHours), nominalSystemKwh: groupNominalSystemKwh, existingDimmingSavingKwh: groupExistingDimmingSavingKwh, baselineKwh: groupBaseline, proposedLedKwh, ledKwh: groupLed, salesTotal: upgradeSelected ? quantity * sale : 0 };
+    return { ...g, upgradeSelected, quantity, product, configuredLedWattage, systemFactor, existingSystemWattage, effectiveBaselineWattage, dimmingPercent, profileHoursTotal: positive(g.existingFullPowerHours) + positive(g.existingReducedHours), nominalSystemKwh: groupNominalSystemKwh, existingDimmingSavingKwh: groupExistingDimmingSavingKwh, baselineKwh: groupBaseline, proposedLedKwh, ledKwh: groupLed, salesTotal: upgradeSelected ? quantity * sale : 0 };
   });
   const lcuQuantity = smartEnabled ? smartQuantity : 0;
   const cloSavingKwh = cmsEnabled ? smartLedKwh * positive(a.cloPercent) / 100 : 0;
