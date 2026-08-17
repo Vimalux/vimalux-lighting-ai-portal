@@ -237,19 +237,20 @@
 .value-summary-bar small { margin-top: 5px; color: white; font-size: 10px; }
 .value-summary-scenario > strong { font-size: 12px; }
 .value-summary-scenario > small { font-size: 10px; color: #64748b; }
-.value-period-plot { display: grid; grid-template-columns: minmax(130px, 18%) 1fr; gap: 28px; align-items: end; margin-top: 18px; }
-.value-period-current { display: grid; grid-template-rows: 250px auto; gap: 8px; text-align: center; }
+.value-period-plot { display: grid; grid-template-columns: minmax(130px, 18%) 1fr; gap: 28px; align-items: start; margin-top: 18px; }
+.value-period-current { display: grid; grid-template-rows: 180px auto; gap: 8px; padding-top: 25px; text-align: center; }
+.value-period-current .value-summary-bar { height: 180px; }
 .value-period-timeline { min-width: 0; }
 .value-period-reference { padding: 0 0 6px; border-bottom: 2px dashed #64748b; color: #475569; font-size: 11px; font-weight: 700; text-align: right; }
-.value-period-phases { height: 290px; display: flex; align-items: stretch; border-bottom: 2px solid #94a3b8; }
-.value-period-phase { min-width: 0; display: grid; grid-template-rows: 210px auto auto auto; align-content: end; gap: 4px; padding: 0 5px 8px; border-right: 1px solid white; text-align: center; }
+.value-period-phases { height: 250px; display: flex; align-items: stretch; border-bottom: 2px solid #94a3b8; }
+.value-period-phase { min-width: 0; display: grid; grid-template-rows: 180px auto auto auto; align-content: end; gap: 4px; padding: 0 5px 8px; border-right: 1px solid white; text-align: center; }
 .value-period-phase.smart-inactive { background: #fffbeb; }
 .value-period-phase > strong { font-size: 12px; }
 .value-period-phase > span { color: #64748b; font-size: 10px; }
 .value-period-phase > b { color: #0f172a; font-size: 11px; }
-.value-period-phase .value-summary-bar { height: 210px; }
-.value-period-plot .value-summary-bar b { font-size: 12px; }
-.value-period-plot .value-summary-bar small { font-size: 9px; }
+.value-period-phase .value-summary-bar { height: 180px; }
+.value-period-plot .value-summary-bar b { font-size: 10px; }
+.value-period-plot .value-summary-bar small { margin-top: 3px; font-size: 8px; }
 .smart-full-period-note { margin-top: 14px; padding: 13px 16px; border: 1px solid #a7f3d0; border-radius: 8px; background: #ecfdf5; color: #047857; font-size: 13px; font-weight: 700; text-align: center; }
 .contract-phase-timeline { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 20px; }
 .contract-phase { position: relative; display: grid; gap: 7px; padding: 15px; border: 1px solid #cbd5e1; border-top: 5px solid #64748b; border-radius: 9px; background: #fff; }
