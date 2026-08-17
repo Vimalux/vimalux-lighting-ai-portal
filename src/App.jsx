@@ -1803,6 +1803,25 @@ const assumptionGroups = (t) => [
 function Assumptions({ p, r, update }) {
   const t = useT(p.language);
   const type = p.assumptions.dealType || "cash";
+  const [dimmingTechnology, setDimmingTechnology] = useState("ALL");
+  const [dimmingWattage, setDimmingWattage] = useState("ALL");
+  const dimmingTargets = p.groups
+    .map((group, index) => ({ group, index }))
+    .filter(({ group }) => dimmingTechnology === "ALL" || group.technology === dimmingTechnology)
+    .filter(({ group }) => dimmingWattage === "ALL" || String(group.existingWattage) === dimmingWattage);
+  const dimmingWattages = [...new Set(p.groups
+    .filter((group) => dimmingTechnology === "ALL" || group.technology === dimmingTechnology)
+    .map((group) => String(group.existingWattage)))]
+    .sort((a, b) => numberValue(a) - numberValue(b));
+  const applyVisibleDimmingProfile = () => {
+    const source = dimmingTargets[0]?.group;
+    if (!source) return;
+    const keys = ["existingDimmingProfile", "existingDimmingMethod", "existingDimmingPercent", "existingFullPowerHours", "existingReducedHours", "existingReducedLoadPercent", "existingDriverType", "existingDimmingNote"];
+    const targetIndexes = new Set(dimmingTargets.map(({ index }) => index));
+    update(["groups"], p.groups.map((group, index) => targetIndexes.has(index)
+      ? { ...group, ...Object.fromEntries(keys.map((key) => [key, source[key]])), existingSystemFactor: source.existingSystemFactor }
+      : group));
+  };
   return (
     <div className="cards-grid">
       {assumptionGroups(t).map(([title, fields], index) => (
@@ -1875,6 +1894,26 @@ function Assumptions({ p, r, update }) {
             : "Existing baseline & dimming"
         }
       >
+        <div className="dimming-bulk">
+          <label>
+            <span>{p.language === "it" ? "Filtra tecnologia" : "Filter technology"}</span>
+            <select value={dimmingTechnology} onChange={(event) => { setDimmingTechnology(event.target.value); setDimmingWattage("ALL"); }}>
+              <option value="ALL">{p.language === "it" ? "Tutte" : "All"}</option>
+              {[...new Set(p.groups.map((group) => group.technology))].map((technology) => <option key={technology} value={technology}>{technology}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>{p.language === "it" ? "Filtra potenza" : "Filter wattage"}</span>
+            <select value={dimmingWattage} onChange={(event) => setDimmingWattage(event.target.value)}>
+              <option value="ALL">{p.language === "it" ? "Tutte" : "All"}</option>
+              {dimmingWattages.map((wattage) => <option key={wattage} value={wattage}>{wattage} W</option>)}
+            </select>
+          </label>
+          <button className="primary" disabled={!dimmingTargets.length} onClick={applyVisibleDimmingProfile}>
+            {p.language === "it" ? `Applica la prima riga a ${dimmingTargets.length} gruppi` : `Apply first row to ${dimmingTargets.length} groups`}
+          </button>
+          <small>{p.language === "it" ? "La prima riga filtrata viene usata come modello." : "The first filtered row is used as the template."}</small>
+        </div>
         <div className="table-scroll">
           <table>
             <thead>
@@ -1888,7 +1927,7 @@ function Assumptions({ p, r, update }) {
                     : "Annual average reduction %",
                   p.language === "it" ? "Ore piena potenza" : "Full-power hours",
                   p.language === "it" ? "Ore ridotte" : "Reduced hours",
-                  p.language === "it" ? "Potenza ridotta %" : "Reduced load %",
+                  p.language === "it" ? "Livello potenza residua %" : "Remaining power level %",
                   p.language === "it" ? "Riduzione effettiva %" : "Effective reduction %",
                   p.language === "it" ? "Fattore sistema" : "System factor",
                   p.language === "it" ? "Tipo driver" : "Driver type",
@@ -1953,7 +1992,7 @@ function Assumptions({ p, r, update }) {
                     {hoursMismatch && <small>{p.language === "it" ? `Ore totali ${formatNumber(calculated.profileHoursTotal, p.language)} ≠ ${formatNumber(p.assumptions.operatingHours, p.language)}` : `Total hours ${formatNumber(calculated.profileHoursTotal, p.language)} ≠ ${formatNumber(p.assumptions.operatingHours, p.language)}`}</small>}
                   </td>
                   <td>
-                    {g.technology === "OTHER" ? <NumericInput value={g.existingSystemFactor || 1} onChange={(v) => update(["groups", i, "existingSystemFactor"], v)} /> : <span>{formatNumber(calculated.systemFactor || 1, p.language, 2)}×</span>}
+                    <NumericInput value={g.existingSystemFactor || calculated.systemFactor || 1} onChange={(v) => update(["groups", i, "existingSystemFactor"], v)} />
                   </td>
                   <td>
                     <select
@@ -1996,8 +2035,8 @@ function Assumptions({ p, r, update }) {
         </div>
         <p className="hint">
           {p.language === "it"
-            ? "La riduzione media annua è ponderata sull'intero periodo di funzionamento. Nel profilo orario viene calcolata automaticamente da ore ridotte × (100% − potenza ridotta) ÷ ore annue. Il fattore sistema personalizzato è disponibile per la tecnologia OTHER."
-            : "The annual average reduction is weighted across all operating hours. With an hourly profile it is calculated automatically as reduced hours × (100% − reduced load) ÷ annual hours. A custom system factor is available for OTHER technology."}
+            ? "La riduzione media annua è ponderata sull'intero periodo di funzionamento. Il livello di potenza residua indica la potenza utilizzata durante le ore ridotte: 70% significa una riduzione del 30%. Il calcolo è ore ridotte × (100% − livello residuo) ÷ ore annue. Il fattore sistema predefinito può essere sovrascritto per ogni gruppo."
+            : "The annual average reduction is weighted across all operating hours. Remaining power level means the power used during reduced hours: 70% means a 30% reduction. The calculation is reduced hours × (100% − remaining level) ÷ annual hours. The default system factor can be overridden for every group."}
         </p>
       </Card>
     </div>
