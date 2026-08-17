@@ -3,3 +3,6 @@ dist/
 .pnpm-store/
 .npm-cache/
 pnpm-lock.yaml
+
+.vercel
+.playwright-browsers/
