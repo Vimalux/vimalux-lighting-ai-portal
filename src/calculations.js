@@ -46,10 +46,10 @@ export function calculateBusinessCase(project) {
       upgradedBaselineKwh += groupBaseline;
       upgradedLedKwh += proposedLedKwh;
     }
-    if (upgradeSelected && smartEnabled && g.smartAssigned) {
+    if (upgradeSelected && smartEnabled) {
       smartQuantity += quantity;
       smartLedKwh += groupLed;
-      if (powerAidEnabled && g.powerAidAssigned) powerAidLedKwh += groupLed;
+      if (powerAidEnabled) powerAidLedKwh += groupLed;
     }
     nominalSystemKwh += groupNominalSystemKwh; existingDimmingSavingKwh += groupExistingDimmingSavingKwh; baselineKwh += groupBaseline; ledKwh += groupLed; ledCapex += upgradeSelected ? quantity * sale : 0; ledCost += upgradeSelected ? quantity * positive(product.costPrice) : 0;
     return { ...g, upgradeSelected, quantity, product, systemFactor, existingSystemWattage, effectiveBaselineWattage, dimmingPercent, profileHoursTotal: positive(g.existingFullPowerHours) + positive(g.existingReducedHours), nominalSystemKwh: groupNominalSystemKwh, existingDimmingSavingKwh: groupExistingDimmingSavingKwh, baselineKwh: groupBaseline, proposedLedKwh, ledKwh: groupLed, salesTotal: upgradeSelected ? quantity * sale : 0 };
@@ -66,9 +66,14 @@ export function calculateBusinessCase(project) {
   const price = (product, key = "salesPrice") => project.pricing.overrides[product.id]?.[key] ?? positive(product[key]);
   const lcu = getSmart(project.solution.lcuProductId), gateway = getSmart(project.solution.gatewayProductId);
   const antenna = getSmart(project.solution.antennaProductId), meter = getSmart(project.solution.meterProductId);
-  const gatewayQty = smartEnabled && upgradedQuantity > 0 ? positive(project.solution.gatewayQuantity) : 0;
-  const antennaQty = smartEnabled && upgradedQuantity > 0 ? positive(project.solution.antennaQuantity) : 0;
-  const meterQty = smartEnabled && upgradedQuantity > 0 ? positive(project.solution.meterQuantity) : 0;
+  const panelEquipmentEnabled = smartEnabled && upgradedQuantity > 0 && Boolean(
+    project.solution.panelEquipmentEnabled ?? (
+      positive(project.solution.gatewayQuantity) || positive(project.solution.antennaQuantity) || positive(project.solution.meterQuantity)
+    )
+  );
+  const gatewayQty = panelEquipmentEnabled ? positive(project.solution.gatewayQuantity) : 0;
+  const antennaQty = panelEquipmentEnabled ? positive(project.solution.antennaQuantity) : 0;
+  const meterQty = panelEquipmentEnabled ? positive(project.solution.meterQuantity) : 0;
   const smartHardwareCapex = lcuQuantity * price(lcu);
   const implementationCapex = lcuQuantity * price(lcu, "implementationSalesPrice");
   const gatewayCapex = gatewayQty * price(gateway), antennaCapex = antennaQty * price(antenna), meterCapex = meterQty * price(meter);

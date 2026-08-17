@@ -971,8 +971,6 @@ function Existing({ p, update, t }) {
                     : "Existing wattage",
                   p.language === "it" ? "Da sostituire" : "Upgrade",
                   p.language === "it" ? "Prodotto LED" : "Proposed LED",
-                  "Smart Lighting",
-                  "PowerAiD",
                   "",
                 ].map((x) => (
                   <th key={x}>{x}</th>
@@ -1050,36 +1048,6 @@ function Existing({ p, update, t }) {
                           </option>
                         ))}
                     </select>
-                  </td>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={g.smartAssigned}
-                      disabled={g.upgradeSelected === false}
-                      onChange={(e) =>
-                        update(["groups", i, "smartAssigned"], e.target.checked)
-                      }
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={g.powerAidAssigned}
-                      disabled={g.upgradeSelected === false || !p.solution.powerAidEnabled}
-                      title={
-                        p.solution.powerAidEnabled
-                          ? "PowerAiD assigned to this group"
-                          : p.language === "it"
-                            ? "Attivare PowerAiD in Soluzione per abilitare l'assegnazione al gruppo"
-                            : "Enable PowerAiD under Solution to activate group assignment"
-                      }
-                      onChange={(e) =>
-                        update(
-                          ["groups", i, "powerAidAssigned"],
-                          e.target.checked,
-                        )
-                      }
-                    />
                   </td>
                   <td>
                     <button className="danger" onClick={() => remove(g.id)}>
@@ -1391,7 +1359,7 @@ function Solution({ p, r, update, t, money, num }) {
       <Card title={t("solution")}>
         <div className="toggles">
           <Toggle
-            label="Smart Lighting"
+            label={p.language === "it" ? "Smart / apparecchi online" : "Smart / luminaires online"}
             value={p.solution.smartEnabled}
             onChange={setSmartEnabled}
           />
@@ -1414,6 +1382,11 @@ function Solution({ p, r, update, t, money, num }) {
             onChange={(v) => update(["solution", "powerAidEnabled"], v)}
           />
         </div>
+        <p className="hint">
+          {p.language === "it"
+            ? "Una LCU viene inclusa automaticamente per ogni apparecchio selezionato per l'upgrade. I gateway necessari alla rete Mesh sono inclusi nel prezzo della LCU."
+            : "One LCU is included automatically for every luminaire selected for upgrade. Gateways required for the Mesh network are included in the LCU price."}
+        </p>
         <div className="form-grid">
           <ProductSelect
             label="LCU"
@@ -1422,48 +1395,29 @@ function Solution({ p, r, update, t, money, num }) {
             value={p.solution.lcuProductId}
             onChange={(v) => update(["solution", "lcuProductId"], v)}
           />
-          <ProductSelect
-            label="Gateway"
-            type="Gateway"
-            p={p}
-            value={p.solution.gatewayProductId}
-            onChange={(v) => update(["solution", "gatewayProductId"], v)}
+        </div>
+        <div className="optional-equipment">
+          <Toggle
+            label={p.language === "it" ? "Apparecchiature aggiuntive nei quadri (opzionale)" : "Additional panel equipment (optional)"}
+            value={Boolean(p.solution.panelEquipmentEnabled)}
+            disabled={!p.solution.smartEnabled}
+            onChange={(v) => update(["solution", "panelEquipmentEnabled"], v)}
           />
-          <Field
-            label={
-              p.language === "it" ? "Quantità gateway" : "Gateway quantity"
-            }
-            value={p.solution.gatewayQuantity}
-            onChange={(v) => update(["solution", "gatewayQuantity"], v)}
-          />
-          <ProductSelect
-            label="Antenna"
-            type="Antenna"
-            p={p}
-            value={p.solution.antennaProductId}
-            onChange={(v) => update(["solution", "antennaProductId"], v)}
-          />
-          <Field
-            label={
-              p.language === "it" ? "Quantità antenne" : "Antenna quantity"
-            }
-            value={p.solution.antennaQuantity}
-            onChange={(v) => update(["solution", "antennaQuantity"], v)}
-          />
-          <ProductSelect
-            label={p.language === "it" ? "Contatore" : "Energy meter"}
-            type="Energy Meter"
-            p={p}
-            value={p.solution.meterProductId}
-            onChange={(v) => update(["solution", "meterProductId"], v)}
-          />
-          <Field
-            label={
-              p.language === "it" ? "Quantità contatori" : "Meter quantity"
-            }
-            value={p.solution.meterQuantity}
-            onChange={(v) => update(["solution", "meterQuantity"], v)}
-          />
+          {p.solution.panelEquipmentEnabled && <>
+            <p className="hint">
+              {p.language === "it"
+                ? "Aggiungere qui solo gateway, antenne o contatori installati nei quadri elettrici. Non inserire i gateway Mesh già inclusi nella LCU."
+                : "Add only gateways, antennas or meters installed in electrical panels. Do not enter Mesh gateways already included with the LCU."}
+            </p>
+            <div className="form-grid">
+              <ProductSelect label="Gateway" type="Gateway" p={p} value={p.solution.gatewayProductId} onChange={(v) => update(["solution", "gatewayProductId"], v)} />
+              <Field label={p.language === "it" ? "Quantità gateway nei quadri" : "Panel gateway quantity"} value={p.solution.gatewayQuantity} onChange={(v) => update(["solution", "gatewayQuantity"], v)} />
+              <ProductSelect label="Antenna" type="Antenna" p={p} value={p.solution.antennaProductId} onChange={(v) => update(["solution", "antennaProductId"], v)} />
+              <Field label={p.language === "it" ? "Quantità antenne nei quadri" : "Panel antenna quantity"} value={p.solution.antennaQuantity} onChange={(v) => update(["solution", "antennaQuantity"], v)} />
+              <ProductSelect label={p.language === "it" ? "Contatore / connettore" : "Meter / connector"} type="Energy Meter" p={p} value={p.solution.meterProductId} onChange={(v) => update(["solution", "meterProductId"], v)} />
+              <Field label={p.language === "it" ? "Quantità contatori / connettori" : "Meter / connector quantity"} value={p.solution.meterQuantity} onChange={(v) => update(["solution", "meterQuantity"], v)} />
+            </div>
+          </>}
         </div>
       </Card>
       <Card
@@ -1509,8 +1463,8 @@ function Solution({ p, r, update, t, money, num }) {
           </strong>
           <span>
             {p.language === "it"
-              ? "Calcolata dalle assegnazioni Smart Lighting"
-              : "Calculated from Smart Lighting assignments"}
+              ? "Una per ogni apparecchio online selezionato per l'upgrade"
+              : "One per online luminaire selected for upgrade"}
           </span>
         </div>
         <Breakdown

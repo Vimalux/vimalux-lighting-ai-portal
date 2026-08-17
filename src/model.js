@@ -9,7 +9,7 @@ export const defaultProject = () => ({
   project: { name: "Nuovo progetto", businessCaseId: `BC-${Date.now().toString().slice(-6)}`, consultant: "", date: today(), currency: "EUR" },
   crm: { status: "lead", closingProbability: 25, totalContractValue: null },
   groups: [{ id: uid(), name: "Gruppo 1", quantity: 100, technology: "SAP", existingWattage: 100, existingSystemFactor: 0, existingDimmingProfile: "none", existingDimmingMethod: "average", existingDimmingPercent: 0, existingFullPowerHours: 0, existingReducedHours: 0, existingReducedLoadPercent: 100, existingDimmingNote: "", existingDriverType: "non_dimmable", upgradeSelected: true, proposedProductId: "led-40", smartAssigned: true, powerAidAssigned: true }],
-  solution: { smartEnabled: true, cmsEnabled: true, powerAidEnabled: false, lcuProductId: "lcu-1", gatewayProductId: "gateway-1", gatewayQuantity: 1, antennaProductId: "antenna-1", antennaQuantity: 1, meterProductId: "meter-1", meterQuantity: 1 },
+  solution: { smartEnabled: true, cmsEnabled: true, powerAidEnabled: false, lcuProductId: "lcu-1", panelEquipmentEnabled: false, gatewayProductId: "gateway-1", gatewayQuantity: 0, antennaProductId: "antenna-1", antennaQuantity: 0, meterProductId: "meter-1", meterQuantity: 0 },
   assumptions: { operatingHours: 4200, energyPrice: .25, sapFactor: 1.2, mhFactor: 1.15, mercuryFactor: 1.15, co2KgPerKwh: .233, cloPercent: 10, powerAidPercent: 40, powerAidCustomerFeePercent: 30, powerAidSupplierSharePercent: 70, existingMaintenance: 25, newMaintenance: 5, financingModel: "cash", dealType: "cash", financingPeriod: 5, serviceAgreementPeriod: 10, analysisPeriod: 20, contractYears: 10, financingYears: 5, rateProfileId: "custom", interestRate: 5, interestRateSnapshot: { profileId: "custom", annualRate: 5, capturedAt: null }, allInclusiveAnnualPayment: 0, officialOfferCapex: 0, officialAnnualOpex: 0, upfrontPayment: 0, energyEscalation: 2, opexEscalation: 2, discountRate: 5, freightCostPerLamp: 4, freightSalesPerLamp: 6, dutyCost: 0, commissionPercent: 0, agent1Name: "", agent1CommissionPercent: 0, agent2Name: "", agent2CommissionPercent: 0, warrantyReservePercent: 0, fundingCostPercent: 0, otherDirectCosts: 0, minimumMarginPercent: 30 },
   pricing: { overrides: {} },
   catalogue: {
@@ -51,6 +51,10 @@ export function migrateProject(saved) {
   project.assumptions.contractYears = project.assumptions.serviceAgreementPeriod;
   if (!project.solution.smartEnabled) project.solution.cmsEnabled = false;
   if (!project.solution.smartEnabled || !project.solution.cmsEnabled) project.solution.powerAidEnabled = false;
+  if (saved?.solution?.panelEquipmentEnabled == null) {
+    project.solution.panelEquipmentEnabled = ["gatewayQuantity", "antennaQuantity", "meterQuantity"]
+      .some((key) => numberValue(saved?.solution?.[key]) > 0);
+  }
   if (saved?.assumptions?.powerAidCustomerFeePercent == null && saved?.assumptions?.powerAidSharePercent != null) project.assumptions.powerAidCustomerFeePercent = numberValue(saved.assumptions.powerAidSharePercent);
   if (saved?.assumptions?.agent1CommissionPercent == null && saved?.assumptions?.commissionPercent != null) project.assumptions.agent1CommissionPercent = numberValue(saved.assumptions.commissionPercent);
   project.assumptions.rateProfileId = project.assumptions.rateProfileId || "custom";
