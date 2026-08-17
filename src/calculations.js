@@ -82,6 +82,8 @@ export function calculateBusinessCase(project) {
   const gatewayRecurringCost = smartEnabled ? gatewayQty * positive(gateway.annualCost) : 0;
   const annualOpexDirectCost = cmsDirectCost + gatewayRecurringCost;
   const totalAnnualOpex = annualRecurringRevenue;
+  const fixedAnnualOpex = Math.max(0, totalAnnualOpex - powerAidCustomerFee);
+  const powerAidCustomerNetBenefit = Math.max(0, powerAidGrossSaving - powerAidCustomerFee);
   const maintenanceSaving = totalQuantity * Math.max(0, positive(a.existingMaintenance) - positive(a.newMaintenance));
   const grossBenefit = energySaving + maintenanceSaving;
   const legacyDealType = a.financingModel === "finance" ? "finance" : ["laas", "ppp"].includes(a.financingModel) ? "noleggio_operativo" : "cash";
@@ -104,7 +106,7 @@ export function calculateBusinessCase(project) {
   const customerAnnualNetBenefit = grossBenefit - customerAnnualPayment;
   const escalatingTotal = (annual, rate, years = serviceAgreementPeriod) => Array.from({ length: years }, (_, index) => annual * Math.pow(1 + n(rate) / 100, index)).reduce((sum, value) => sum + value, 0);
   const financedHardwareTotal = positive(a.upfrontPayment) + financingAnnualPayment * financingYears;
-  const fixedAnnualServiceRevenue = Math.max(0, totalAnnualOpex - powerAidCustomerFee);
+  const fixedAnnualServiceRevenue = fixedAnnualOpex;
   const powerAidContractRevenue = Array.from({ length: serviceAgreementPeriod }, (_, index) => powerAidCustomerFee * Math.pow(1 + n(a.energyEscalation) / 100, index)).reduce((sum, value) => sum + value, 0);
   const contractOpexRevenue = dealType === "noleggio_operativo" ? 0 : escalatingTotal(fixedAnnualServiceRevenue, a.opexEscalation) + powerAidContractRevenue;
   const powerAidSupplierContractCost = Array.from({ length: serviceAgreementPeriod }, (_, index) => powerAidSupplierCost * Math.pow(1 + n(a.energyEscalation) / 100, index)).reduce((sum, value) => sum + value, 0);
@@ -157,7 +159,7 @@ export function calculateBusinessCase(project) {
   const decisionStatus = netProjectMarginPercent >= minimumMarginPercent && customerDecisionStatus === "GO" ? "GO" : netProjectMarginPercent >= 20 && customerDecisionStatus !== "NO_GO" ? "REVIEW" : "NO_GO";
   return { totalQuantity, smartQuantity, lcuQuantity, nominalSystemKwh, existingDimmingSavingKwh, baselineKwh, ledKwh, ledSavingKwh, cloSavingKwh, afterCloKwh, powerAidSavingKwh, finalKwh,
     ledCapex, ledCost, smartHardwareCapex, implementationCapex, gatewayCapex, antennaCapex, meterCapex, freight, calculatedCapex, totalCapex, calculatedAnnualRecurringRevenue,
-    cmsOpex: cmsRevenue, cmsRevenue, gatewayOpex: gatewayRecurringRevenue, gatewayRecurringRevenue, powerAidFee: powerAidCustomerFee, powerAidGrossSavingEUR: powerAidGrossSaving, powerAidCustomerFee, powerAidSupplierCost, powerAidVimaluxMargin, powerAidMarginPct, savingsAsAServiceRevenue, recurringOpex, annualRecurringRevenue, cmsDirectCost, gatewayRecurringCost, totalAnnualOpex, energySaving, maintenanceSaving, grossBenefit, monthlyPayment, annualPayment,
+    cmsOpex: cmsRevenue, cmsRevenue, gatewayOpex: gatewayRecurringRevenue, gatewayRecurringRevenue, powerAidFee: powerAidCustomerFee, powerAidGrossSavingEUR: powerAidGrossSaving, powerAidCustomerFee, powerAidCustomerNetBenefit, powerAidSupplierCost, powerAidVimaluxMargin, powerAidMarginPct, savingsAsAServiceRevenue, recurringOpex, annualRecurringRevenue, fixedAnnualOpex, cmsDirectCost, gatewayRecurringCost, totalAnnualOpex, energySaving, energySavingWithoutPowerAid: energySaving - powerAidGrossSaving, maintenanceSaving, grossBenefit, monthlyPayment, annualPayment,
     dealType, financingYears, financingPeriod, serviceAgreementPeriod, interestRateSnapshot: a.interestRateSnapshot || null, financingMonthlyPayment, financingAnnualPayment, allInclusiveAnnualPayment, allInclusiveContractRevenue, customerAnnualPayment, customerMonthlyPayment: monthlyPayment, customerPaymentYear1: dealType === "cash" ? totalCapex + totalAnnualOpex : positive(a.upfrontPayment) + customerAnnualPayment,
     customerAnnualNetBenefit, payback, roiPercent, npv, lifecycleResult, analysisPeriod, energyReductionPercent, co2ReductionKg, decisionStatus, customerDecisionStatus,
     smartHardwareCost, implementationCost, gatewayCost, antennaCost, meterCost, freightCost, capexDirectCost, annualOpexDirectCost, contractOpexRevenue, contractOpexCost, capexContractRevenue, totalContractRevenue, commissionCost, warrantyReserve, financingCost, totalDirectCosts, netProjectProfit, netProjectMarginPercent, minimumMarginPercent,
