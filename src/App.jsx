@@ -1955,9 +1955,9 @@ function Kpis({ p, r, t, money, num }) {
     [opexLabel, money2(r.totalAnnualOpex / 12)],
     [
       p.language === "it"
-        ? "OPEX mensile per apparecchio"
-        : "Monthly OPEX per luminaire",
-      money2(r.totalAnnualOpex / 12 / luminaires),
+        ? "OPEX annuo per apparecchio"
+        : "Annual OPEX per luminaire",
+      money2(r.totalAnnualOpex / luminaires),
     ],
     ...paymentKpis,
     [t("annualNet"), money(r.customerAnnualNetBenefit)],
