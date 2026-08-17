@@ -129,12 +129,16 @@ export function calculateBusinessCase(project) {
   const capexContractRevenue = dealType === "cash" ? totalCapex : dealType === "finance" ? financedHardwareTotal : 0;
   const allInclusiveContractRevenue = dealType === "noleggio_operativo" ? positive(a.upfrontPayment) + allInclusiveAnnualPayment * contractYears : 0;
   const totalContractRevenue = dealType === "noleggio_operativo" ? allInclusiveContractRevenue : capexContractRevenue + contractOpexRevenue;
-  const commissionCost = totalContractRevenue * positive(a.commissionPercent) / 100;
+  const dutyCost = positive(a.dutyCost);
+  const commissionableLampSales = Math.max(0, ledCapex - freightCost - dutyCost);
+  const agent1CommissionCost = commissionableLampSales * positive(a.agent1CommissionPercent) / 100;
+  const agent2CommissionCost = commissionableLampSales * positive(a.agent2CommissionPercent) / 100;
+  const commissionCost = agent1CommissionCost + agent2CommissionCost;
   const warrantyReserve = totalCapex * positive(a.warrantyReservePercent) / 100;
   const fundingRate = positive(a.fundingCostPercent) / 1200;
   const fundingPayment = hardwareFinanced ? (fundingRate ? principal * fundingRate / (1 - Math.pow(1 + fundingRate, -months)) : principal / months) : 0;
   const financingCost = hardwareFinanced ? Math.max(0, fundingPayment * months - principal) : 0;
-  const totalDirectCosts = capexDirectCost + contractOpexCost + commissionCost + warrantyReserve + financingCost + positive(a.otherDirectCosts);
+  const totalDirectCosts = capexDirectCost + dutyCost + contractOpexCost + commissionCost + warrantyReserve + financingCost + positive(a.otherDirectCosts);
   const netProjectProfit = totalContractRevenue - totalDirectCosts;
   const netProjectMarginPercent = totalContractRevenue ? netProjectProfit / totalContractRevenue * 100 : 0;
   const analysisPeriod = Math.max(1, Math.round(positive(a.analysisPeriod)));
@@ -178,6 +182,6 @@ export function calculateBusinessCase(project) {
     cmsOpex: cmsRevenue, cmsRevenue, gatewayOpex: gatewayRecurringRevenue, gatewayRecurringRevenue, powerAidFee: powerAidCustomerFee, powerAidGrossSavingEUR: powerAidGrossSaving, powerAidCustomerFee, powerAidCustomerNetBenefit, powerAidSupplierCost, powerAidVimaluxMargin, powerAidMarginPct, savingsAsAServiceRevenue, recurringOpex, annualRecurringRevenue, fixedAnnualOpex, cmsDirectCost, gatewayRecurringCost, totalAnnualOpex, energySaving, energySavingWithoutPowerAid: energySaving - powerAidGrossSaving, maintenanceSaving, grossBenefit, monthlyPayment, annualPayment,
     dealType, financingYears, financingPeriod, serviceAgreementPeriod, interestRateSnapshot: a.interestRateSnapshot || null, financingMonthlyPayment, financingAnnualPayment, allInclusiveAnnualPayment, allInclusiveContractRevenue, customerAnnualPayment, customerMonthlyPayment: monthlyPayment, customerPaymentYear1: dealType === "cash" ? totalCapex + totalAnnualOpex : positive(a.upfrontPayment) + customerAnnualPayment,
     customerAnnualNetBenefit, payback, roiPercent, npv, lifecycleResult, analysisPeriod, energyReductionPercent, upgradedEnergyReductionPercent, co2ReductionKg, decisionStatus, customerDecisionStatus,
-    smartHardwareCost, implementationCost, gatewayCost, antennaCost, meterCost, freightCost, capexDirectCost, annualOpexDirectCost, contractOpexRevenue, contractOpexCost, capexContractRevenue, totalContractRevenue, commissionCost, warrantyReserve, financingCost, totalDirectCosts, netProjectProfit, netProjectMarginPercent, minimumMarginPercent,
+    smartHardwareCost, implementationCost, gatewayCost, antennaCost, meterCost, freightCost, dutyCost, capexDirectCost, annualOpexDirectCost, contractOpexRevenue, contractOpexCost, capexContractRevenue, totalContractRevenue, commissionableLampSales, agent1CommissionCost, agent2CommissionCost, commissionCost, warrantyReserve, financingCost, totalDirectCosts, netProjectProfit, netProjectMarginPercent, minimumMarginPercent,
     cashFlowRows, groupRows, hardware: { lcu, gateway, antenna, meter, gatewayQty, antennaQty, meterQty }, powerAidEnabled, cmsEnabled, smartEnabled };
 }

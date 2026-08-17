@@ -92,6 +92,9 @@ const numeric = new Set([
   "freightCostPerLamp",
   "freightSalesPerLamp",
   "commissionPercent",
+  "agent1CommissionPercent",
+  "agent2CommissionPercent",
+  "dutyCost",
   "warrantyReservePercent",
   "fundingCostPercent",
   "otherDirectCosts",
@@ -2300,9 +2303,22 @@ function InternalReport({ p, r, update, money }) {
   const pct = (v) => formatPercent(v, p.language);
   const fields = [
     [
-      "commissionPercent",
-      it ? "Commissioni di vendita (%)" : "Sales commission (%)",
+      "agent1Name",
+      it ? "Agente / consulente 1" : "Agent / consultant 1",
     ],
+    [
+      "agent1CommissionPercent",
+      it ? "Commissione agente 1 (%)" : "Agent 1 commission (%)",
+    ],
+    [
+      "agent2Name",
+      it ? "Agente / consulente 2" : "Agent / consultant 2",
+    ],
+    [
+      "agent2CommissionPercent",
+      it ? "Commissione agente 2 (%)" : "Agent 2 commission (%)",
+    ],
+    ["dutyCost", it ? "Duty / dazi (€)" : "Duty (€)"],
     [
       "warrantyReservePercent",
       it ? "Riserva garanzia (%)" : "Warranty reserve (%)",
@@ -2320,7 +2336,16 @@ function InternalReport({ p, r, update, money }) {
       r.capexDirectCost,
     ],
     [it ? "OPEX del contratto" : "Contract OPEX", r.contractOpexCost],
-    [it ? "Commissioni" : "Commissions", r.commissionCost],
+    [it ? "Duty / dazi" : "Duty", r.dutyCost],
+    [
+      `${p.assumptions.agent1Name || (it ? "Agente 1" : "Agent 1")} · ${pct(p.assumptions.agent1CommissionPercent)}`,
+      r.agent1CommissionCost,
+    ],
+    [
+      `${p.assumptions.agent2Name || (it ? "Agente 2" : "Agent 2")} · ${pct(p.assumptions.agent2CommissionPercent)}`,
+      r.agent2CommissionCost,
+    ],
+    [it ? "Commissioni totali" : "Total commissions", r.commissionCost],
     [it ? "Riserva garanzia" : "Warranty reserve", r.warrantyReserve],
     [it ? "Costo finanziamento" : "Financing cost", r.financingCost],
     [
@@ -2387,6 +2412,12 @@ function InternalReport({ p, r, update, money }) {
                 onChange={(value) => update(["assumptions", key], value)}
               />
             ))}
+          </div>
+          <div className="commission-basis">
+            <div><span>{it ? "Vendita lampade LED" : "LED luminaire sales"}</span><strong>{money(r.ledCapex)}</strong></div>
+            <div><span>{it ? "Meno trasporto" : "Less freight"}</span><strong>− {money(r.freightCost)}</strong></div>
+            <div><span>{it ? "Meno duty / dazi" : "Less duty"}</span><strong>− {money(r.dutyCost)}</strong></div>
+            <div className="commission-basis-total"><span>{it ? "Base commissionabile" : "Commissionable base"}</span><strong>{money(r.commissionableLampSales)}</strong></div>
           </div>
           <p className="hint">
             {it
