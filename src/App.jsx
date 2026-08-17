@@ -676,11 +676,12 @@ const Field = ({ label, value, onChange, type = "text", children, disabled = fal
     )}
   </label>
 );
-const Toggle = ({ label, value, onChange }) => (
-  <label className="toggle">
+const Toggle = ({ label, value, onChange, disabled = false, title = "" }) => (
+  <label className={`toggle ${disabled ? "field-disabled" : ""}`} title={title}>
     <input
       type="checkbox"
       checked={Boolean(value)}
+      disabled={disabled}
       onChange={(e) => onChange(e.target.checked)}
     />
     <span>{label}</span>
@@ -1334,6 +1335,23 @@ function Solution({ p, r, update, t, money, num }) {
       r.meterCapex,
     ] : null,
   ].filter(Boolean);
+  const smartCapex =
+    r.smartHardwareCapex +
+    r.implementationCapex +
+    r.gatewayCapex +
+    r.antennaCapex +
+    r.meterCapex;
+  const setSmartEnabled = (enabled) => {
+    update(["solution", "smartEnabled"], enabled);
+    if (!enabled) {
+      update(["solution", "cmsEnabled"], false);
+      update(["solution", "powerAidEnabled"], false);
+    }
+  };
+  const setCmsEnabled = (enabled) => {
+    update(["solution", "cmsEnabled"], enabled);
+    if (!enabled) update(["solution", "powerAidEnabled"], false);
+  };
   return (
     <div className="two-col">
       <Card title={t("solution")}>
@@ -1341,16 +1359,24 @@ function Solution({ p, r, update, t, money, num }) {
           <Toggle
             label="Smart Lighting"
             value={p.solution.smartEnabled}
-            onChange={(v) => update(["solution", "smartEnabled"], v)}
+            onChange={setSmartEnabled}
           />
           <Toggle
             label="CMS"
             value={p.solution.cmsEnabled}
-            onChange={(v) => update(["solution", "cmsEnabled"], v)}
+            disabled={!p.solution.smartEnabled}
+            title={!p.solution.smartEnabled ? "Smart Lighting is required for CMS" : ""}
+            onChange={setCmsEnabled}
           />
           <Toggle
             label="PowerAiD"
             value={p.solution.powerAidEnabled}
+            disabled={!p.solution.smartEnabled || !p.solution.cmsEnabled}
+            title={
+              !p.solution.smartEnabled || !p.solution.cmsEnabled
+                ? "Smart Lighting and CMS are required for PowerAiD"
+                : ""
+            }
             onChange={(v) => update(["solution", "powerAidEnabled"], v)}
           />
         </div>
@@ -1425,6 +1451,12 @@ function Solution({ p, r, update, t, money, num }) {
           money={money}
           number={num}
         />
+        <div className="summary-line">
+          <span>
+            {p.language === "it" ? "Subtotale LED" : "LED subtotal"} · {num(r.totalQuantity)} {t("units")}
+          </span>
+          <strong>{money(r.ledCapex)}</strong>
+        </div>
         {r.smartEnabled && <><p className="hint">
           <strong>Smart Lighting</strong>
         </p><div className="lcu-callout">
@@ -1446,7 +1478,23 @@ function Solution({ p, r, update, t, money, num }) {
           rows={smartRows}
           money={money}
           number={num}
-        /></>}
+        />
+        <div className="summary-line">
+          <span>{p.language === "it" ? "Subtotale CAPEX Smart" : "Smart CAPEX subtotal"}</span>
+          <strong>{money(smartCapex)}</strong>
+        </div></>}
+        {r.freight > 0 && <div className="summary-line">
+          <span>{p.language === "it" ? "Trasporto" : "Freight"}</span>
+          <strong>{money(r.freight)}</strong>
+        </div>}
+        <div className="summary-line">
+          <span>{t("capex")}</span>
+          <strong>{money(r.totalCapex)}</strong>
+        </div>
+        <div className="summary-line">
+          <span>{p.language === "it" ? "OPEX annuo" : "Annual OPEX"}</span>
+          <strong>{money(r.totalAnnualOpex)}</strong>
+        </div>
       </Card>
     </div>
   );
@@ -1560,9 +1608,10 @@ function Pricing({ p, r, update, t, money }) {
     ),
     {
       id: "poweraid",
-      label: it ? "Fee cliente PowerAiD" : "PowerAiD customer fee",
+      label: it ? "Fee cliente PowerAiD (% risparmio incrementale)" : "PowerAiD customer fee (% incremental saving)",
       q: 1,
-      cost: 0,
+      cost: p.assumptions.powerAidSupplierSharePercent,
+      costTotal: r.powerAidSupplierCost,
       cat: p.assumptions.powerAidCustomerFeePercent,
       total: r.powerAidCustomerFee,
       assumptionKey: "powerAidCustomerFeePercent",
@@ -1625,7 +1674,7 @@ function Pricing({ p, r, update, t, money }) {
           <tbody>
             {rows.map((x, i) => {
               const sale = x.q ? x.total / x.q : 0,
-                margin = x.total - x.q * (x.cost || 0);
+                margin = x.total - (x.costTotal ?? x.q * (x.cost || 0));
               const override = x.productId
                 ? p.pricing.overrides[x.productId]?.[x.key]
                 : x.assumptionKey
@@ -1640,7 +1689,11 @@ function Pricing({ p, r, update, t, money }) {
                       ? formatPercent(x.cat, p.language)
                       : money(x.cat)}
                   </td>
-                  <td>{x.percent ? "-" : money(x.cost)}</td>
+                  <td>
+                    {x.percent
+                      ? formatPercent(x.cost, p.language)
+                      : money(x.cost)}
+                  </td>
                   <td>
                     {x.groupIndex != null ? (
                       <NumericInput
@@ -2222,6 +2275,27 @@ function InternalReport({ p, r, update, money }) {
           </div>
         </Card>
       </div>
+      {r.powerAidEnabled && (
+        <Card title={it ? "Economia PowerAiD / Felicity" : "PowerAiD / Felicity economics"}>
+          <div className="breakdown">
+            {[
+              [it ? "Risparmio incrementale PowerAiD" : "PowerAiD incremental saving", money(r.powerAidGrossSavingEUR)],
+              [it ? `Fee cliente (${pct(p.assumptions.powerAidCustomerFeePercent)})` : `Customer fee (${pct(p.assumptions.powerAidCustomerFeePercent)})`, money(r.powerAidCustomerFee)],
+              [it ? `Quota Felicity (${pct(p.assumptions.powerAidSupplierSharePercent)} del fee)` : `Felicity share (${pct(p.assumptions.powerAidSupplierSharePercent)} of fee)`, money(r.powerAidSupplierCost)],
+              [it ? "Margine lordo VIMALUX" : "VIMALUX gross margin", money(r.powerAidVimaluxMargin)],
+              [it ? "Margine sul fee cliente" : "Margin on customer fee", pct(r.powerAidMarginPct)],
+              ["ARR PowerAiD", money(r.powerAidCustomerFee)],
+              ["MRR PowerAiD", money(r.powerAidCustomerFee / 12)],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <span>{label}</span>
+                <span></span>
+                <strong>{value}</strong>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </>
   );
 }

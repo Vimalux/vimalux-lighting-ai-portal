@@ -49,6 +49,8 @@ export function migrateProject(saved) {
   project.assumptions.analysisPeriod = Math.max(1, Math.round(numberValue(saved?.assumptions?.analysisPeriod) || Math.max(legacyContractYears, 20)));
   project.assumptions.financingYears = project.assumptions.financingPeriod;
   project.assumptions.contractYears = project.assumptions.serviceAgreementPeriod;
+  if (!project.solution.smartEnabled) project.solution.cmsEnabled = false;
+  if (!project.solution.smartEnabled || !project.solution.cmsEnabled) project.solution.powerAidEnabled = false;
   if (saved?.assumptions?.powerAidCustomerFeePercent == null && saved?.assumptions?.powerAidSharePercent != null) project.assumptions.powerAidCustomerFeePercent = numberValue(saved.assumptions.powerAidSharePercent);
   project.assumptions.rateProfileId = project.assumptions.rateProfileId || "custom";
   project.assumptions.interestRateSnapshot = project.assumptions.interestRateSnapshot || { profileId: project.assumptions.rateProfileId, annualRate: numberValue(project.assumptions.interestRate), capturedAt: null };

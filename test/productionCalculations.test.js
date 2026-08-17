@@ -5,7 +5,7 @@ import { calculateWeightedTcv, crmMetrics, formatProbabilityPoints, pipelineStag
 import { defaultProject } from "../src/model.js";
 import { partnerTotals } from "../src/partners.js";
 
-test("recurring revenue categories are independently gated", () => {
+test("PowerAiD recurring revenue requires an active CMS connection", () => {
   const project = defaultProject();
   project.solution.powerAidEnabled = true;
   let result = calculateBusinessCase(project);
@@ -14,7 +14,8 @@ test("recurring revenue categories are independently gated", () => {
   project.solution.cmsEnabled = false;
   result = calculateBusinessCase(project);
   assert.equal(result.cmsRevenue, 0);
-  assert.ok(result.savingsAsAServiceRevenue > 0);
+  assert.equal(result.savingsAsAServiceRevenue, 0);
+  assert.equal(result.powerAidSavingKwh, 0);
   project.solution.powerAidEnabled = false;
   result = calculateBusinessCase(project);
   assert.equal(result.savingsAsAServiceRevenue, 0);

@@ -15,8 +15,8 @@ const positive = (v) => Math.max(0, n(v));
 export function calculateBusinessCase(project) {
   const a = project.assumptions;
   const smartEnabled = Boolean(project.solution.smartEnabled);
-  const powerAidEnabled = smartEnabled && Boolean(project.solution.powerAidEnabled);
   const cmsEnabled = smartEnabled && Boolean(project.solution.cmsEnabled);
+  const powerAidEnabled = cmsEnabled && Boolean(project.solution.powerAidEnabled);
   const ledById = Object.fromEntries(project.catalogue.led.map((p) => [p.id, p]));
   const smartById = Object.fromEntries(project.catalogue.smart.map((p) => [p.id, p]));
   const factor = { SAP: n(a.sapFactor), MH: n(a.mhFactor), MERCURY: n(a.mercuryFactor), LED: 1, OTHER: 1 };
