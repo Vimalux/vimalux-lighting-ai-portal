@@ -28,45 +28,50 @@ export function generateCustomerPdf(project, result) {
   const rows = (items) => items.filter((item) => item && item[1] !== "" && item[1] != null).map(([label, value]) => [label, String(value)]);
   const drawCustomerValueChart = () => {
     const chartRows = result.customerValueRows || [];
-    const max = Math.max(1, ...chartRows.map((row) => Math.max(row.currentOperatingCost, row.futureOperatingCost + row.servicePayment + row.investmentPayment + Math.max(0, row.customerSaving))));
-    const x = 18, top = 30, chartHeight = 76, chartWidth = 174;
-    const gap = 1.6, barWidth = Math.max(2.8, (chartWidth - gap * Math.max(0, chartRows.length - 1)) / Math.max(1, chartRows.length));
+    const first = chartRows[0];
+    if (!first) return;
+    const postContract = result.serviceAgreementPeriod < result.analysisPeriod ? chartRows[result.serviceAgreementPeriod] : null;
+    const parts = (row, fullSmart = false) => fullSmart
+      ? [{ value: Math.max(0, row.currentOperatingCost - row.fullSmartBenefit), color: [79, 183, 185] }, { value: row.fullSmartOpex, color: [245, 158, 11] }, { value: row.investmentPayment, color: [148, 163, 184] }, { value: row.fullSmartNetBenefit, color: [22, 163, 74] }]
+      : [{ value: row.futureOperatingCost, color: [79, 183, 185] }, { value: row.servicePayment, color: [245, 158, 11] }, { value: row.investmentPayment, color: [148, 163, 184] }, { value: row.customerSaving, color: [22, 163, 74] }];
+    const scenarios = [{ label: it ? "Situazione attuale" : "Current situation", current: true, row: first }, { label: it ? "Durante il contratto" : "During the contract", year: 1, row: first }];
+    if (postContract) scenarios.push({ label: it ? "Dopo il contratto\nsenza Smart" : "After contract\nwithout Smart", year: postContract.year, row: postContract }, { label: it ? "Smart mantenuto" : "Smart continued", year: postContract.year, row: postContract, fullSmart: true });
+    const top = 32, chartHeight = 92, barWidth = 30, gap = scenarios.length === 4 ? 14 : 34;
+    const chartWidth = scenarios.length * barWidth + (scenarios.length - 1) * gap;
+    const x = (210 - chartWidth) / 2;
     section(it ? "Ripartizione del costo annuo e del risparmio cliente" : "Annual cost allocation and customer savings", 18);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(71, 85, 105);
     doc.text(it ? "Costo operativo post-upgrade, servizi, pagamento contrattuale e risparmio netto del cliente." : "Post-upgrade operating cost, services, contracted payment and customer net saving.", 18, 24);
-    doc.setDrawColor(148, 163, 184);
-    doc.line(x, top + chartHeight, x + chartWidth, top + chartHeight);
-    doc.setLineDashPattern([2, 1], 0);
-    doc.line(x, top, x + chartWidth, top);
-    doc.setLineDashPattern([], 0);
-    chartRows.forEach((row, index) => {
+    doc.setDrawColor(148, 163, 184); doc.line(x - 6, top + chartHeight, x + chartWidth + 6, top + chartHeight);
+    scenarios.forEach((scenario, index) => {
       const bx = x + index * (barWidth + gap);
       let bottom = top + chartHeight;
       const segment = (value, color) => {
-        const h = Math.max(0, value) / max * chartHeight;
+        const h = Math.max(0, value) / Math.max(1, scenario.row.currentOperatingCost) * chartHeight;
         if (!h) return;
         bottom -= h;
-        doc.setFillColor(...color);
-        doc.rect(bx, bottom, barWidth, h, "F");
+        doc.setFillColor(...color); doc.rect(bx, bottom, barWidth, h, "F");
+        if (h >= 12) {
+          doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+          doc.text(`${Math.round(value / scenario.row.currentOperatingCost * 100)}%`, bx + barWidth / 2, bottom + h / 2, { align: "center" });
+        }
       };
-      segment(row.futureOperatingCost, [79, 183, 185]);
-      segment(row.servicePayment, [245, 158, 11]);
-      segment(row.investmentPayment, [148, 163, 184]);
-      segment(Math.max(0, row.customerSaving), [22, 163, 74]);
-      doc.setFontSize(5.5);
-      doc.setTextColor(71, 85, 105);
-      doc.text(String(row.year), bx + barWidth / 2, top + chartHeight + 4, { align: "center" });
+      if (scenario.current) segment(scenario.row.currentOperatingCost, [15, 111, 174]);
+      else parts(scenario.row, scenario.fullSmart).forEach((part) => segment(part.value, part.color));
+      doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(15, 23, 42);
+      doc.text(scenario.label.split("\n"), bx + barWidth / 2, top + chartHeight + 7, { align: "center" });
+      if (scenario.year) { doc.setFont("helvetica", "normal"); doc.setFontSize(6); doc.setTextColor(71, 85, 105); doc.text(`${it ? "Anno" : "Year"} ${scenario.year}`, bx + barWidth / 2, top + chartHeight + 16, { align: "center" }); }
     });
     const legend = [[it ? "Costo operativo post-upgrade" : "Post-upgrade operating cost", [79, 183, 185]], [it ? "OPEX servizi" : "Service OPEX", [245, 158, 11]], [it ? "Pagamento contratto / investimento" : "Contract / investment payment", [148, 163, 184]], [it ? "Risparmio netto cliente" : "Customer net saving", [22, 163, 74]]];
     legend.forEach(([label, color], index) => {
-      const lx = 18 + (index % 2) * 90, ly = 116 + Math.floor(index / 2) * 7;
+      const lx = 18 + (index % 2) * 90, ly = 151 + Math.floor(index / 2) * 7;
       doc.setFillColor(...color); doc.rect(lx, ly - 3, 4, 4, "F");
       doc.setTextColor(71, 85, 105); doc.setFontSize(7); doc.text(label, lx + 6, ly);
     });
-    if (result.cmsEnabled) {
-      const boxY = 134;
+    if (result.cmsEnabled && postContract) {
+      const boxY = 169;
       doc.setFillColor(248, 250, 252); doc.setDrawColor(220, 229, 232); doc.roundedRect(18, boxY, 174, 38, 2, 2, "FD");
       const comparison = [[it ? `Smart per ${result.serviceAgreementPeriod} anni` : `Smart for ${result.serviceAgreementPeriod} years`, money(result.contractedSavingsTotal), false], [it ? `Smart per tutti i ${result.analysisPeriod} anni` : `Smart for all ${result.analysisPeriod} years`, money(result.fullSmartSavingsTotal), false], [it ? "Risparmio lordo aggiuntivo" : "Additional gross saving", money(result.fullSmartAdditionalGrossSavings), true], [it ? "Effetto netto dopo i costi" : "Net effect after service costs", money(result.fullSmartIncrementalSavings), result.fullSmartIncrementalSavings >= 0]];
       comparison.forEach(([label, value], index) => {
@@ -77,6 +82,10 @@ export function generateCustomerPdf(project, result) {
       });
       doc.setFont("helvetica", "normal"); doc.setTextColor(71, 85, 105); doc.setFontSize(6.5);
       doc.text(result.powerAidEnabled ? (it ? "PowerAiD e il relativo fee sono inclusi solo quando generano un risparmio incrementale." : "PowerAiD and its fee are included only when they generate incremental savings.") : (it ? "PowerAiD non incluso nello scenario." : "PowerAiD is not included in the scenario."), 24, boxY + 33, { maxWidth: 160 });
+    } else if (result.cmsEnabled) {
+      doc.setFillColor(236, 253, 245); doc.setDrawColor(167, 243, 208); doc.roundedRect(42, 172, 126, 16, 2, 2, "FD");
+      doc.setTextColor(4, 120, 87); doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+      doc.text(it ? `Smart attivo per l'intero periodo di analisi - ${result.analysisPeriod} anni` : `Smart active throughout the full analysis period - ${result.analysisPeriod} years`, 105, 182, { align: "center" });
     }
   };
 

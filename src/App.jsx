@@ -2535,22 +2535,45 @@ function Report({ p, r, t, money, num }) {
 function CustomerValueChart({ p, r, money }) {
   const it = p.language === "it";
   const rows = r.customerValueRows || [];
-  const max = Math.max(1, ...rows.map((row) => Math.max(row.currentOperatingCost, row.futureOperatingCost + row.servicePayment + row.investmentPayment + Math.max(0, row.customerSaving))));
-  const height = (value) => `${Math.max(0, value) / max * 100}%`;
+  const first = rows[0];
+  if (!first) return null;
+  const postContract = r.serviceAgreementPeriod < r.analysisPeriod ? rows[r.serviceAgreementPeriod] : null;
+  const segments = (row, fullSmart = false) => {
+    const values = fullSmart ? {
+      future: Math.max(0, row.currentOperatingCost - row.fullSmartBenefit),
+      service: row.fullSmartOpex,
+      payment: row.investmentPayment,
+      saving: row.fullSmartNetBenefit,
+    } : { future: row.futureOperatingCost, service: row.servicePayment, payment: row.investmentPayment, saving: row.customerSaving };
+    return Object.entries(values).map(([key, value]) => ({ key, value, pct: row.currentOperatingCost ? value / row.currentOperatingCost * 100 : 0 }));
+  };
+  const scenarios = [
+    { key: "current", label: it ? "Situazione attuale" : "Current situation", year: null, current: true, cost: first.currentOperatingCost },
+    { key: "contract", label: it ? "Durante il contratto" : "During the contract", year: 1, parts: segments(first) },
+    ...(postContract ? [
+      { key: "without", label: it ? "Dopo il contratto - senza Smart" : "After contract - without Smart", year: postContract.year, parts: segments(postContract) },
+      { key: "with", label: it ? "Smart mantenuto" : "Smart continued", year: postContract.year, parts: segments(postContract, true) },
+    ] : []),
+  ];
+  const partLabel = { future: it ? "Costo futuro" : "Future cost", service: "OPEX", payment: it ? "Investimento" : "Investment", saving: it ? "Risparmio cliente" : "Customer saving" };
   return (
     <section className="customer-value-chart">
       <h3>{it ? "Ripartizione del costo annuo e del risparmio cliente" : "Annual cost allocation and customer savings"}</h3>
       <p className="chart-intro">{it ? "Il costo attuale viene confrontato con il costo post-upgrade, i pagamenti contrattuali e il risparmio netto del cliente." : "The current cost is compared with post-upgrade cost, contracted payments and the customer's net saving."}</p>
-      <div className="value-chart-plot">
-        {rows.map((row) => (
-          <div className="value-chart-year" key={row.year} title={`${it ? "Anno" : "Year"} ${row.year}: ${money(row.customerSaving)}`}>
-            <div className="value-chart-bar">
-              <span className="value-future" style={{ height: height(row.futureOperatingCost) }} />
-              <span className="value-service" style={{ height: height(row.servicePayment) }} />
-              <span className="value-payment" style={{ height: height(row.investmentPayment) }} />
-              <span className="value-saving" style={{ height: height(Math.max(0, row.customerSaving)) }} />
+      <div className={`value-summary-plot scenarios-${scenarios.length}`}>
+        {scenarios.map((scenario) => (
+          <div className="value-summary-scenario" key={scenario.key}>
+            <div className="value-summary-bar">
+              {scenario.current ? (
+                <span className="value-current" style={{ height: "100%" }}><b>100%</b><small>{money(scenario.cost)}</small></span>
+              ) : scenario.parts.map((part) => part.value > 0 && (
+                <span key={part.key} className={`value-${part.key}`} style={{ height: `${Math.max(0, part.pct)}%` }} title={`${partLabel[part.key]}: ${money(part.value)}`}>
+                  {part.pct >= 8 && <><b>{Math.round(part.pct)}%</b><small>{money(part.value)}</small></>}
+                </span>
+              ))}
             </div>
-            <small>{row.year}</small>
+            <strong>{scenario.label}</strong>
+            {scenario.year && <small>{it ? "Anno" : "Year"} {scenario.year}</small>}
           </div>
         ))}
       </div>
@@ -2560,7 +2583,7 @@ function CustomerValueChart({ p, r, money }) {
         <span><i className="value-payment" />{it ? "Pagamento contratto / investimento" : "Contract / investment payment"}</span>
         <span><i className="value-saving" />{it ? "Risparmio netto cliente" : "Customer net saving"}</span>
       </div>
-      {r.cmsEnabled && (
+      {r.cmsEnabled && postContract && (
         <div className="smart-term-comparison">
           <div><span>{it ? `Smart per ${r.serviceAgreementPeriod} anni` : `Smart for ${r.serviceAgreementPeriod} years`}</span><strong>{money(r.contractedSavingsTotal)}</strong></div>
           <div><span>{it ? `Smart per tutti i ${r.analysisPeriod} anni` : `Smart for all ${r.analysisPeriod} years`}</span><strong>{money(r.fullSmartSavingsTotal)}</strong></div>
@@ -2568,6 +2591,9 @@ function CustomerValueChart({ p, r, money }) {
           <div className={r.fullSmartIncrementalSavings >= 0 ? "comparison-gain" : "comparison-loss"}><span>{it ? "Effetto netto dopo i costi del servizio" : "Net effect after service costs"}</span><strong>{money(r.fullSmartIncrementalSavings)}</strong></div>
           <p>{r.powerAidEnabled ? (it ? "Il confronto include PowerAiD e il relativo fee solo quando genera un risparmio incrementale." : "The comparison includes PowerAiD and its fee only when it generates incremental savings.") : (it ? "PowerAiD non è incluso in questo scenario." : "PowerAiD is not included in this scenario.")}</p>
         </div>
+      )}
+      {r.cmsEnabled && !postContract && (
+        <div className="smart-full-period-note">✓ {it ? `Smart attivo per l'intero periodo di analisi - ${r.analysisPeriod} anni` : `Smart active throughout the full analysis period - ${r.analysisPeriod} years`}</div>
       )}
     </section>
   );

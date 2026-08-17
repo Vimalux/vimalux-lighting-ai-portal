@@ -228,6 +228,16 @@
 .value-service { background: #f59e0b; }
 .value-payment { background: #94a3b8; }
 .value-saving { background: #16a34a; }
+.value-current { background: #0f6fae; }
+.value-summary-plot { height: 330px; display: flex; justify-content: center; align-items: flex-end; gap: 54px; padding: 20px 32px 0; border-left: 2px solid #94a3b8; border-bottom: 2px solid #94a3b8; }
+.value-summary-scenario { height: 100%; width: min(180px, 22%); display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 5px; text-align: center; }
+.value-summary-bar { width: 100%; height: calc(100% - 48px); display: flex; flex-direction: column-reverse; }
+.value-summary-bar > span { width: 100%; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; overflow: hidden; }
+.value-summary-bar b { font-size: 18px; line-height: 1; }
+.value-summary-bar small { margin-top: 5px; color: white; font-size: 10px; }
+.value-summary-scenario > strong { font-size: 12px; }
+.value-summary-scenario > small { font-size: 10px; color: #64748b; }
+.smart-full-period-note { margin-top: 14px; padding: 13px 16px; border: 1px solid #a7f3d0; border-radius: 8px; background: #ecfdf5; color: #047857; font-size: 13px; font-weight: 700; text-align: center; }
 .value-chart-year small { font-size: 9px; color: #64748b; }
 .value-chart-legend { display: flex; flex-wrap: wrap; gap: 12px 20px; margin: 14px 0; font-size: 11px; color: #475569; }
 .value-chart-legend span { display: flex; align-items: center; gap: 6px; }
@@ -269,5 +279,9 @@
   }
 
   .smart-term-comparison { grid-template-columns: 1fr; }
+  .value-summary-plot { height: 290px; gap: 14px; padding-left: 8px; padding-right: 8px; }
+  .value-summary-scenario { width: 25%; }
+  .value-summary-bar b { font-size: 13px; }
+  .value-summary-bar small { display: none; }
   .value-chart-plot { gap: 3px; padding-left: 4px; padding-right: 4px; }
 }
