@@ -80,6 +80,46 @@
   color: #64748b;
 }
 
+.bulk-selection-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.bulk-selection-actions button:not(.primary) {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 9px 13px;
+}
+
+.solution-quantity-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 18px;
+}
+
+.solution-quantity-grid > div {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  display: grid;
+  gap: 7px;
+  padding: 13px;
+}
+
+.solution-quantity-grid span {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.solution-quantity-grid strong {
+  font-size: 20px;
+}
+
 .dimming-card table {
   table-layout: fixed;
 }

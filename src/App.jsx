@@ -770,6 +770,7 @@ function Existing({ p, update, t }) {
           quantity: 0,
           technology: "SAP",
           existingWattage: 0,
+          upgradeSelected: true,
           proposedProductId: p.catalogue.led[0]?.id || "",
           smartAssigned: true,
           powerAidAssigned: true,
@@ -806,6 +807,13 @@ function Existing({ p, update, t }) {
           ? { ...group, proposedProductId: bulkProduct }
           : group,
       ),
+    );
+  };
+  const setUpgradeForVisible = (upgradeSelected) => {
+    if (!visibleGroups.length) return;
+    update(
+      ["groups"],
+      p.groups.map((group) => matchesFilter(group) ? { ...group, upgradeSelected } : group),
     );
   };
   const openFile = async (file) => {
@@ -937,6 +945,14 @@ function Existing({ p, update, t }) {
                 {p.language === "it" ? "Cancella filtri" : "Clear filters"}
               </button>
             )}
+            <div className="bulk-selection-actions">
+              <button className="primary" onClick={() => setUpgradeForVisible(true)}>
+                {p.language === "it" ? "Seleziona risultati" : "Select results"}
+              </button>
+              <button onClick={() => setUpgradeForVisible(false)}>
+                {p.language === "it" ? "Escludi risultati" : "Exclude results"}
+              </button>
+            </div>
           </div>
         </div>
         <div className="table-scroll">
@@ -950,6 +966,7 @@ function Existing({ p, update, t }) {
                   p.language === "it"
                     ? "Potenza esistente"
                     : "Existing wattage",
+                  p.language === "it" ? "Da sostituire" : "Upgrade",
                   p.language === "it" ? "Prodotto LED" : "Proposed LED",
                   "Smart Lighting",
                   "PowerAiD",
@@ -1005,8 +1022,16 @@ function Existing({ p, update, t }) {
                     />
                   </td>
                   <td>
+                    <input
+                      type="checkbox"
+                      checked={g.upgradeSelected !== false}
+                      onChange={(e) => update(["groups", i, "upgradeSelected"], e.target.checked)}
+                    />
+                  </td>
+                  <td>
                     <select
                       value={g.proposedProductId}
+                      disabled={g.upgradeSelected === false}
                       onChange={(e) =>
                         update(
                           ["groups", i, "proposedProductId"],
@@ -1027,6 +1052,7 @@ function Existing({ p, update, t }) {
                     <input
                       type="checkbox"
                       checked={g.smartAssigned}
+                      disabled={g.upgradeSelected === false}
                       onChange={(e) =>
                         update(["groups", i, "smartAssigned"], e.target.checked)
                       }
@@ -1036,7 +1062,7 @@ function Existing({ p, update, t }) {
                     <input
                       type="checkbox"
                       checked={g.powerAidAssigned}
-                      disabled={!p.solution.powerAidEnabled}
+                      disabled={g.upgradeSelected === false || !p.solution.powerAidEnabled}
                       title={
                         p.solution.powerAidEnabled
                           ? "PowerAiD assigned to this group"
@@ -1312,7 +1338,7 @@ function ProductSelect({ label, type, p, value, onChange }) {
 function Solution({ p, r, update, t, money, num }) {
   const ledProducts = [...r.groupRows.reduce((products, group) => {
     const id = group.product?.id;
-    if (!id || !group.quantity) return products;
+    if (!group.upgradeSelected || !id || !group.quantity) return products;
     const current = products.get(id) || {
       label: `${group.product.brand || ""} ${group.product.name || ""} · ${num(group.product.wattage || 0)} W`.trim(),
       quantity: 0,
@@ -1444,6 +1470,11 @@ function Solution({ p, r, update, t, money, num }) {
             : "Used solution summary"
         }
       >
+        <div className="solution-quantity-grid">
+          <div><span>{p.language === "it" ? "Apparecchi esistenti totali" : "Total existing luminaires"}</span><strong>{num(r.totalQuantity)}</strong></div>
+          <div><span>{p.language === "it" ? "Selezionati per upgrade" : "Selected for upgrade"}</span><strong>{num(r.upgradedQuantity)}</strong></div>
+          <div><span>{p.language === "it" ? "Non sostituiti" : "Not upgraded"}</span><strong>{num(r.notUpgradedQuantity)}</strong></div>
+        </div>
         <p className="hint">
           <strong>{p.language === "it" ? "Apparecchi LED" : "LED luminaires"}</strong>
         </p>
@@ -1458,7 +1489,7 @@ function Solution({ p, r, update, t, money, num }) {
         />
         <div className="summary-line">
           <span>
-            {p.language === "it" ? "Subtotale LED" : "LED subtotal"} · {num(r.totalQuantity)} {t("units")}
+            {p.language === "it" ? "Subtotale LED" : "LED subtotal"} · {num(r.upgradedQuantity)} {t("units")}
           </span>
           <strong>{money(r.ledCapex)}</strong>
         </div>
@@ -1534,7 +1565,7 @@ function Pricing({ p, r, update, t, money }) {
     total,
   });
   const rows = [
-    ...r.groupRows.map((g, i) => ({
+    ...r.groupRows.map((g, i) => g.upgradeSelected ? ({
       id: g.id,
       label: `LED · ${g.product.name}`,
       q: g.quantity,
@@ -1542,7 +1573,7 @@ function Pricing({ p, r, update, t, money }) {
       cat: g.product.salesPrice,
       total: g.salesTotal,
       groupIndex: i,
-    })),
+    }) : null).filter(Boolean),
     productRow(
       "lcu",
       "LCU",
@@ -1591,7 +1622,7 @@ function Pricing({ p, r, update, t, money }) {
     {
       id: "freight",
       label: it ? "Trasporto" : "Freight",
-      q: r.totalQuantity,
+      q: r.upgradedQuantity,
       cost: p.assumptions.freightCostPerLamp,
       cat: p.assumptions.freightSalesPerLamp,
       total: r.freight,
@@ -2044,7 +2075,7 @@ function Assumptions({ p, r, update }) {
 }
 function Kpis({ p, r, t, money, num }) {
   const allInclusive = r.dealType === "noleggio_operativo";
-  const luminaires = Math.max(1, r.totalQuantity);
+  const luminaires = Math.max(1, r.upgradedQuantity);
   const money2 = (value) =>
     formatMoney(value, p.language, p.project.currency, 2);
   const opexLabel = allInclusive
@@ -2338,7 +2369,7 @@ function InternalReport({ p, r, update, money }) {
         </div>
         <div className="kpi">
           <span>{it ? "Utile per apparecchio" : "Profit per luminaire"}</span>
-          <strong>{money(r.netProjectProfit / Math.max(1, r.totalQuantity))}</strong>
+          <strong>{money(r.netProjectProfit / Math.max(1, r.upgradedQuantity))}</strong>
         </div>
       </div>
       <div className="two-col">

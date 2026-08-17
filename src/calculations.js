@@ -20,7 +20,7 @@ export function calculateBusinessCase(project) {
   const ledById = Object.fromEntries(project.catalogue.led.map((p) => [p.id, p]));
   const smartById = Object.fromEntries(project.catalogue.smart.map((p) => [p.id, p]));
   const factor = { SAP: n(a.sapFactor), MH: n(a.mhFactor), MERCURY: n(a.mercuryFactor), LED: 1, OTHER: 1 };
-  let totalQuantity = 0, smartQuantity = 0, nominalSystemKwh = 0, existingDimmingSavingKwh = 0, baselineKwh = 0, ledKwh = 0, smartLedKwh = 0, powerAidLedKwh = 0, ledCapex = 0, ledCost = 0;
+  let totalQuantity = 0, upgradedQuantity = 0, smartQuantity = 0, nominalSystemKwh = 0, existingDimmingSavingKwh = 0, baselineKwh = 0, ledKwh = 0, smartLedKwh = 0, powerAidLedKwh = 0, ledCapex = 0, ledCost = 0;
   const groupRows = project.groups.map((g) => {
     const quantity = positive(g.quantity);
     const product = ledById[g.proposedProductId] || {};
@@ -36,16 +36,19 @@ export function calculateBusinessCase(project) {
     const groupNominalSystemKwh = quantity * existingSystemWattage * positive(a.operatingHours) / 1000;
     const groupExistingDimmingSavingKwh = groupNominalSystemKwh * dimmingPercent / 100;
     const groupBaseline = groupNominalSystemKwh - groupExistingDimmingSavingKwh;
-    const groupLed = quantity * positive(product.wattage) * positive(a.operatingHours) / 1000;
+    const upgradeSelected = g.upgradeSelected !== false;
+    const proposedLedKwh = quantity * positive(product.wattage) * positive(a.operatingHours) / 1000;
+    const groupLed = upgradeSelected ? proposedLedKwh : groupBaseline;
     const sale = g.projectLedPrice == null ? positive(product.salesPrice) : positive(g.projectLedPrice);
     totalQuantity += quantity;
-    if (smartEnabled && g.smartAssigned) {
+    if (upgradeSelected) upgradedQuantity += quantity;
+    if (upgradeSelected && smartEnabled && g.smartAssigned) {
       smartQuantity += quantity;
       smartLedKwh += groupLed;
       if (powerAidEnabled && g.powerAidAssigned) powerAidLedKwh += groupLed;
     }
-    nominalSystemKwh += groupNominalSystemKwh; existingDimmingSavingKwh += groupExistingDimmingSavingKwh; baselineKwh += groupBaseline; ledKwh += groupLed; ledCapex += quantity * sale; ledCost += quantity * positive(product.costPrice);
-    return { ...g, quantity, product, systemFactor, existingSystemWattage, effectiveBaselineWattage, dimmingPercent, profileHoursTotal: positive(g.existingFullPowerHours) + positive(g.existingReducedHours), nominalSystemKwh: groupNominalSystemKwh, existingDimmingSavingKwh: groupExistingDimmingSavingKwh, baselineKwh: groupBaseline, ledKwh: groupLed, salesTotal: quantity * sale };
+    nominalSystemKwh += groupNominalSystemKwh; existingDimmingSavingKwh += groupExistingDimmingSavingKwh; baselineKwh += groupBaseline; ledKwh += groupLed; ledCapex += upgradeSelected ? quantity * sale : 0; ledCost += upgradeSelected ? quantity * positive(product.costPrice) : 0;
+    return { ...g, upgradeSelected, quantity, product, systemFactor, existingSystemWattage, effectiveBaselineWattage, dimmingPercent, profileHoursTotal: positive(g.existingFullPowerHours) + positive(g.existingReducedHours), nominalSystemKwh: groupNominalSystemKwh, existingDimmingSavingKwh: groupExistingDimmingSavingKwh, baselineKwh: groupBaseline, proposedLedKwh, ledKwh: groupLed, salesTotal: upgradeSelected ? quantity * sale : 0 };
   });
   const lcuQuantity = smartEnabled ? smartQuantity : 0;
   const cloSavingKwh = cmsEnabled ? smartLedKwh * positive(a.cloPercent) / 100 : 0;
@@ -57,17 +60,17 @@ export function calculateBusinessCase(project) {
   const price = (product, key = "salesPrice") => project.pricing.overrides[product.id]?.[key] ?? positive(product[key]);
   const lcu = getSmart(project.solution.lcuProductId), gateway = getSmart(project.solution.gatewayProductId);
   const antenna = getSmart(project.solution.antennaProductId), meter = getSmart(project.solution.meterProductId);
-  const gatewayQty = smartEnabled ? positive(project.solution.gatewayQuantity) : 0;
-  const antennaQty = smartEnabled ? positive(project.solution.antennaQuantity) : 0;
-  const meterQty = smartEnabled ? positive(project.solution.meterQuantity) : 0;
+  const gatewayQty = smartEnabled && upgradedQuantity > 0 ? positive(project.solution.gatewayQuantity) : 0;
+  const antennaQty = smartEnabled && upgradedQuantity > 0 ? positive(project.solution.antennaQuantity) : 0;
+  const meterQty = smartEnabled && upgradedQuantity > 0 ? positive(project.solution.meterQuantity) : 0;
   const smartHardwareCapex = lcuQuantity * price(lcu);
   const implementationCapex = lcuQuantity * price(lcu, "implementationSalesPrice");
   const gatewayCapex = gatewayQty * price(gateway), antennaCapex = antennaQty * price(antenna), meterCapex = meterQty * price(meter);
-  const freight = totalQuantity * positive(a.freightSalesPerLamp);
+  const freight = upgradedQuantity * positive(a.freightSalesPerLamp);
   const smartHardwareCost = lcuQuantity * positive(lcu.costPrice);
   const implementationCost = lcuQuantity * positive(lcu.implementationCost);
   const gatewayCost = gatewayQty * positive(gateway.costPrice), antennaCost = antennaQty * positive(antenna.costPrice), meterCost = meterQty * positive(meter.costPrice);
-  const freightCost = totalQuantity * positive(a.freightCostPerLamp);
+  const freightCost = upgradedQuantity * positive(a.freightCostPerLamp);
   const capexDirectCost = ledCost + smartHardwareCost + implementationCost + gatewayCost + antennaCost + meterCost + freightCost;
   const calculatedCapex = ledCapex + smartHardwareCapex + implementationCapex + gatewayCapex + antennaCapex + meterCapex + freight;
   const totalCapex = positive(a.officialOfferCapex) || calculatedCapex;
@@ -90,7 +93,7 @@ export function calculateBusinessCase(project) {
   const totalAnnualOpex = annualRecurringRevenue;
   const fixedAnnualOpex = Math.max(0, totalAnnualOpex - powerAidCustomerFee);
   const powerAidCustomerNetBenefit = Math.max(0, powerAidGrossSaving - powerAidCustomerFee);
-  const maintenanceSaving = totalQuantity * Math.max(0, positive(a.existingMaintenance) - positive(a.newMaintenance));
+  const maintenanceSaving = upgradedQuantity * Math.max(0, positive(a.existingMaintenance) - positive(a.newMaintenance));
   const grossBenefit = energySaving + maintenanceSaving;
   const legacyDealType = a.financingModel === "finance" ? "finance" : ["laas", "ppp"].includes(a.financingModel) ? "noleggio_operativo" : "cash";
   const dealType = ["cash", "noleggio_operativo", "finance"].includes(a.dealType) ? a.dealType : legacyDealType;
@@ -163,7 +166,7 @@ export function calculateBusinessCase(project) {
   const customerDecisionStatus = npv > 0 && customerAnnualNetBenefit >= 0 ? "GO" : npv > 0 || customerAnnualNetBenefit >= 0 ? "REVIEW" : "NO_GO";
   const minimumMarginPercent = positive(a.minimumMarginPercent || 30);
   const decisionStatus = netProjectMarginPercent >= minimumMarginPercent && customerDecisionStatus === "GO" ? "GO" : netProjectMarginPercent >= 20 && customerDecisionStatus !== "NO_GO" ? "REVIEW" : "NO_GO";
-  return { totalQuantity, smartQuantity, lcuQuantity, nominalSystemKwh, existingDimmingSavingKwh, baselineKwh, ledKwh, ledSavingKwh, cloSavingKwh, afterCloKwh, powerAidSavingKwh, finalKwh,
+  return { totalQuantity, upgradedQuantity, notUpgradedQuantity: Math.max(0, totalQuantity - upgradedQuantity), smartQuantity, lcuQuantity, nominalSystemKwh, existingDimmingSavingKwh, baselineKwh, ledKwh, ledSavingKwh, cloSavingKwh, afterCloKwh, powerAidSavingKwh, finalKwh,
     ledCapex, ledCost, smartHardwareCapex, implementationCapex, gatewayCapex, antennaCapex, meterCapex, freight, calculatedCapex, totalCapex, calculatedAnnualRecurringRevenue,
     cmsOpex: cmsRevenue, cmsRevenue, gatewayOpex: gatewayRecurringRevenue, gatewayRecurringRevenue, powerAidFee: powerAidCustomerFee, powerAidGrossSavingEUR: powerAidGrossSaving, powerAidCustomerFee, powerAidCustomerNetBenefit, powerAidSupplierCost, powerAidVimaluxMargin, powerAidMarginPct, savingsAsAServiceRevenue, recurringOpex, annualRecurringRevenue, fixedAnnualOpex, cmsDirectCost, gatewayRecurringCost, totalAnnualOpex, energySaving, energySavingWithoutPowerAid: energySaving - powerAidGrossSaving, maintenanceSaving, grossBenefit, monthlyPayment, annualPayment,
     dealType, financingYears, financingPeriod, serviceAgreementPeriod, interestRateSnapshot: a.interestRateSnapshot || null, financingMonthlyPayment, financingAnnualPayment, allInclusiveAnnualPayment, allInclusiveContractRevenue, customerAnnualPayment, customerMonthlyPayment: monthlyPayment, customerPaymentYear1: dealType === "cash" ? totalCapex + totalAnnualOpex : positive(a.upfrontPayment) + customerAnnualPayment,

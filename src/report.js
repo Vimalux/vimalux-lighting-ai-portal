@@ -82,13 +82,15 @@ export function generateCustomerPdf(project, result) {
   section(it ? "Assunzioni principali" : "Key assumptions", doc.lastAutoTable.finalY + 8);
   const technology = [...new Set(project.groups.map((group) => group.technology))].join(", ");
   const averageExistingWattage = result.totalQuantity ? result.groupRows.reduce((sum, group) => sum + group.quantity * Number(group.existingWattage || 0), 0) / result.totalQuantity : 0;
-  const proposedProducts = [...new Set(result.groupRows.map((group) => group.product?.name).filter(Boolean))].join(", ");
-  const proposedWattages = [...new Set(result.groupRows.map((group) => Number(group.product?.wattage || 0)).filter(Boolean))].sort((a, b) => a - b).map((value) => `${formatNumber(value, lang)} W`).join(", ");
+  const proposedProducts = [...new Set(result.groupRows.filter((group) => group.upgradeSelected).map((group) => group.product?.name).filter(Boolean))].join(", ");
+  const proposedWattages = [...new Set(result.groupRows.filter((group) => group.upgradeSelected).map((group) => Number(group.product?.wattage || 0)).filter(Boolean))].sort((a, b) => a - b).map((value) => `${formatNumber(value, lang)} W`).join(", ");
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 13,
     theme: "striped",
     body: rows([
       [it ? "Numero apparecchi" : "Number of luminaires", formatNumber(result.totalQuantity, lang)],
+      [it ? "Apparecchi selezionati per upgrade" : "Luminaires selected for upgrade", formatNumber(result.upgradedQuantity, lang)],
+      [it ? "Apparecchi non sostituiti" : "Luminaires not upgraded", formatNumber(result.notUpgradedQuantity, lang)],
       [it ? "Tecnologia esistente" : "Existing technology", technology],
       [it ? "Potenza media esistente" : "Average existing wattage", `${formatNumber(averageExistingWattage, lang, 1)} W`],
       [it ? "Prodotto LED proposto" : "Proposed LED product", proposedProducts],
@@ -118,7 +120,7 @@ export function generateCustomerPdf(project, result) {
 
   doc.addPage();
   section(it ? "Soluzione proposta" : "Proposed solution summary", 18);
-  const replacementRows = aggregateReplacementRows(result.groupRows);
+  const replacementRows = aggregateReplacementRows(result.groupRows.filter((group) => group.upgradeSelected));
   autoTable(doc, {
     startY: 23,
     head: [[it ? "Tecnologia esistente" : "Existing technology", it ? "Potenza esistente" : "Existing wattage", it ? "QuantitÃ " : "Quantity", it ? "Nuovo prodotto LED" : "New LED product"]],
