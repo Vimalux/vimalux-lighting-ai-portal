@@ -2156,7 +2156,8 @@ function Kpis({ p, r, t, money, num }) {
       `${t("lifecycle")} – ${r.analysisPeriod} ${t("years")}`,
       money(r.lifecycleResult),
     ],
-    [t("energyReduction"), formatPercent(r.energyReductionPercent, p.language)],
+    [p.language === "it" ? "Riduzione intera installazione" : "Whole-installation reduction", formatPercent(r.energyReductionPercent, p.language)],
+    [p.language === "it" ? "Riduzione apparecchi aggiornati" : "Upgraded-luminaire reduction", formatPercent(r.upgradedEnergyReductionPercent, p.language)],
     [t("co2Reduction"), `${num(r.co2ReductionKg / 1000, 1)} t`],
   ];
   return (
@@ -2226,6 +2227,8 @@ function Business({ p, r, t, money, num }) {
                 r.existingDimmingSavingKwh,
               ],
               [t("baseline"), 1, r.baselineKwh],
+              [p.language === "it" ? "Baseline apparecchi selezionati" : "Selected-luminaire baseline", 1, r.upgradedBaselineKwh],
+              [p.language === "it" ? "Consumo apparecchi non sostituiti" : "Non-upgraded consumption", 1, r.notUpgradedBaselineKwh],
               [
                 p.language === "it" ? "Consumo LED" : "LED consumption",
                 1,
@@ -2242,6 +2245,7 @@ function Business({ p, r, t, money, num }) {
               ],
               [t("powerSaving"), 1, r.powerAidSavingKwh],
               [t("final"), 1, r.finalKwh],
+              [p.language === "it" ? "Consumo finale apparecchi aggiornati" : "Upgraded-luminaire final consumption", 1, r.upgradedFinalKwh],
             ]}
           />
         </Card>
