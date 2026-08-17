@@ -1872,24 +1872,34 @@ function Assumptions({ p, update }) {
 }
 function Kpis({ p, r, t, money, num }) {
   const allInclusive = r.dealType === "noleggio_operativo";
+  const luminaires = Math.max(1, r.totalQuantity);
   const opexLabel = allInclusive
-    ? `${t("annualOpex")} (${p.language === "it" ? "incluso nel canone" : "included in payment"})`
-    : t("annualOpex");
+    ? p.language === "it"
+      ? "OPEX mensile (incluso nel canone)"
+      : "Monthly OPEX (included in payment)"
+    : p.language === "it"
+      ? "OPEX mensile"
+      : "Monthly OPEX";
   const paymentLabel = allInclusive
     ? p.language === "it"
       ? "Canone Mensile Tutto Incluso"
       : "All-inclusive Monthly Payment"
     : t("monthlyPayment");
   const list = [
-    [t("preliminary"), r.decisionStatus.replace("_", "-"), "status"],
     [t("capex"), money(r.totalCapex)],
-    [opexLabel, money(r.totalAnnualOpex)],
+    [opexLabel, money(r.totalAnnualOpex / 12)],
+    [
+      p.language === "it"
+        ? "OPEX mensile per apparecchio"
+        : "Monthly OPEX per luminaire",
+      money(r.totalAnnualOpex / 12 / luminaires),
+    ],
     [paymentLabel, money(r.monthlyPayment)],
     [
       p.language === "it"
-        ? "Pagamento cliente anno 1"
-        : "Customer payment year 1",
-      money(r.customerPaymentYear1),
+        ? "Canone mensile per apparecchio"
+        : "Monthly payment per luminaire",
+      money(r.monthlyPayment / luminaires),
     ],
     [t("annualNet"), money(r.customerAnnualNetBenefit)],
     [
@@ -1934,14 +1944,14 @@ function Business({ p, r, t, money, num }) {
       : "Annual payment";
   const assessmentText =
     p.language === "it"
-      ? `La valutazione combina sostenibilita cliente e margine netto VIMALUX (${formatPercent(r.netProjectMarginPercent, p.language)}; requisito ${formatPercent(r.minimumMarginPercent, p.language)}).`
-      : `The assessment combines customer viability and VIMALUX net margin (${formatPercent(r.netProjectMarginPercent, p.language)}; requirement ${formatPercent(r.minimumMarginPercent, p.language)}).`;
+      ? `La valutazione cliente si basa sul beneficio netto annuo e sul VAN nel periodo di analisi di ${r.analysisPeriod} anni.`
+      : `The customer assessment is based on annual net benefit and NPV over the ${r.analysisPeriod}-year analysis period.`;
   return (
     <>
-      <div className={`assessment ${r.decisionStatus.toLowerCase()}`}>
+      <div className={`assessment ${r.customerDecisionStatus.toLowerCase()}`}>
         <div>
           <small>{t("preliminary")}</small>
-          <h2>{r.decisionStatus.replace("_", "-")}</h2>
+          <h2>{r.customerDecisionStatus.replace("_", "-")}</h2>
         </div>
         <p>{assessmentText}</p>
       </div>
@@ -2098,8 +2108,8 @@ function InternalReport({ p, r, update, money }) {
           </strong>
         </div>
         <div className="kpi">
-          <span>{it ? "Valutazione cliente" : "Customer assessment"}</span>
-          <strong>{r.customerDecisionStatus.replace("_", "-")}</strong>
+          <span>{it ? "Utile per apparecchio" : "Profit per luminaire"}</span>
+          <strong>{money(r.netProjectProfit / Math.max(1, r.totalQuantity))}</strong>
         </div>
       </div>
       <div className="two-col">
@@ -2183,7 +2193,7 @@ function Report({ p, r, t, money, num }) {
           {p.language === "it" ? "Sintesi Esecutiva" : "Executive Summary"}
         </h3>
         <Kpis p={p} r={r} t={t} money={money} num={num} />
-        <p className="conclusion">{t(r.decisionStatus)}</p>
+        <p className="conclusion">{t(r.customerDecisionStatus)}</p>
         <h3>
           {p.language === "it"
             ? "Flusso di cassa cliente"
