@@ -2516,6 +2516,7 @@ function Report({ p, r, t, money, num }) {
         </h3>
         <Kpis p={p} r={r} t={t} money={money} num={num} />
         <p className="conclusion">{t(r.customerDecisionStatus)}</p>
+        <CustomerValueChart p={p} r={r} money={money} />
         <h3>
           {p.language === "it"
             ? "Flusso di cassa cliente"
@@ -2529,6 +2530,46 @@ function Report({ p, r, t, money, num }) {
         </p>
       </div>
     </>
+  );
+}
+function CustomerValueChart({ p, r, money }) {
+  const it = p.language === "it";
+  const rows = r.customerValueRows || [];
+  const max = Math.max(1, ...rows.map((row) => Math.max(row.currentOperatingCost, row.futureOperatingCost + row.servicePayment + row.investmentPayment + Math.max(0, row.customerSaving))));
+  const height = (value) => `${Math.max(0, value) / max * 100}%`;
+  return (
+    <section className="customer-value-chart">
+      <h3>{it ? "Ripartizione del costo annuo e del risparmio cliente" : "Annual cost allocation and customer savings"}</h3>
+      <p className="chart-intro">{it ? "Il costo attuale viene confrontato con il costo post-upgrade, i pagamenti contrattuali e il risparmio netto del cliente." : "The current cost is compared with post-upgrade cost, contracted payments and the customer's net saving."}</p>
+      <div className="value-chart-plot">
+        {rows.map((row) => (
+          <div className="value-chart-year" key={row.year} title={`${it ? "Anno" : "Year"} ${row.year}: ${money(row.customerSaving)}`}>
+            <div className="value-chart-bar">
+              <span className="value-future" style={{ height: height(row.futureOperatingCost) }} />
+              <span className="value-service" style={{ height: height(row.servicePayment) }} />
+              <span className="value-payment" style={{ height: height(row.investmentPayment) }} />
+              <span className="value-saving" style={{ height: height(Math.max(0, row.customerSaving)) }} />
+            </div>
+            <small>{row.year}</small>
+          </div>
+        ))}
+      </div>
+      <div className="value-chart-legend">
+        <span><i className="value-future" />{it ? "Costo operativo post-upgrade" : "Post-upgrade operating cost"}</span>
+        <span><i className="value-service" />{it ? "OPEX servizi" : "Service OPEX"}</span>
+        <span><i className="value-payment" />{it ? "Pagamento contratto / investimento" : "Contract / investment payment"}</span>
+        <span><i className="value-saving" />{it ? "Risparmio netto cliente" : "Customer net saving"}</span>
+      </div>
+      {r.cmsEnabled && (
+        <div className="smart-term-comparison">
+          <div><span>{it ? `Smart per ${r.serviceAgreementPeriod} anni` : `Smart for ${r.serviceAgreementPeriod} years`}</span><strong>{money(r.contractedSavingsTotal)}</strong></div>
+          <div><span>{it ? `Smart per tutti i ${r.analysisPeriod} anni` : `Smart for all ${r.analysisPeriod} years`}</span><strong>{money(r.fullSmartSavingsTotal)}</strong></div>
+          <div className="comparison-gain"><span>{it ? "Risparmio lordo aggiuntivo con Smart" : "Additional gross saving with Smart"}</span><strong>{money(r.fullSmartAdditionalGrossSavings)}</strong></div>
+          <div className={r.fullSmartIncrementalSavings >= 0 ? "comparison-gain" : "comparison-loss"}><span>{it ? "Effetto netto dopo i costi del servizio" : "Net effect after service costs"}</span><strong>{money(r.fullSmartIncrementalSavings)}</strong></div>
+          <p>{r.powerAidEnabled ? (it ? "Il confronto include PowerAiD e il relativo fee solo quando genera un risparmio incrementale." : "The comparison includes PowerAiD and its fee only when it generates incremental savings.") : (it ? "PowerAiD non è incluso in questo scenario." : "PowerAiD is not included in this scenario.")}</p>
+        </div>
+      )}
+    </section>
   );
 }
 function CashTable({ p, r, money }) {

@@ -218,6 +218,28 @@
   color: #c2410c;
 }
 
+.customer-value-chart { margin: 26px 0; }
+.chart-intro { font-size: 13px; color: #64748b; }
+.value-chart-plot { height: 230px; display: flex; align-items: flex-end; gap: 6px; padding: 18px 10px 0; border-left: 2px solid #94a3b8; border-bottom: 2px solid #94a3b8; background: linear-gradient(to top, #e2e8f0 1px, transparent 1px); background-size: 100% 25%; }
+.value-chart-year { height: 100%; flex: 1; min-width: 14px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 5px; }
+.value-chart-bar { width: 100%; height: calc(100% - 18px); display: flex; flex-direction: column-reverse; justify-content: flex-start; }
+.value-chart-bar span { display: block; width: 100%; }
+.value-future { background: #4fb7b9; }
+.value-service { background: #f59e0b; }
+.value-payment { background: #94a3b8; }
+.value-saving { background: #16a34a; }
+.value-chart-year small { font-size: 9px; color: #64748b; }
+.value-chart-legend { display: flex; flex-wrap: wrap; gap: 12px 20px; margin: 14px 0; font-size: 11px; color: #475569; }
+.value-chart-legend span { display: flex; align-items: center; gap: 6px; }
+.value-chart-legend i { width: 12px; height: 12px; border-radius: 2px; }
+.smart-term-comparison { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; background: #f8fafc; border: 1px solid #dce5e8; border-radius: 9px; padding: 14px; }
+.smart-term-comparison > div { display: grid; gap: 5px; }
+.smart-term-comparison span { font-size: 11px; color: #64748b; }
+.smart-term-comparison strong { font-size: 17px; }
+.smart-term-comparison .comparison-gain strong { color: #15803d; }
+.smart-term-comparison .comparison-loss strong { color: #be123c; }
+.smart-term-comparison p { grid-column: 1 / -1; margin: 2px 0 0; font-size: 11px; color: #64748b; }
+
 .dimming-warning small {
   display: block;
   font-size: 10px;
@@ -245,4 +267,7 @@
   .poweraid-value-grid {
     grid-template-columns: 1fr;
   }
+
+  .smart-term-comparison { grid-template-columns: 1fr; }
+  .value-chart-plot { gap: 3px; padding-left: 4px; padding-right: 4px; }
 }

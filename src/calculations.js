@@ -144,6 +144,9 @@ export function calculateBusinessCase(project) {
   const analysisPeriod = Math.max(1, Math.round(positive(a.analysisPeriod)));
   let cumulative = hardwareFinanced ? -positive(a.upfrontPayment) : -totalCapex, npv = cumulative;
   const cashFlowRows = [];
+  const customerValueRows = [];
+  let contractedSavingsTotal = cumulative, fullSmartSavingsTotal = cumulative;
+  let contractedGrossBenefitTotal = 0, fullSmartGrossBenefitTotal = 0, fullSmartExtensionServiceCost = 0;
   for (let year = 1; year <= analysisPeriod; year += 1) {
     const energyGrowth = Math.pow(1 + n(a.energyEscalation) / 100, year - 1);
     const opexGrowth = Math.pow(1 + n(a.opexEscalation || a.energyEscalation) / 100, year - 1);
@@ -163,9 +166,24 @@ export function calculateBusinessCase(project) {
         : 0;
     const serviceOpex = dealType === "noleggio_operativo" ? 0 : opex;
     const netCashFlow = benefit - serviceOpex - payment;
+    const currentOperatingCost = baselineKwh * positive(a.energyPrice) * energyGrowth + totalQuantity * positive(a.existingMaintenance);
+    const futureOperatingCost = Math.max(0, currentOperatingCost - benefit);
+    const fullSmartCloSaving = cmsEnabled ? cloSavingKwh * positive(a.energyPrice) * energyGrowth : 0;
+    const fullSmartPowerAidGrossSaving = powerAidEnabled ? powerAidGrossSaving * energyGrowth : 0;
+    const fullSmartBenefit = annualLedEnergySaving + fullSmartCloSaving + fullSmartPowerAidGrossSaving + maintenanceSaving;
+    const fullSmartPowerAidFee = powerAidEnabled ? fullSmartPowerAidGrossSaving * positive(a.powerAidCustomerFeePercent) / 100 : 0;
+    const fullSmartOpex = fixedServiceOpex * opexGrowth + fullSmartPowerAidFee;
+    const fullSmartServicePayment = serviceActive ? serviceOpex : fullSmartOpex;
+    const fullSmartNetBenefit = fullSmartBenefit - fullSmartServicePayment - payment;
+    contractedSavingsTotal += netCashFlow;
+    fullSmartSavingsTotal += fullSmartNetBenefit;
+    contractedGrossBenefitTotal += benefit;
+    fullSmartGrossBenefitTotal += fullSmartBenefit;
+    fullSmartExtensionServiceCost += Math.max(0, fullSmartServicePayment - serviceOpex);
     cumulative += netCashFlow;
     npv += netCashFlow / Math.pow(1 + n(a.discountRate) / 100, year);
     cashFlowRows.push({ year, grossBenefit: benefit, ledEnergySavingEUR: annualLedEnergySaving, cloSavingEUR: annualCloEnergySaving, opex, serviceOpex, payment, financePayment: dealType === "finance" ? payment : 0, contractedCustomerPayment: serviceOpex + payment, powerAidGrossSavingEUR: annualPowerAidGrossSaving, powerAidCustomerFee: annualPowerAidCustomerFee, powerAidSupplierCost: annualPowerAidSupplierCost, powerAidVimaluxMargin: annualPowerAidCustomerFee - annualPowerAidSupplierCost, netCashFlow, cumulative });
+    customerValueRows.push({ year, currentOperatingCost, futureOperatingCost, investmentPayment: payment, servicePayment: serviceOpex, customerSaving: netCashFlow, fullSmartNetBenefit, fullSmartBenefit, fullSmartOpex });
   }
   const annualOperationalBenefit = grossBenefit - totalAnnualOpex;
   const payback = annualOperationalBenefit > 0 ? totalCapex / annualOperationalBenefit : null;
@@ -183,5 +201,5 @@ export function calculateBusinessCase(project) {
     dealType, financingYears, financingPeriod, serviceAgreementPeriod, interestRateSnapshot: a.interestRateSnapshot || null, financingMonthlyPayment, financingAnnualPayment, allInclusiveAnnualPayment, allInclusiveContractRevenue, customerAnnualPayment, customerMonthlyPayment: monthlyPayment, customerPaymentYear1: dealType === "cash" ? totalCapex + totalAnnualOpex : positive(a.upfrontPayment) + customerAnnualPayment,
     customerAnnualNetBenefit, payback, roiPercent, npv, lifecycleResult, analysisPeriod, energyReductionPercent, upgradedEnergyReductionPercent, co2ReductionKg, decisionStatus, customerDecisionStatus,
     smartHardwareCost, implementationCost, gatewayCost, antennaCost, meterCost, freightCost, dutyCost, capexDirectCost, annualOpexDirectCost, contractOpexRevenue, contractOpexCost, capexContractRevenue, totalContractRevenue, commissionableLampSales, agent1CommissionCost, agent2CommissionCost, commissionCost, warrantyReserve, financingCost, totalDirectCosts, netProjectProfit, netProjectMarginPercent, minimumMarginPercent,
-    cashFlowRows, groupRows, hardware: { lcu, gateway, antenna, meter, gatewayQty, antennaQty, meterQty }, powerAidEnabled, cmsEnabled, smartEnabled };
+    cashFlowRows, customerValueRows, contractedSavingsTotal, fullSmartSavingsTotal, contractedGrossBenefitTotal, fullSmartGrossBenefitTotal, fullSmartAdditionalGrossSavings: fullSmartGrossBenefitTotal - contractedGrossBenefitTotal, fullSmartExtensionServiceCost, fullSmartIncrementalSavings: fullSmartSavingsTotal - contractedSavingsTotal, groupRows, hardware: { lcu, gateway, antenna, meter, gatewayQty, antennaQty, meterQty }, powerAidEnabled, cmsEnabled, smartEnabled };
 }
