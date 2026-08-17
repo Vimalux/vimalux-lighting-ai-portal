@@ -1304,6 +1304,36 @@ function ProductSelect({ label, type, p, value, onChange }) {
   );
 }
 function Solution({ p, r, update, t, money, num }) {
+  const ledProducts = [...r.groupRows.reduce((products, group) => {
+    const id = group.product?.id;
+    if (!id || !group.quantity) return products;
+    const current = products.get(id) || {
+      label: `${group.product.brand || ""} ${group.product.name || ""} · ${num(group.product.wattage || 0)} W`.trim(),
+      quantity: 0,
+      total: 0,
+    };
+    current.quantity += group.quantity;
+    current.total += group.salesTotal;
+    products.set(id, current);
+    return products;
+  }, new Map()).values()];
+  const smartRows = [
+    r.lcuQuantity > 0 ? ["LCU", r.lcuQuantity, r.smartHardwareCapex] : null,
+    r.implementationCapex > 0 ? [
+      p.language === "it" ? "Implementazione" : "Implementation",
+      r.lcuQuantity,
+      r.implementationCapex,
+    ] : null,
+    r.cmsEnabled && r.cmsOpex > 0 ? ["CMS", r.lcuQuantity, r.cmsOpex] : null,
+    r.hardware.gatewayQty > 0 ? ["Gateway", r.hardware.gatewayQty, r.gatewayCapex] : null,
+    r.gatewayOpex > 0 ? ["Gateway OPEX", r.hardware.gatewayQty, r.gatewayOpex] : null,
+    r.hardware.antennaQty > 0 ? ["Antenna", r.hardware.antennaQty, r.antennaCapex] : null,
+    r.hardware.meterQty > 0 ? [
+      p.language === "it" ? "Contatore" : "Energy meter",
+      r.hardware.meterQty,
+      r.meterCapex,
+    ] : null,
+  ].filter(Boolean);
   return (
     <div className="two-col">
       <Card title={t("solution")}>
@@ -1379,11 +1409,25 @@ function Solution({ p, r, update, t, money, num }) {
       <Card
         title={
           p.language === "it"
-            ? "Riepilogo hardware Smart"
-            : "Smart hardware summary"
+            ? "Riepilogo soluzione utilizzata"
+            : "Used solution summary"
         }
       >
-        <div className="lcu-callout">
+        <p className="hint">
+          <strong>{p.language === "it" ? "Apparecchi LED" : "LED luminaires"}</strong>
+        </p>
+        <Breakdown
+          rows={ledProducts.map((product) => [
+            product.label,
+            product.quantity,
+            product.total,
+          ])}
+          money={money}
+          number={num}
+        />
+        {r.smartEnabled && <><p className="hint">
+          <strong>Smart Lighting</strong>
+        </p><div className="lcu-callout">
           <small>
             {p.language === "it"
               ? "Quantità LCU calcolata"
@@ -1399,26 +1443,10 @@ function Solution({ p, r, update, t, money, num }) {
           </span>
         </div>
         <Breakdown
-          rows={[
-            ["LCU", r.lcuQuantity, r.smartHardwareCapex],
-            [
-              p.language === "it" ? "Implementazione" : "Implementation",
-              r.lcuQuantity,
-              r.implementationCapex,
-            ],
-            ["CMS", r.lcuQuantity, r.cmsOpex],
-            ["Gateway", r.hardware.gatewayQty, r.gatewayCapex],
-            ["Gateway OPEX", r.hardware.gatewayQty, r.gatewayOpex],
-            ["Antenna", r.hardware.antennaQty, r.antennaCapex],
-            [
-              p.language === "it" ? "Contatore" : "Energy meter",
-              r.hardware.meterQty,
-              r.meterCapex,
-            ],
-          ]}
+          rows={smartRows}
           money={money}
           number={num}
-        />
+        /></>}
       </Card>
     </div>
   );
@@ -1873,6 +1901,8 @@ function Assumptions({ p, update }) {
 function Kpis({ p, r, t, money, num }) {
   const allInclusive = r.dealType === "noleggio_operativo";
   const luminaires = Math.max(1, r.totalQuantity);
+  const money2 = (value) =>
+    formatMoney(value, p.language, p.project.currency, 2);
   const opexLabel = allInclusive
     ? p.language === "it"
       ? "OPEX mensile (incluso nel canone)"
@@ -1887,19 +1917,19 @@ function Kpis({ p, r, t, money, num }) {
     : t("monthlyPayment");
   const list = [
     [t("capex"), money(r.totalCapex)],
-    [opexLabel, money(r.totalAnnualOpex / 12)],
+    [opexLabel, money2(r.totalAnnualOpex / 12)],
     [
       p.language === "it"
         ? "OPEX mensile per apparecchio"
         : "Monthly OPEX per luminaire",
-      money(r.totalAnnualOpex / 12 / luminaires),
+      money2(r.totalAnnualOpex / 12 / luminaires),
     ],
-    [paymentLabel, money(r.monthlyPayment)],
+    [paymentLabel, money2(r.monthlyPayment)],
     [
       p.language === "it"
         ? "Canone mensile per apparecchio"
         : "Monthly payment per luminaire",
-      money(r.monthlyPayment / luminaires),
+      money2(r.monthlyPayment / luminaires),
     ],
     [t("annualNet"), money(r.customerAnnualNetBenefit)],
     [
@@ -2212,6 +2242,8 @@ function Report({ p, r, t, money, num }) {
 function CashTable({ p, r, money }) {
   const allInclusive = r.dealType === "noleggio_operativo";
   const included = p.language === "it" ? "Incluso" : "Included";
+  const money2 = (value) =>
+    formatMoney(value, p.language, p.project.currency, 2);
   return (
     <div className="table-scroll">
       <table>
@@ -2240,8 +2272,8 @@ function CashTable({ p, r, money }) {
             <tr key={x.year}>
               <td>{x.year}</td>
               <td>{money(x.grossBenefit)}</td>
-              <td>{allInclusive ? included : money(x.opex)}</td>
-              <td>{money(x.payment)}</td>
+              <td>{allInclusive ? included : money2(x.opex)}</td>
+              <td>{money2(x.payment)}</td>
               <td>{money(x.netCashFlow)}</td>
               <td>{money(x.cumulative)}</td>
             </tr>

@@ -10,6 +10,7 @@ export function generateCustomerPdf(project, result) {
   const t = useT(lang);
   const it = lang === "it";
   const money = (value) => formatMoney(value, lang, project.project.currency);
+  const money2 = (value) => formatMoney(value, lang, project.project.currency, 2);
   const percent = (value) => formatPercent(value, lang);
   const commercial = reportCommercialContext(project, result);
   const { projectType, financed } = commercial;
@@ -44,8 +45,8 @@ export function generateCustomerPdf(project, result) {
   autoTable(doc, {
     startY: 57,
     theme: "grid",
-    head: [[t("preliminary"), t("capex"), t("monthlyPayment"), t("annualOpex"), `${t("annualNet")}*`, t("roi"), paybackLabel]],
-    body: [[result.customerDecisionStatus.replace("_", "-"), money(result.totalCapex), money(result.monthlyPayment), money(result.totalAnnualOpex), money(result.customerAnnualNetBenefit), percent(result.roiPercent), result.payback == null ? t("notAvailable") : `${formatNumber(result.payback, lang, 1)} ${t("years")}`]],
+    head: [[t("preliminary"), t("capex"), t("monthlyPayment"), it ? "OPEX mensile" : "Monthly OPEX", `${t("annualNet")}*`, t("roi"), paybackLabel]],
+    body: [[result.customerDecisionStatus.replace("_", "-"), money(result.totalCapex), money2(result.monthlyPayment), money2(result.totalAnnualOpex / 12), money(result.customerAnnualNetBenefit), percent(result.roiPercent), result.payback == null ? t("notAvailable") : `${formatNumber(result.payback, lang, 1)} ${t("years")}`]],
     headStyles: { fillColor: [15, 118, 110] },
     styles: { font: "helvetica", fontSize: 6.9, cellPadding: 1.8, valign: "middle" },
     columnStyles: { 0: { halign: "left" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
@@ -125,7 +126,7 @@ export function generateCustomerPdf(project, result) {
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 14,
       head: [[it ? "Componente" : "Component", it ? "QuantitÃ " : "Quantity", it ? "Prodotto" : "Product"]],
-      body: [["LCU", formatNumber(result.lcuQuantity, lang), result.hardware.lcu.name || "-"], ["Gateway", formatNumber(result.hardware.gatewayQty, lang), result.hardware.gateway.name || "-"], ["Antenna", formatNumber(result.hardware.antennaQty, lang), result.hardware.antenna.name || "-"], [it ? "Contatore" : "Energy meter", formatNumber(result.hardware.meterQty, lang), result.hardware.meter.name || "-"]],
+      body: [["LCU", result.lcuQuantity, result.hardware.lcu.name || "-"], ["Gateway", result.hardware.gatewayQty, result.hardware.gateway.name || "-"], ["Antenna", result.hardware.antennaQty, result.hardware.antenna.name || "-"], [it ? "Contatore" : "Energy meter", result.hardware.meterQty, result.hardware.meter.name || "-"]].filter(([, quantity]) => quantity > 0).map(([component, quantity, product]) => [component, formatNumber(quantity, lang), product]),
       headStyles: { fillColor: [15, 118, 110] },
       styles: { font: "helvetica", fontSize: 8, valign: "middle" },
       columnStyles: { 0: { halign: "left" }, 1: { halign: "right", cellWidth: 32 }, 2: { halign: "left" } },
@@ -137,7 +138,7 @@ export function generateCustomerPdf(project, result) {
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 14,
     theme: "striped",
-    body: rows([[it ? "Consumo nominale di sistema" : "Nominal system consumption", `${formatNumber(result.nominalSystemKwh, lang)} kWh`], [it ? "Riduzione dimmer esistente" : "Existing fixed dimming reduction", `${formatNumber(result.existingDimmingSavingKwh, lang)} kWh`], [t("baseline"), `${formatNumber(result.baselineKwh, lang)} kWh`], [it ? "Consumo LED" : "LED consumption", `${formatNumber(result.ledKwh, lang)} kWh`], [t("ledSaving"), `${formatNumber(result.ledSavingKwh, lang)} kWh`], [t("cloSaving"), `${formatNumber(result.cloSavingKwh, lang)} kWh`], [it ? "Consumo dopo CLO" : "Consumption after CLO", `${formatNumber(result.afterCloKwh, lang)} kWh`], [t("powerSaving"), `${formatNumber(result.powerAidSavingKwh, lang)} kWh`], [t("final"), `${formatNumber(result.finalKwh, lang)} kWh`], [t("energyReduction"), percent(result.energyReductionPercent)], [it ? "Riduzione CO2" : "CO2 reduction", `${formatNumber(result.co2ReductionKg / 1000, lang, 1)} ${it ? "t/anno" : "t/year"}`], [t("maintenanceSaving"), money(result.maintenanceSaving)], [t("annualOpex"), money(result.totalAnnualOpex)], [t("npv"), money(result.npv)], [`${t("lifecycle")} - ${result.analysisPeriod} ${t("years")}`, money(result.lifecycleResult)]]),
+    body: rows([[it ? "Consumo nominale di sistema" : "Nominal system consumption", `${formatNumber(result.nominalSystemKwh, lang)} kWh`], [it ? "Riduzione dimmer esistente" : "Existing fixed dimming reduction", `${formatNumber(result.existingDimmingSavingKwh, lang)} kWh`], [t("baseline"), `${formatNumber(result.baselineKwh, lang)} kWh`], [it ? "Consumo LED" : "LED consumption", `${formatNumber(result.ledKwh, lang)} kWh`], [t("ledSaving"), `${formatNumber(result.ledSavingKwh, lang)} kWh`], [t("cloSaving"), `${formatNumber(result.cloSavingKwh, lang)} kWh`], [it ? "Consumo dopo CLO" : "Consumption after CLO", `${formatNumber(result.afterCloKwh, lang)} kWh`], [t("powerSaving"), `${formatNumber(result.powerAidSavingKwh, lang)} kWh`], [t("final"), `${formatNumber(result.finalKwh, lang)} kWh`], [t("energyReduction"), percent(result.energyReductionPercent)], [it ? "Riduzione CO2" : "CO2 reduction", `${formatNumber(result.co2ReductionKg / 1000, lang, 1)} ${it ? "t/anno" : "t/year"}`], [t("maintenanceSaving"), money(result.maintenanceSaving)], [t("annualOpex"), money2(result.totalAnnualOpex)], [t("npv"), money(result.npv)], [`${t("lifecycle")} - ${result.analysisPeriod} ${t("years")}`, money(result.lifecycleResult)]]),
     styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.05 },
     columnStyles: { 0: { halign: "left" }, 1: { halign: "right" } },
   });
@@ -147,7 +148,7 @@ export function generateCustomerPdf(project, result) {
     startY: doc.lastAutoTable.finalY + 14,
     margin: { bottom: 18 },
     head: [[it ? "Voce" : "Item", it ? "Importo" : "Amount"]],
-    body: rows([[it ? "Apparecchi LED" : "LED luminaires", money(result.ledCapex)], ["LCU", money(result.smartHardwareCapex)], [it ? "Implementazione" : "Implementation", money(result.implementationCapex)], ["Gateway", money(result.gatewayCapex)], [it ? "Antenne" : "Antennas", money(result.antennaCapex)], [it ? "Contatori" : "Meters", money(result.meterCapex)], [it ? "Trasporto" : "Freight", money(result.freight)], [t("capex"), money(result.totalCapex)], ["CMS", money(result.cmsOpex)], ["Gateway OPEX", money(result.gatewayOpex)], ["PowerAiD fee", money(result.powerAidFee)], [t("annualOpex"), money(result.totalAnnualOpex)]]),
+    body: rows([[it ? "Apparecchi LED" : "LED luminaires", money(result.ledCapex)], ["LCU", money(result.smartHardwareCapex)], [it ? "Implementazione" : "Implementation", money(result.implementationCapex)], ["Gateway", money(result.gatewayCapex)], [it ? "Antenne" : "Antennas", money(result.antennaCapex)], [it ? "Contatori" : "Meters", money(result.meterCapex)], [it ? "Trasporto" : "Freight", money(result.freight)], [t("capex"), money(result.totalCapex)], ["CMS", money2(result.cmsOpex)], ["Gateway OPEX", money2(result.gatewayOpex)], ["PowerAiD fee", money2(result.powerAidFee)], [t("annualOpex"), money2(result.totalAnnualOpex)]]),
     headStyles: { fillColor: [15, 118, 110] },
     styles: { font: "helvetica", fontSize: 7.1, cellPadding: 0.9 },
     columnStyles: { 0: { halign: "left" }, 1: { halign: "right", cellWidth: 46 } },
@@ -162,7 +163,7 @@ export function generateCustomerPdf(project, result) {
     showHead: "everyPage",
     rowPageBreak: "avoid",
     head: [[it ? "Anno" : "Year", it ? "Beneficio lordo" : "Gross benefit", "OPEX", it ? "Pagamento" : "Payment", it ? "Flusso netto" : "Net cash flow", it ? "Cumulato" : "Cumulative"]],
-    body: result.cashFlowRows.map((row) => [row.year, money(row.grossBenefit), commercial.opexIncludedInPayment ? commercial.includedLabel : money(row.opex), money(row.payment), money(row.netCashFlow), money(row.cumulative)]),
+    body: result.cashFlowRows.map((row) => [row.year, money(row.grossBenefit), commercial.opexIncludedInPayment ? commercial.includedLabel : money2(row.opex), money2(row.payment), money(row.netCashFlow), money(row.cumulative)]),
     headStyles: { fillColor: [15, 118, 110] },
     styles: { font: "helvetica", fontSize: 7.3, cellPadding: 1.5, valign: "middle" },
     columnStyles: { 0: { halign: "center" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
