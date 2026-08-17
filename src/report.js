@@ -34,18 +34,18 @@ export function generateCustomerPdf(project, result) {
     const parts = (row, fullSmart = false) => fullSmart
       ? [{ value: Math.max(0, row.currentOperatingCost - row.fullSmartBenefit), color: [79, 183, 185] }, { value: row.fullSmartOpex, color: [245, 158, 11] }, { value: row.investmentPayment, color: [148, 163, 184] }, { value: row.fullSmartNetBenefit, color: [22, 163, 74] }]
       : [{ value: row.futureOperatingCost, color: [79, 183, 185] }, { value: row.servicePayment, color: [245, 158, 11] }, { value: row.investmentPayment, color: [148, 163, 184] }, { value: row.customerSaving, color: [22, 163, 74] }];
-    const scenarios = [{ label: it ? "Situazione attuale" : "Current situation", current: true, row: first }, { label: it ? "Nuova soluzione - anno 1" : "New solution - year 1", year: 1, row: first }];
+    const scenarios = [{ label: it ? "Situazione attuale" : "Current situation", current: true, row: first }, { label: it ? "Nuova soluzione" : "New solution", row: first }];
     const financingChanges = result.financingPeriod < result.analysisPeriod && chartRows[result.financingPeriod - 1]?.investmentPayment !== chartRows[result.financingPeriod]?.investmentPayment;
     const phaseStarts = [...new Set([1, financingChanges ? result.financingPeriod + 1 : null, result.serviceAgreementPeriod + 1].filter((year) => year && year <= result.analysisPeriod))].sort((a, b) => a - b);
     const phases = phaseStarts.map((start, index) => ({ start, end: (phaseStarts[index + 1] || result.analysisPeriod + 1) - 1, row: chartRows[start - 1], smart: start <= result.serviceAgreementPeriod }));
-    const top = 32, chartHeight = 82, barWidth = 42, gap = 34;
+    const top = 34, chartHeight = 70, barWidth = 42, gap = 34;
     const chartWidth = scenarios.length * barWidth + (scenarios.length - 1) * gap;
     const x = (210 - chartWidth) / 2;
-    section(it ? "Ripartizione del costo annuo e del risparmio cliente" : "Annual cost allocation and customer savings", 18);
+    section(it ? "Confronto dei costi annuali - anno 1" : "Annual cost comparison - year 1", 18);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(71, 85, 105);
-    doc.text(it ? "Costo operativo post-upgrade, servizi, pagamento contrattuale e risparmio netto del cliente." : "Post-upgrade operating cost, services, contracted payment and customer net saving.", 18, 24);
+    doc.text(it ? `Le colonne mostrano l'anno 1. La sequenza sottostante mostra l'intero periodo di analisi di ${result.analysisPeriod} anni.` : `The columns show year 1. The timeline below shows the full ${result.analysisPeriod}-year analysis period.`, 18, 24);
     doc.setDrawColor(148, 163, 184); doc.line(x - 6, top + chartHeight, x + chartWidth + 6, top + chartHeight);
     scenarios.forEach((scenario, index) => {
       const bx = x + index * (barWidth + gap);
@@ -55,16 +55,16 @@ export function generateCustomerPdf(project, result) {
         if (!h) return;
         bottom -= h;
         doc.setFillColor(...color); doc.rect(bx, bottom, barWidth, h, "F");
-        if (h >= 12) {
+        if (h >= 7) {
           doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(10);
           doc.text(`${Math.round(value / scenario.row.currentOperatingCost * 100)}%`, bx + barWidth / 2, bottom + h / 2, { align: "center" });
+          if (h >= 11) { doc.setFontSize(6.5); doc.text(money(value), bx + barWidth / 2, bottom + h / 2 + 4, { align: "center" }); }
         }
       };
       if (scenario.current) segment(scenario.row.currentOperatingCost, [15, 111, 174]);
       else parts(scenario.row, scenario.fullSmart).forEach((part) => segment(part.value, part.color));
       doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(15, 23, 42);
       doc.text(scenario.label.split("\n"), bx + barWidth / 2, top + chartHeight + 7, { align: "center" });
-      if (scenario.year) { doc.setFont("helvetica", "normal"); doc.setFontSize(6); doc.setTextColor(71, 85, 105); doc.text(`${it ? "Anno" : "Year"} ${scenario.year}`, bx + barWidth / 2, top + chartHeight + 16, { align: "center" }); }
     });
     const legend = [[it ? "Costo operativo post-upgrade" : "Post-upgrade operating cost", [79, 183, 185]], [it ? "OPEX servizi" : "Service OPEX", [245, 158, 11]], [it ? "Pagamento contratto / investimento" : "Contract / investment payment", [148, 163, 184]], [it ? "Risparmio netto cliente" : "Customer net saving", [22, 163, 74]]];
     legend.forEach(([label, color], index) => {
@@ -85,9 +85,9 @@ export function generateCustomerPdf(project, result) {
     if (result.cmsEnabled && postContract) {
       const boxY = 196;
       doc.setFillColor(236, 253, 245); doc.setDrawColor(167, 243, 208); doc.roundedRect(18, boxY, 174, 32, 2, 2, "FD");
-      const comparison = [[it ? `Senza Smart dal ${postContract.year}° anno` : `Without Smart from year ${postContract.year}`, `${money(postContract.customerSaving)} / ${it ? "anno" : "year"}`], [it ? "Mantenendo Smart" : "Keeping Smart", `${money(postContract.fullSmartNetBenefit)} / ${it ? "anno" : "year"}`], [it ? `Effetto netto fino all'anno ${result.analysisPeriod}` : `Net effect through year ${result.analysisPeriod}`, money(result.fullSmartIncrementalSavings)]];
+      const comparison = [[it ? `Senza Smart - anni ${postContract.year}-${result.analysisPeriod}` : `Without Smart - years ${postContract.year}-${result.analysisPeriod}`, `${money(postContract.customerSaving)} / ${it ? "anno" : "year"}`], [it ? `Con Smart - anni ${postContract.year}-${result.analysisPeriod}` : `With Smart - years ${postContract.year}-${result.analysisPeriod}`, `${money(postContract.fullSmartNetBenefit)} / ${it ? "anno" : "year"}`], [it ? "Beneficio aggiuntivo Smart" : "Additional Smart benefit", `${money(postContract.fullSmartNetBenefit - postContract.customerSaving)} / ${it ? "anno" : "year"}`]];
       comparison.forEach(([label, value], index) => { const cx = 24 + index * 56; doc.setTextColor(71, 85, 105); doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.text(label, cx, boxY + 8, { maxWidth: 50 }); doc.setTextColor(index === 2 && result.fullSmartIncrementalSavings < 0 ? 190 : 4, index === 2 && result.fullSmartIncrementalSavings < 0 ? 18 : 120, index === 2 && result.fullSmartIncrementalSavings < 0 ? 60 : 87); doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(value, cx, boxY + 20, { maxWidth: 50 }); });
-      doc.setFont("helvetica", "normal"); doc.setTextColor(71, 85, 105); doc.setFontSize(6.5); doc.text(result.powerAidEnabled ? (it ? "PowerAiD incluso solo quando genera un risparmio incrementale." : "PowerAiD included only when it generates incremental savings.") : (it ? "PowerAiD non incluso nello scenario." : "PowerAiD is not included in the scenario."), 24, boxY + 27, { maxWidth: 160 });
+      doc.setFont("helvetica", "normal"); doc.setTextColor(71, 85, 105); doc.setFontSize(6.5); doc.text(`${it ? "Beneficio aggiuntivo totale" : "Total additional benefit"}: ${money(result.fullSmartIncrementalSavings)}. ${result.powerAidEnabled ? (it ? "PowerAiD incluso solo quando genera un risparmio incrementale." : "PowerAiD included only when it generates incremental savings.") : (it ? "PowerAiD non incluso nello scenario." : "PowerAiD is not included in the scenario.")}`, 24, boxY + 27, { maxWidth: 160 });
     } else if (result.cmsEnabled) {
       doc.setFillColor(236, 253, 245); doc.setDrawColor(167, 243, 208); doc.roundedRect(42, 196, 126, 16, 2, 2, "FD"); doc.setTextColor(4, 120, 87); doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.text(it ? `Smart attivo per l'intero periodo di analisi - ${result.analysisPeriod} anni` : `Smart active throughout the full analysis period - ${result.analysisPeriod} years`, 105, 206, { align: "center" });
     }
@@ -100,7 +100,7 @@ export function generateCustomerPdf(project, result) {
   doc.setFontSize(20);
   doc.text("VIMALUX Intelligence", 14, 17);
   doc.setFontSize(14);
-  doc.text(it ? "Studio Preliminare di FattibilitÃ  Economica" : "Preliminary Business Case", 14, 28);
+  doc.text(it ? "Studio Preliminare di Fattibilità Economica" : "Preliminary Business Case", 14, 28);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.text(`${project.project.businessCaseId}  |  ${project.customer.name || "-"}  |  ${project.project.date}`, 14, 36);
@@ -174,7 +174,7 @@ export function generateCustomerPdf(project, result) {
       [it ? "Tasso di attualizzazione" : "Discount rate", percent(project.assumptions.discountRate)],
       [it ? "Periodo di analisi" : "Analysis period", `${project.assumptions.analysisPeriod} ${t("years")}`],
       ["Smart Lighting", result.smartEnabled ? t("yes") : t("no")],
-      [it ? "QuantitÃ  LCU calcolata" : "Calculated LCU quantity", result.lcuQuantity],
+      [it ? "Quantità LCU calcolata" : "Calculated LCU quantity", result.lcuQuantity],
       ["CMS", result.cmsEnabled ? t("yes") : t("no")],
       ["PowerAiD", result.powerAidEnabled ? t("yes") : t("no")],
       ["CLO", percent(result.smartEnabled ? project.assumptions.cloPercent : 0)],
@@ -189,7 +189,7 @@ export function generateCustomerPdf(project, result) {
   const replacementRows = aggregateReplacementRows(result.groupRows.filter((group) => group.upgradeSelected));
   autoTable(doc, {
     startY: 23,
-    head: [[it ? "Tecnologia esistente" : "Existing technology", it ? "Potenza esistente" : "Existing wattage", it ? "QuantitÃ " : "Quantity", it ? "Nuovo prodotto LED" : "New LED product"]],
+    head: [[it ? "Tecnologia esistente" : "Existing technology", it ? "Potenza esistente" : "Existing wattage", it ? "Quantità" : "Quantity", it ? "Nuovo prodotto LED" : "New LED product"]],
     body: replacementRows.map((row) => [row.technology, `${formatNumber(row.existingWattage, lang)} W`, formatNumber(row.quantity, lang), row.productName]),
     headStyles: { fillColor: [15, 118, 110] },
     styles: { font: "helvetica", fontSize: 8, valign: "middle" },
@@ -201,7 +201,7 @@ export function generateCustomerPdf(project, result) {
     section(it ? "Hardware Smart Lighting" : "Smart Lighting hardware", doc.lastAutoTable.finalY + 9);
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 14,
-      head: [[it ? "Componente" : "Component", it ? "QuantitÃ " : "Quantity", it ? "Prodotto" : "Product"]],
+      head: [[it ? "Componente" : "Component", it ? "Quantità" : "Quantity", it ? "Prodotto" : "Product"]],
       body: [["LCU", result.lcuQuantity, result.hardware.lcu.name || "-"], ["Gateway", result.hardware.gatewayQty, result.hardware.gateway.name || "-"], ["Antenna", result.hardware.antennaQty, result.hardware.antenna.name || "-"], [it ? "Contatore" : "Energy meter", result.hardware.meterQty, result.hardware.meter.name || "-"]].filter(([, quantity]) => quantity > 0).map(([component, quantity, product]) => [component, formatNumber(quantity, lang), product]),
       headStyles: { fillColor: [15, 118, 110] },
       styles: { font: "helvetica", fontSize: 8, valign: "middle" },
@@ -215,7 +215,7 @@ export function generateCustomerPdf(project, result) {
     startY: doc.lastAutoTable.finalY + 14,
     theme: "striped",
     body: rows([[it ? "Consumo nominale di sistema" : "Nominal system consumption", `${formatNumber(result.nominalSystemKwh, lang)} kWh`], [it ? "Riduzione dimmer esistente" : "Existing fixed dimming reduction", `${formatNumber(result.existingDimmingSavingKwh, lang)} kWh`], [it ? "Baseline intera installazione" : "Whole-installation baseline", `${formatNumber(result.baselineKwh, lang)} kWh`], [it ? "Baseline apparecchi selezionati" : "Selected-luminaire baseline", `${formatNumber(result.upgradedBaselineKwh, lang)} kWh`], [it ? "Consumo apparecchi non sostituiti" : "Non-upgraded consumption", `${formatNumber(result.notUpgradedBaselineKwh, lang)} kWh`], [it ? "Consumo LED / installazione post-upgrade" : "LED / post-upgrade installation consumption", `${formatNumber(result.ledKwh, lang)} kWh`], [t("ledSaving"), `${formatNumber(result.ledSavingKwh, lang)} kWh`], [t("cloSaving"), `${formatNumber(result.cloSavingKwh, lang)} kWh`], [it ? "Consumo dopo CLO" : "Consumption after CLO", `${formatNumber(result.afterCloKwh, lang)} kWh`], [t("powerSaving"), `${formatNumber(result.powerAidSavingKwh, lang)} kWh`], [it ? "Consumo finale apparecchi aggiornati" : "Upgraded-luminaire final consumption", `${formatNumber(result.upgradedFinalKwh, lang)} kWh`], [it ? "Consumo finale intera installazione" : "Whole-installation final consumption", `${formatNumber(result.finalKwh, lang)} kWh`], [it ? "Riduzione apparecchi aggiornati" : "Upgraded-luminaire reduction", percent(result.upgradedEnergyReductionPercent)], [it ? "Riduzione intera installazione" : "Whole-installation reduction", percent(result.energyReductionPercent)], [it ? "Riduzione CO2" : "CO2 reduction", `${formatNumber(result.co2ReductionKg / 1000, lang, 1)} ${it ? "t/anno" : "t/year"}`], [t("maintenanceSaving"), money(result.maintenanceSaving)], [t("annualOpex"), money2(result.totalAnnualOpex)], [t("npv"), money(result.npv)], [`${t("lifecycle")} - ${result.analysisPeriod} ${t("years")}`, money(result.lifecycleResult)]]),
-    styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.05 },
+    styles: { font: "helvetica", fontSize: 7.2, cellPadding: 0.7 },
     columnStyles: { 0: { halign: "left" }, 1: { halign: "right" } },
   });
 
@@ -226,7 +226,7 @@ export function generateCustomerPdf(project, result) {
     head: [[it ? "Voce" : "Item", it ? "Importo" : "Amount"]],
     body: rows([[it ? "Apparecchi LED" : "LED luminaires", money(result.ledCapex)], ["LCU", money(result.smartHardwareCapex)], [it ? "Implementazione" : "Implementation", money(result.implementationCapex)], ["Gateway", money(result.gatewayCapex)], [it ? "Antenne" : "Antennas", money(result.antennaCapex)], [it ? "Contatori" : "Meters", money(result.meterCapex)], [it ? "Trasporto" : "Freight", money(result.freight)], [t("capex"), money(result.totalCapex)], ["CMS", money2(result.cmsOpex)], ["Gateway OPEX", money2(result.gatewayOpex)], ["PowerAiD fee", money2(result.powerAidFee)], [t("annualOpex"), money2(result.totalAnnualOpex)]]),
     headStyles: { fillColor: [15, 118, 110] },
-    styles: { font: "helvetica", fontSize: 7.1, cellPadding: 0.9 },
+    styles: { font: "helvetica", fontSize: 6.6, cellPadding: 0.55 },
     columnStyles: { 0: { halign: "left" }, 1: { halign: "right", cellWidth: 46 } },
     didParseCell: alignTableHeaders("left", "right"),
   });
@@ -258,7 +258,7 @@ export function generateCustomerPdf(project, result) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.text(it ? "Censimento GPS - classificazione UNI 11248 - progettazione illuminotecnica - assegnazione prodotti - proposta tecnica finale in VIMALUX Planner" : "GPS census - UNI 11248 classification - photometric design - product assignment - final technical proposal in VIMALUX Planner", 14, y + 6, { maxWidth: 182 });
-  const disclaimer = it ? "Questa analisi rappresenta una valutazione preliminare basata su quantitÃ  aggregate, potenze medie e ipotesi commerciali. Le quantitÃ  definitive, il censimento GPS, la classificazione stradale, le verifiche UNI 11248, la progettazione illuminotecnica e l'assegnazione finale dei prodotti saranno sviluppati tramite VIMALUX Planner." : "This analysis is a preliminary assessment based on aggregated quantities, average wattages and commercial assumptions. Final quantities, the GPS census, road classification, UNI 11248 verification, photometric design and final product assignment will be developed through VIMALUX Planner.";
+  const disclaimer = it ? "Questa analisi rappresenta una valutazione preliminare basata su quantità aggregate, potenze medie e ipotesi commerciali. Le quantità definitive, il censimento GPS, la classificazione stradale, le verifiche UNI 11248, la progettazione illuminotecnica e l'assegnazione finale dei prodotti saranno sviluppati tramite VIMALUX Planner." : "This analysis is a preliminary assessment based on aggregated quantities, average wattages and commercial assumptions. Final quantities, the GPS census, road classification, UNI 11248 verification, photometric design and final product assignment will be developed through VIMALUX Planner.";
   doc.setFontSize(8);
   doc.setTextColor(71, 85, 105);
   doc.text(disclaimer, 14, y + 18, { maxWidth: 182 });

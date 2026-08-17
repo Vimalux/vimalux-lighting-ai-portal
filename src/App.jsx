@@ -2549,7 +2549,7 @@ function CustomerValueChart({ p, r, money }) {
   };
   const scenarios = [
     { key: "current", label: it ? "Situazione attuale" : "Current situation", year: null, current: true, cost: first.currentOperatingCost },
-    { key: "contract", label: it ? "Nuova soluzione - anno 1" : "New solution - year 1", year: 1, parts: segments(first) },
+    { key: "contract", label: it ? "Nuova soluzione" : "New solution", parts: segments(first) },
   ];
   const financingChanges = r.financingPeriod < r.analysisPeriod && rows[r.financingPeriod - 1]?.investmentPayment !== rows[r.financingPeriod]?.investmentPayment;
   const phaseStarts = [...new Set([1, financingChanges ? r.financingPeriod + 1 : null, r.serviceAgreementPeriod + 1].filter((year) => year && year <= r.analysisPeriod))].sort((a, b) => a - b);
@@ -2561,8 +2561,8 @@ function CustomerValueChart({ p, r, money }) {
   const partLabel = { future: it ? "Costo futuro" : "Future cost", service: "OPEX", payment: it ? "Investimento" : "Investment", saving: it ? "Risparmio cliente" : "Customer saving" };
   return (
     <section className="customer-value-chart">
-      <h3>{it ? "Ripartizione del costo annuo e del risparmio cliente" : "Annual cost allocation and customer savings"}</h3>
-      <p className="chart-intro">{it ? "Il costo attuale viene confrontato con il costo post-upgrade, i pagamenti contrattuali e il risparmio netto del cliente." : "The current cost is compared with post-upgrade cost, contracted payments and the customer's net saving."}</p>
+      <h3>{it ? "Confronto dei costi annuali - anno 1" : "Annual cost comparison - year 1"}</h3>
+      <p className="chart-intro">{it ? `Le colonne mostrano l'anno 1. La sequenza sottostante mostra l'intero periodo di analisi di ${r.analysisPeriod} anni.` : `The columns show year 1. The timeline below shows the full ${r.analysisPeriod}-year analysis period.`}</p>
       <div className={`value-summary-plot scenarios-${scenarios.length}`}>
         {scenarios.map((scenario) => (
           <div className="value-summary-scenario" key={scenario.key}>
@@ -2576,7 +2576,6 @@ function CustomerValueChart({ p, r, money }) {
               ))}
             </div>
             <strong>{scenario.label}</strong>
-            {scenario.year && <small>{it ? "Anno" : "Year"} {scenario.year}</small>}
           </div>
         ))}
       </div>
@@ -2598,9 +2597,9 @@ function CustomerValueChart({ p, r, money }) {
       </div>
       {r.cmsEnabled && postContract && (
         <div className="smart-continuation-callout">
-          <div><span>{it ? `Dal ${postContract.year}° anno senza Smart` : `From year ${postContract.year} without Smart`}</span><strong>{money(postContract.customerSaving)} / {it ? "anno" : "year"}</strong></div>
-          <div><span>{it ? "Mantenendo Smart" : "Keeping Smart"}</span><strong>{money(postContract.fullSmartNetBenefit)} / {it ? "anno" : "year"}</strong></div>
-          <div className={r.fullSmartIncrementalSavings >= 0 ? "positive" : "negative"}><span>{it ? `Effetto netto totale fino all'anno ${r.analysisPeriod}` : `Total net effect through year ${r.analysisPeriod}`}</span><strong>{money(r.fullSmartIncrementalSavings)}</strong></div>
+          <div><span>{it ? `Senza Smart - anni ${postContract.year}-${r.analysisPeriod}` : `Without Smart - years ${postContract.year}-${r.analysisPeriod}`}</span><strong>{money(postContract.customerSaving)} / {it ? "anno" : "year"}</strong></div>
+          <div><span>{it ? `Con Smart - anni ${postContract.year}-${r.analysisPeriod}` : `With Smart - years ${postContract.year}-${r.analysisPeriod}`}</span><strong>{money(postContract.fullSmartNetBenefit)} / {it ? "anno" : "year"}</strong></div>
+          <div className={r.fullSmartIncrementalSavings >= 0 ? "positive" : "negative"}><span>{it ? "Beneficio aggiuntivo Smart" : "Additional Smart benefit"}</span><strong>{money(postContract.fullSmartNetBenefit - postContract.customerSaving)} / {it ? "anno" : "year"}<small>{money(r.fullSmartIncrementalSavings)} {it ? "totale" : "total"}</small></strong></div>
           <p>{r.powerAidEnabled ? (it ? "PowerAiD è incluso solo quando genera un risparmio incrementale." : "PowerAiD is included only when it generates incremental savings.") : (it ? "PowerAiD non è incluso nello scenario." : "PowerAiD is not included in the scenario.")}</p>
         </div>
       )}

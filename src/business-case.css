@@ -249,6 +249,7 @@
 .smart-continuation-callout > div { display: grid; gap: 5px; }
 .smart-continuation-callout span { font-size: 11px; color: #475569; }
 .smart-continuation-callout strong { font-size: 16px; }
+.smart-continuation-callout strong small { display: block; margin-top: 4px; font-size: 11px; font-weight: 600; color: #047857; }
 .smart-continuation-callout p { grid-column: 1 / -1; margin: 2px 0 0; font-size: 11px; color: #64748b; }
 .value-chart-year small { font-size: 9px; color: #64748b; }
 .value-chart-legend { display: flex; flex-wrap: wrap; gap: 12px 20px; margin: 14px 0; font-size: 11px; color: #475569; }
