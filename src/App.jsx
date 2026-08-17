@@ -2549,12 +2549,15 @@ function CustomerValueChart({ p, r, money }) {
   };
   const scenarios = [
     { key: "current", label: it ? "Situazione attuale" : "Current situation", year: null, current: true, cost: first.currentOperatingCost },
-    { key: "contract", label: it ? "Durante il contratto" : "During the contract", year: 1, parts: segments(first) },
-    ...(postContract ? [
-      { key: "without", label: it ? "Dopo il contratto - senza Smart" : "After contract - without Smart", year: postContract.year, parts: segments(postContract) },
-      { key: "with", label: it ? "Smart mantenuto" : "Smart continued", year: postContract.year, parts: segments(postContract, true) },
-    ] : []),
+    { key: "contract", label: it ? "Nuova soluzione - anno 1" : "New solution - year 1", year: 1, parts: segments(first) },
   ];
+  const financingChanges = r.financingPeriod < r.analysisPeriod && rows[r.financingPeriod - 1]?.investmentPayment !== rows[r.financingPeriod]?.investmentPayment;
+  const phaseStarts = [...new Set([1, financingChanges ? r.financingPeriod + 1 : null, r.serviceAgreementPeriod + 1].filter((year) => year && year <= r.analysisPeriod))].sort((a, b) => a - b);
+  const phases = phaseStarts.map((start, index) => {
+    const end = (phaseStarts[index + 1] || r.analysisPeriod + 1) - 1;
+    const row = rows[start - 1];
+    return { start, end, row, financing: row.investmentPayment > 0, smart: start <= r.serviceAgreementPeriod };
+  });
   const partLabel = { future: it ? "Costo futuro" : "Future cost", service: "OPEX", payment: it ? "Investimento" : "Investment", saving: it ? "Risparmio cliente" : "Customer saving" };
   return (
     <section className="customer-value-chart">
@@ -2583,13 +2586,22 @@ function CustomerValueChart({ p, r, money }) {
         <span><i className="value-payment" />{it ? "Pagamento contratto / investimento" : "Contract / investment payment"}</span>
         <span><i className="value-saving" />{it ? "Risparmio netto cliente" : "Customer net saving"}</span>
       </div>
+      <div className="contract-phase-timeline">
+        {phases.map((phase) => (
+          <div className={`contract-phase ${phase.smart ? "smart-active" : "smart-inactive"}`} key={phase.start}>
+            <strong>{it ? "Anni" : "Years"} {phase.start}{phase.end > phase.start ? `–${phase.end}` : ""}</strong>
+            <span>{phase.financing ? (it ? "Finanziamento attivo" : "Financing active") : (it ? "Finanziamento concluso" : "Financing completed")}</span>
+            <span>{phase.smart ? "Smart / CMS attivo" : (it ? "Smart / CMS concluso" : "Smart / CMS ended")}</span>
+            <b>{it ? "Risparmio netto annuo" : "Annual net saving"}: {money(phase.row.customerSaving)}</b>
+          </div>
+        ))}
+      </div>
       {r.cmsEnabled && postContract && (
-        <div className="smart-term-comparison">
-          <div><span>{it ? `Smart per ${r.serviceAgreementPeriod} anni` : `Smart for ${r.serviceAgreementPeriod} years`}</span><strong>{money(r.contractedSavingsTotal)}</strong></div>
-          <div><span>{it ? `Smart per tutti i ${r.analysisPeriod} anni` : `Smart for all ${r.analysisPeriod} years`}</span><strong>{money(r.fullSmartSavingsTotal)}</strong></div>
-          <div className="comparison-gain"><span>{it ? "Risparmio lordo aggiuntivo con Smart" : "Additional gross saving with Smart"}</span><strong>{money(r.fullSmartAdditionalGrossSavings)}</strong></div>
-          <div className={r.fullSmartIncrementalSavings >= 0 ? "comparison-gain" : "comparison-loss"}><span>{it ? "Effetto netto dopo i costi del servizio" : "Net effect after service costs"}</span><strong>{money(r.fullSmartIncrementalSavings)}</strong></div>
-          <p>{r.powerAidEnabled ? (it ? "Il confronto include PowerAiD e il relativo fee solo quando genera un risparmio incrementale." : "The comparison includes PowerAiD and its fee only when it generates incremental savings.") : (it ? "PowerAiD non è incluso in questo scenario." : "PowerAiD is not included in this scenario.")}</p>
+        <div className="smart-continuation-callout">
+          <div><span>{it ? `Dal ${postContract.year}° anno senza Smart` : `From year ${postContract.year} without Smart`}</span><strong>{money(postContract.customerSaving)} / {it ? "anno" : "year"}</strong></div>
+          <div><span>{it ? "Mantenendo Smart" : "Keeping Smart"}</span><strong>{money(postContract.fullSmartNetBenefit)} / {it ? "anno" : "year"}</strong></div>
+          <div className={r.fullSmartIncrementalSavings >= 0 ? "positive" : "negative"}><span>{it ? `Effetto netto totale fino all'anno ${r.analysisPeriod}` : `Total net effect through year ${r.analysisPeriod}`}</span><strong>{money(r.fullSmartIncrementalSavings)}</strong></div>
+          <p>{r.powerAidEnabled ? (it ? "PowerAiD è incluso solo quando genera un risparmio incrementale." : "PowerAiD is included only when it generates incremental savings.") : (it ? "PowerAiD non è incluso nello scenario." : "PowerAiD is not included in the scenario.")}</p>
         </div>
       )}
       {r.cmsEnabled && !postContract && (

@@ -34,9 +34,11 @@ export function generateCustomerPdf(project, result) {
     const parts = (row, fullSmart = false) => fullSmart
       ? [{ value: Math.max(0, row.currentOperatingCost - row.fullSmartBenefit), color: [79, 183, 185] }, { value: row.fullSmartOpex, color: [245, 158, 11] }, { value: row.investmentPayment, color: [148, 163, 184] }, { value: row.fullSmartNetBenefit, color: [22, 163, 74] }]
       : [{ value: row.futureOperatingCost, color: [79, 183, 185] }, { value: row.servicePayment, color: [245, 158, 11] }, { value: row.investmentPayment, color: [148, 163, 184] }, { value: row.customerSaving, color: [22, 163, 74] }];
-    const scenarios = [{ label: it ? "Situazione attuale" : "Current situation", current: true, row: first }, { label: it ? "Durante il contratto" : "During the contract", year: 1, row: first }];
-    if (postContract) scenarios.push({ label: it ? "Dopo il contratto\nsenza Smart" : "After contract\nwithout Smart", year: postContract.year, row: postContract }, { label: it ? "Smart mantenuto" : "Smart continued", year: postContract.year, row: postContract, fullSmart: true });
-    const top = 32, chartHeight = 92, barWidth = 30, gap = scenarios.length === 4 ? 14 : 34;
+    const scenarios = [{ label: it ? "Situazione attuale" : "Current situation", current: true, row: first }, { label: it ? "Nuova soluzione - anno 1" : "New solution - year 1", year: 1, row: first }];
+    const financingChanges = result.financingPeriod < result.analysisPeriod && chartRows[result.financingPeriod - 1]?.investmentPayment !== chartRows[result.financingPeriod]?.investmentPayment;
+    const phaseStarts = [...new Set([1, financingChanges ? result.financingPeriod + 1 : null, result.serviceAgreementPeriod + 1].filter((year) => year && year <= result.analysisPeriod))].sort((a, b) => a - b);
+    const phases = phaseStarts.map((start, index) => ({ start, end: (phaseStarts[index + 1] || result.analysisPeriod + 1) - 1, row: chartRows[start - 1], smart: start <= result.serviceAgreementPeriod }));
+    const top = 32, chartHeight = 82, barWidth = 42, gap = 34;
     const chartWidth = scenarios.length * barWidth + (scenarios.length - 1) * gap;
     const x = (210 - chartWidth) / 2;
     section(it ? "Ripartizione del costo annuo e del risparmio cliente" : "Annual cost allocation and customer savings", 18);
@@ -54,38 +56,40 @@ export function generateCustomerPdf(project, result) {
         bottom -= h;
         doc.setFillColor(...color); doc.rect(bx, bottom, barWidth, h, "F");
         if (h >= 12) {
-          doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+          doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(10);
           doc.text(`${Math.round(value / scenario.row.currentOperatingCost * 100)}%`, bx + barWidth / 2, bottom + h / 2, { align: "center" });
         }
       };
       if (scenario.current) segment(scenario.row.currentOperatingCost, [15, 111, 174]);
       else parts(scenario.row, scenario.fullSmart).forEach((part) => segment(part.value, part.color));
-      doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(15, 23, 42);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(15, 23, 42);
       doc.text(scenario.label.split("\n"), bx + barWidth / 2, top + chartHeight + 7, { align: "center" });
       if (scenario.year) { doc.setFont("helvetica", "normal"); doc.setFontSize(6); doc.setTextColor(71, 85, 105); doc.text(`${it ? "Anno" : "Year"} ${scenario.year}`, bx + barWidth / 2, top + chartHeight + 16, { align: "center" }); }
     });
     const legend = [[it ? "Costo operativo post-upgrade" : "Post-upgrade operating cost", [79, 183, 185]], [it ? "OPEX servizi" : "Service OPEX", [245, 158, 11]], [it ? "Pagamento contratto / investimento" : "Contract / investment payment", [148, 163, 184]], [it ? "Risparmio netto cliente" : "Customer net saving", [22, 163, 74]]];
     legend.forEach(([label, color], index) => {
-      const lx = 18 + (index % 2) * 90, ly = 151 + Math.floor(index / 2) * 7;
+      const lx = 18 + (index % 2) * 90, ly = 130 + Math.floor(index / 2) * 8;
       doc.setFillColor(...color); doc.rect(lx, ly - 3, 4, 4, "F");
-      doc.setTextColor(71, 85, 105); doc.setFontSize(7); doc.text(label, lx + 6, ly);
+      doc.setTextColor(71, 85, 105); doc.setFontSize(7.5); doc.text(label, lx + 6, ly);
+    });
+    const phaseY = 150, phaseGap = 4, phaseWidth = (174 - phaseGap * (phases.length - 1)) / phases.length;
+    phases.forEach((phase, index) => {
+      const px = 18 + index * (phaseWidth + phaseGap), financing = phase.row.investmentPayment > 0;
+      doc.setFillColor(248, 250, 252); doc.setDrawColor(phase.smart ? 15 : 245, phase.smart ? 118 : 158, phase.smart ? 110 : 11); doc.roundedRect(px, phaseY, phaseWidth, 38, 2, 2, "FD");
+      doc.setTextColor(15, 23, 42); doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(`${it ? "Anni" : "Years"} ${phase.start}${phase.end > phase.start ? `-${phase.end}` : ""}`, px + 4, phaseY + 8);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7.2); doc.setTextColor(71, 85, 105);
+      doc.text(financing ? (it ? "Finanziamento attivo" : "Financing active") : (it ? "Finanziamento concluso" : "Financing completed"), px + 4, phaseY + 16, { maxWidth: phaseWidth - 8 });
+      doc.text(phase.smart ? "Smart / CMS attivo" : (it ? "Smart / CMS concluso" : "Smart / CMS ended"), px + 4, phaseY + 22, { maxWidth: phaseWidth - 8 });
+      doc.setTextColor(15, 23, 42); doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.text(`${it ? "Risparmio annuo" : "Annual saving"}: ${money(phase.row.customerSaving)}`, px + 4, phaseY + 31, { maxWidth: phaseWidth - 8 });
     });
     if (result.cmsEnabled && postContract) {
-      const boxY = 169;
-      doc.setFillColor(248, 250, 252); doc.setDrawColor(220, 229, 232); doc.roundedRect(18, boxY, 174, 38, 2, 2, "FD");
-      const comparison = [[it ? `Smart per ${result.serviceAgreementPeriod} anni` : `Smart for ${result.serviceAgreementPeriod} years`, money(result.contractedSavingsTotal), false], [it ? `Smart per tutti i ${result.analysisPeriod} anni` : `Smart for all ${result.analysisPeriod} years`, money(result.fullSmartSavingsTotal), false], [it ? "Risparmio lordo aggiuntivo" : "Additional gross saving", money(result.fullSmartAdditionalGrossSavings), true], [it ? "Effetto netto dopo i costi" : "Net effect after service costs", money(result.fullSmartIncrementalSavings), result.fullSmartIncrementalSavings >= 0]];
-      comparison.forEach(([label, value], index) => {
-        const cx = 24 + index * 42;
-        doc.setTextColor(71, 85, 105); doc.setFontSize(6.2); doc.text(label, cx, boxY + 9, { maxWidth: 38 });
-        const positiveValue = comparison[index][2];
-        doc.setTextColor(positiveValue ? 21 : index === 3 ? 190 : 15, positiveValue ? 128 : index === 3 ? 18 : 23, positiveValue ? 61 : index === 3 ? 60 : 42); doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(value, cx, boxY + 23);
-      });
-      doc.setFont("helvetica", "normal"); doc.setTextColor(71, 85, 105); doc.setFontSize(6.5);
-      doc.text(result.powerAidEnabled ? (it ? "PowerAiD e il relativo fee sono inclusi solo quando generano un risparmio incrementale." : "PowerAiD and its fee are included only when they generate incremental savings.") : (it ? "PowerAiD non incluso nello scenario." : "PowerAiD is not included in the scenario."), 24, boxY + 33, { maxWidth: 160 });
+      const boxY = 196;
+      doc.setFillColor(236, 253, 245); doc.setDrawColor(167, 243, 208); doc.roundedRect(18, boxY, 174, 32, 2, 2, "FD");
+      const comparison = [[it ? `Senza Smart dal ${postContract.year}° anno` : `Without Smart from year ${postContract.year}`, `${money(postContract.customerSaving)} / ${it ? "anno" : "year"}`], [it ? "Mantenendo Smart" : "Keeping Smart", `${money(postContract.fullSmartNetBenefit)} / ${it ? "anno" : "year"}`], [it ? `Effetto netto fino all'anno ${result.analysisPeriod}` : `Net effect through year ${result.analysisPeriod}`, money(result.fullSmartIncrementalSavings)]];
+      comparison.forEach(([label, value], index) => { const cx = 24 + index * 56; doc.setTextColor(71, 85, 105); doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.text(label, cx, boxY + 8, { maxWidth: 50 }); doc.setTextColor(index === 2 && result.fullSmartIncrementalSavings < 0 ? 190 : 4, index === 2 && result.fullSmartIncrementalSavings < 0 ? 18 : 120, index === 2 && result.fullSmartIncrementalSavings < 0 ? 60 : 87); doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(value, cx, boxY + 20, { maxWidth: 50 }); });
+      doc.setFont("helvetica", "normal"); doc.setTextColor(71, 85, 105); doc.setFontSize(6.5); doc.text(result.powerAidEnabled ? (it ? "PowerAiD incluso solo quando genera un risparmio incrementale." : "PowerAiD included only when it generates incremental savings.") : (it ? "PowerAiD non incluso nello scenario." : "PowerAiD is not included in the scenario."), 24, boxY + 27, { maxWidth: 160 });
     } else if (result.cmsEnabled) {
-      doc.setFillColor(236, 253, 245); doc.setDrawColor(167, 243, 208); doc.roundedRect(42, 172, 126, 16, 2, 2, "FD");
-      doc.setTextColor(4, 120, 87); doc.setFont("helvetica", "bold"); doc.setFontSize(8);
-      doc.text(it ? `Smart attivo per l'intero periodo di analisi - ${result.analysisPeriod} anni` : `Smart active throughout the full analysis period - ${result.analysisPeriod} years`, 105, 182, { align: "center" });
+      doc.setFillColor(236, 253, 245); doc.setDrawColor(167, 243, 208); doc.roundedRect(42, 196, 126, 16, 2, 2, "FD"); doc.setTextColor(4, 120, 87); doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.text(it ? `Smart attivo per l'intero periodo di analisi - ${result.analysisPeriod} anni` : `Smart active throughout the full analysis period - ${result.analysisPeriod} years`, 105, 206, { align: "center" });
     }
   };
 
