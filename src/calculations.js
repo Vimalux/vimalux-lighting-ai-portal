@@ -42,7 +42,7 @@ export function calculateBusinessCase(project) {
     return { ...g, quantity, product, existingSystemWattage, effectiveBaselineWattage, dimmingPercent, nominalSystemKwh: groupNominalSystemKwh, existingDimmingSavingKwh: groupExistingDimmingSavingKwh, baselineKwh: groupBaseline, ledKwh: groupLed, salesTotal: quantity * sale };
   });
   const lcuQuantity = smartEnabled ? smartQuantity : 0;
-  const cloSavingKwh = smartEnabled ? smartLedKwh * positive(a.cloPercent) / 100 : 0;
+  const cloSavingKwh = cmsEnabled ? smartLedKwh * positive(a.cloPercent) / 100 : 0;
   const afterCloKwh = Math.max(0, ledKwh - cloSavingKwh);
   const powerAidEligibleAfterCloKwh = Math.max(0, powerAidLedKwh * (1 - positive(a.cloPercent) / 100));
   const powerAidSavingKwh = powerAidEnabled ? powerAidEligibleAfterCloKwh * positive(a.powerAidPercent) / 100 : 0;
@@ -126,9 +126,12 @@ export function calculateBusinessCase(project) {
   for (let year = 1; year <= analysisPeriod; year += 1) {
     const energyGrowth = Math.pow(1 + n(a.energyEscalation) / 100, year - 1);
     const opexGrowth = Math.pow(1 + n(a.opexEscalation || a.energyEscalation) / 100, year - 1);
-    const benefit = energySaving * energyGrowth + maintenanceSaving;
-    const annualPowerAidGrossSaving = powerAidGrossSaving * energyGrowth;
-    const annualPowerAidCustomerFee = powerAidEnabled && year <= serviceAgreementPeriod ? annualPowerAidGrossSaving * positive(a.powerAidCustomerFeePercent) / 100 : 0;
+    const serviceActive = year <= serviceAgreementPeriod;
+    const annualLedEnergySaving = ledSavingKwh * positive(a.energyPrice) * energyGrowth;
+    const annualCloEnergySaving = cmsEnabled && serviceActive ? cloSavingKwh * positive(a.energyPrice) * energyGrowth : 0;
+    const annualPowerAidGrossSaving = powerAidEnabled && serviceActive ? powerAidGrossSaving * energyGrowth : 0;
+    const benefit = annualLedEnergySaving + annualCloEnergySaving + annualPowerAidGrossSaving + maintenanceSaving;
+    const annualPowerAidCustomerFee = powerAidEnabled && serviceActive ? annualPowerAidGrossSaving * positive(a.powerAidCustomerFeePercent) / 100 : 0;
     const annualPowerAidSupplierCost = annualPowerAidCustomerFee * positive(a.powerAidSupplierSharePercent) / 100;
     const fixedServiceOpex = Math.max(0, totalAnnualOpex - powerAidCustomerFee);
     const opex = year <= serviceAgreementPeriod ? fixedServiceOpex * opexGrowth + annualPowerAidCustomerFee : 0;
@@ -141,7 +144,7 @@ export function calculateBusinessCase(project) {
     const netCashFlow = benefit - serviceOpex - payment;
     cumulative += netCashFlow;
     npv += netCashFlow / Math.pow(1 + n(a.discountRate) / 100, year);
-    cashFlowRows.push({ year, grossBenefit: benefit, opex, serviceOpex, payment, financePayment: dealType === "finance" ? payment : 0, contractedCustomerPayment: serviceOpex + payment, powerAidGrossSavingEUR: annualPowerAidGrossSaving, powerAidCustomerFee: annualPowerAidCustomerFee, powerAidSupplierCost: annualPowerAidSupplierCost, powerAidVimaluxMargin: annualPowerAidCustomerFee - annualPowerAidSupplierCost, netCashFlow, cumulative });
+    cashFlowRows.push({ year, grossBenefit: benefit, ledEnergySavingEUR: annualLedEnergySaving, cloSavingEUR: annualCloEnergySaving, opex, serviceOpex, payment, financePayment: dealType === "finance" ? payment : 0, contractedCustomerPayment: serviceOpex + payment, powerAidGrossSavingEUR: annualPowerAidGrossSaving, powerAidCustomerFee: annualPowerAidCustomerFee, powerAidSupplierCost: annualPowerAidSupplierCost, powerAidVimaluxMargin: annualPowerAidCustomerFee - annualPowerAidSupplierCost, netCashFlow, cumulative });
   }
   const annualOperationalBenefit = grossBenefit - totalAnnualOpex;
   const payback = annualOperationalBenefit > 0 ? totalCapex / annualOperationalBenefit : null;
