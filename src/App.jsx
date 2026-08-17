@@ -692,8 +692,8 @@ const Toggle = ({ label, value, onChange, disabled = false, title = "" }) => (
     <span>{label}</span>
   </label>
 );
-const Card = ({ title, children }) => (
-  <section className="card">
+const Card = ({ title, children, className = "" }) => (
+  <section className={`card ${className}`.trim()}>
     <h2>{title}</h2>
     {children}
   </section>
@@ -1868,6 +1868,7 @@ function Assumptions({ p, r, update }) {
         </Card>
       ))}
       <Card
+        className="dimming-card"
         title={
           p.language === "it"
             ? "Baseline e dimmer esistente"
