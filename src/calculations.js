@@ -24,8 +24,14 @@ export function calculateBusinessCase(project) {
   const groupRows = project.groups.map((g) => {
     const quantity = positive(g.quantity);
     const product = ledById[g.proposedProductId] || {};
-    const existingSystemWattage = positive(g.existingWattage) * (factor[g.technology] || 1);
-    const dimmingPercent = g.existingDimmingProfile === "fixed" ? Math.min(100, positive(g.existingDimmingPercent)) : 0;
+    const systemFactor = positive(g.existingSystemFactor) || factor[g.technology] || 1;
+    const existingSystemWattage = positive(g.existingWattage) * systemFactor;
+    const profileDimmingPercent = positive(a.operatingHours)
+      ? positive(g.existingReducedHours) * (1 - Math.min(100, positive(g.existingReducedLoadPercent)) / 100) / positive(a.operatingHours) * 100
+      : 0;
+    const dimmingPercent = g.existingDimmingProfile === "fixed"
+      ? Math.min(100, g.existingDimmingMethod === "profile" ? profileDimmingPercent : positive(g.existingDimmingPercent))
+      : 0;
     const effectiveBaselineWattage = existingSystemWattage * (1 - dimmingPercent / 100);
     const groupNominalSystemKwh = quantity * existingSystemWattage * positive(a.operatingHours) / 1000;
     const groupExistingDimmingSavingKwh = groupNominalSystemKwh * dimmingPercent / 100;
@@ -39,7 +45,7 @@ export function calculateBusinessCase(project) {
       if (powerAidEnabled && g.powerAidAssigned) powerAidLedKwh += groupLed;
     }
     nominalSystemKwh += groupNominalSystemKwh; existingDimmingSavingKwh += groupExistingDimmingSavingKwh; baselineKwh += groupBaseline; ledKwh += groupLed; ledCapex += quantity * sale; ledCost += quantity * positive(product.costPrice);
-    return { ...g, quantity, product, existingSystemWattage, effectiveBaselineWattage, dimmingPercent, nominalSystemKwh: groupNominalSystemKwh, existingDimmingSavingKwh: groupExistingDimmingSavingKwh, baselineKwh: groupBaseline, ledKwh: groupLed, salesTotal: quantity * sale };
+    return { ...g, quantity, product, systemFactor, existingSystemWattage, effectiveBaselineWattage, dimmingPercent, profileHoursTotal: positive(g.existingFullPowerHours) + positive(g.existingReducedHours), nominalSystemKwh: groupNominalSystemKwh, existingDimmingSavingKwh: groupExistingDimmingSavingKwh, baselineKwh: groupBaseline, ledKwh: groupLed, salesTotal: quantity * sale };
   });
   const lcuQuantity = smartEnabled ? smartQuantity : 0;
   const cloSavingKwh = cmsEnabled ? smartLedKwh * positive(a.cloPercent) / 100 : 0;

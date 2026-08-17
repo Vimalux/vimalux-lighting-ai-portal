@@ -52,7 +52,11 @@ const RATE_PROFILES = [
 const numeric = new Set([
   "quantity",
   "existingWattage",
+  "existingSystemFactor",
   "existingDimmingPercent",
+  "existingFullPowerHours",
+  "existingReducedHours",
+  "existingReducedLoadPercent",
   "wattage",
   "lumen",
   "costPrice",
@@ -543,7 +547,7 @@ export default function App() {
         {view === "pricing" && (
           <Pricing p={project} r={result} update={update} t={t} money={money} />
         )}{" "}
-        {view === "assumptions" && <Assumptions p={project} update={update} />}{" "}
+        {view === "assumptions" && <Assumptions p={project} r={result} update={update} />}{" "}
         {view === "business" && (
           <Business p={project} r={result} t={t} money={money} num={num} />
         )}{" "}
@@ -1796,7 +1800,7 @@ const assumptionGroups = (t) => [
     ],
   ],
 ];
-function Assumptions({ p, update }) {
+function Assumptions({ p, r, update }) {
   const t = useT(p.language);
   const type = p.assumptions.dealType || "cash";
   return (
@@ -1877,9 +1881,15 @@ function Assumptions({ p, update }) {
                 {[
                   p.language === "it" ? "Gruppo" : "Group",
                   p.language === "it" ? "Profilo dimmer" : "Dimming profile",
+                  p.language === "it" ? "Metodo" : "Method",
                   p.language === "it"
-                    ? "Riduzione media %"
-                    : "Average reduction %",
+                    ? "Riduzione media annua %"
+                    : "Annual average reduction %",
+                  p.language === "it" ? "Ore piena potenza" : "Full-power hours",
+                  p.language === "it" ? "Ore ridotte" : "Reduced hours",
+                  p.language === "it" ? "Potenza ridotta %" : "Reduced load %",
+                  p.language === "it" ? "Riduzione effettiva %" : "Effective reduction %",
+                  p.language === "it" ? "Fattore sistema" : "System factor",
                   p.language === "it" ? "Tipo driver" : "Driver type",
                   p.language === "it" ? "Nota" : "Note",
                 ].map((x) => (
@@ -1888,8 +1898,12 @@ function Assumptions({ p, update }) {
               </tr>
             </thead>
             <tbody>
-              {p.groups.map((g, i) => (
-                <tr key={g.id}>
+              {p.groups.map((g, i) => {
+                const calculated = r.groupRows.find((row) => row.id === g.id) || {};
+                const detailed = g.existingDimmingProfile === "fixed" && g.existingDimmingMethod === "profile";
+                const hourDifference = Math.abs(numberValue(calculated.profileHoursTotal) - numberValue(p.assumptions.operatingHours));
+                const hoursMismatch = detailed && hourDifference > 0.1;
+                return <tr key={g.id}>
                   <td>{g.name}</td>
                   <td>
                     <select
@@ -1906,12 +1920,39 @@ function Assumptions({ p, update }) {
                     </select>
                   </td>
                   <td>
+                    <select
+                      value={g.existingDimmingMethod || "average"}
+                      disabled={g.existingDimmingProfile !== "fixed"}
+                      onChange={(e) => update(["groups", i, "existingDimmingMethod"], e.target.value)}
+                    >
+                      <option value="average">{p.language === "it" ? "Media annua" : "Annual average"}</option>
+                      <option value="profile">{p.language === "it" ? "Profilo orario" : "Hourly profile"}</option>
+                    </select>
+                  </td>
+                  <td>
                     <NumericInput
                       value={g.existingDimmingPercent}
+                      disabled={g.existingDimmingProfile !== "fixed" || detailed}
                       onChange={(v) =>
                         update(["groups", i, "existingDimmingPercent"], v)
                       }
                     />
+                  </td>
+                  <td>
+                    <NumericInput value={g.existingFullPowerHours} disabled={!detailed} onChange={(v) => update(["groups", i, "existingFullPowerHours"], v)} />
+                  </td>
+                  <td>
+                    <NumericInput value={g.existingReducedHours} disabled={!detailed} onChange={(v) => update(["groups", i, "existingReducedHours"], v)} />
+                  </td>
+                  <td>
+                    <NumericInput value={g.existingReducedLoadPercent} disabled={!detailed} onChange={(v) => update(["groups", i, "existingReducedLoadPercent"], v)} />
+                  </td>
+                  <td className={hoursMismatch ? "dimming-warning" : "dimming-result"}>
+                    <strong>{formatNumber(calculated.dimmingPercent || 0, p.language, 2)}%</strong>
+                    {hoursMismatch && <small>{p.language === "it" ? `Ore totali ${formatNumber(calculated.profileHoursTotal, p.language)} ≠ ${formatNumber(p.assumptions.operatingHours, p.language)}` : `Total hours ${formatNumber(calculated.profileHoursTotal, p.language)} ≠ ${formatNumber(p.assumptions.operatingHours, p.language)}`}</small>}
+                  </td>
+                  <td>
+                    {g.technology === "OTHER" ? <NumericInput value={g.existingSystemFactor || 1} onChange={(v) => update(["groups", i, "existingSystemFactor"], v)} /> : <span>{formatNumber(calculated.systemFactor || 1, p.language, 2)}×</span>}
                   </td>
                   <td>
                     <select
@@ -1947,11 +1988,16 @@ function Assumptions({ p, update }) {
                       }
                     />
                   </td>
-                </tr>
-              ))}
+                </tr>;
+              })}
             </tbody>
           </table>
         </div>
+        <p className="hint">
+          {p.language === "it"
+            ? "La riduzione media annua è ponderata sull'intero periodo di funzionamento. Nel profilo orario viene calcolata automaticamente da ore ridotte × (100% − potenza ridotta) ÷ ore annue. Il fattore sistema personalizzato è disponibile per la tecnologia OTHER."
+            : "The annual average reduction is weighted across all operating hours. With an hourly profile it is calculated automatically as reduced hours × (100% − reduced load) ÷ annual hours. A custom system factor is available for OTHER technology."}
+        </p>
       </Card>
     </div>
   );
