@@ -79,3 +79,22 @@ test("pipeline keeps recurring totals separate and DATEK only receives CMS", () 
   assert.equal(datek.arr, result.cmsRevenue);
   assert.notEqual(datek.arr, result.annualRecurringRevenue);
 });
+
+test("Felicity partner value uses supplier share and supports project-level filtering", () => {
+  const first = defaultProject();
+  first.id = "first";
+  first.solution.powerAidEnabled = true;
+  first.assumptions.powerAidCustomerFeePercent = 50;
+  first.assumptions.powerAidSupplierSharePercent = 70;
+  const second = defaultProject();
+  second.id = "second";
+  second.solution.powerAidEnabled = false;
+  const result = calculateBusinessCase(first);
+  const projectOnly = partnerTotals([first], "FELICITY");
+  const portfolio = partnerTotals([first, second], "FELICITY");
+  assert.equal(projectOnly.projects, 1);
+  assert.equal(projectOnly.arr, result.powerAidSupplierCost);
+  assert.equal(projectOnly.totalContractValue, result.powerAidSupplierContractCost);
+  assert.equal(portfolio.projects, 2);
+  assert.equal(portfolio.arr, projectOnly.arr);
+});

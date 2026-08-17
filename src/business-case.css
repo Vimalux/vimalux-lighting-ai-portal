@@ -142,6 +142,53 @@
   padding-top: 8px;
 }
 
+.poweraid-common {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  display: grid;
+  gap: 10px 18px;
+  grid-template-columns: 1fr auto;
+  margin-bottom: 14px;
+  padding: 14px;
+}
+
+.poweraid-partner-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.poweraid-partner-grid section {
+  border: 1px solid #dce5e8;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.poweraid-partner-grid h3 {
+  color: #0f766e;
+  margin: 0 0 10px;
+}
+
+.poweraid-partner-grid section > div {
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  font-size: 13px;
+  justify-content: space-between;
+  padding: 9px 0;
+}
+
+.partner-scope-card {
+  grid-column: 1 / -1;
+}
+
+.partner-scope-controls {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  max-width: 800px;
+}
+
 .dimming-card table {
   table-layout: fixed;
 }

@@ -2457,22 +2457,28 @@ function InternalReport({ p, r, update, money }) {
       </div>
       {r.powerAidEnabled && (
         <Card title={it ? "Economia PowerAiD / Felicity" : "PowerAiD / Felicity economics"}>
-          <div className="breakdown">
-            {[
-              [it ? "Risparmio incrementale PowerAiD" : "PowerAiD incremental saving", money(r.powerAidGrossSavingEUR)],
-              [it ? `Fee cliente (${pct(p.assumptions.powerAidCustomerFeePercent)})` : `Customer fee (${pct(p.assumptions.powerAidCustomerFeePercent)})`, money(r.powerAidCustomerFee)],
-              [it ? `Quota Felicity (${pct(p.assumptions.powerAidSupplierSharePercent)} del fee)` : `Felicity share (${pct(p.assumptions.powerAidSupplierSharePercent)} of fee)`, money(r.powerAidSupplierCost)],
-              [it ? "Margine lordo VIMALUX" : "VIMALUX gross margin", money(r.powerAidVimaluxMargin)],
-              [it ? "Margine sul fee cliente" : "Margin on customer fee", pct(r.powerAidMarginPct)],
-              ["ARR PowerAiD", money(r.powerAidCustomerFee)],
-              ["MRR PowerAiD", money(r.powerAidCustomerFee / 12)],
-            ].map(([label, value]) => (
-              <div key={label}>
-                <span>{label}</span>
-                <span></span>
-                <strong>{value}</strong>
-              </div>
-            ))}
+          <div className="poweraid-common">
+            <span>{it ? "Risparmio incrementale cliente" : "Customer incremental saving"}</span>
+            <strong>{money(r.powerAidGrossSavingEUR)}</strong>
+            <span>{it ? `Fee cliente (${pct(p.assumptions.powerAidCustomerFeePercent)})` : `Customer fee (${pct(p.assumptions.powerAidCustomerFeePercent)})`}</span>
+            <strong>{money(r.powerAidCustomerFee)}</strong>
+          </div>
+          <div className="poweraid-partner-grid">
+            <section>
+              <h3>VIMALUX</h3>
+              <div><span>{it ? "Fee cliente annua" : "Annual customer fee"}</span><strong>{money(r.powerAidCustomerFee)}</strong></div>
+              <div><span>{it ? "Meno quota Felicity" : "Less Felicity share"}</span><strong>− {money(r.powerAidSupplierCost)}</strong></div>
+              <div><span>{it ? "Margine lordo annuo" : "Annual gross margin"}</span><strong className="positive">{money(r.powerAidVimaluxMargin)}</strong></div>
+              <div><span>{it ? "Margine contratto" : "Contract margin"}</span><strong className="positive">{money(r.powerAidVimaluxContractMargin)}</strong></div>
+              <div><span>MRR</span><strong>{money(r.powerAidVimaluxMargin / 12)}</strong></div>
+            </section>
+            <section>
+              <h3>Felicity</h3>
+              <div><span>{it ? `Quota del fee (${pct(p.assumptions.powerAidSupplierSharePercent)})` : `Share of fee (${pct(p.assumptions.powerAidSupplierSharePercent)})`}</span><strong>{money(r.powerAidSupplierCost)}</strong></div>
+              <div><span>{it ? "Valore annuo / ARR" : "Annual value / ARR"}</span><strong>{money(r.powerAidSupplierCost)}</strong></div>
+              <div><span>{it ? "Valore mensile / MRR" : "Monthly value / MRR"}</span><strong>{money(r.powerAidSupplierCost / 12)}</strong></div>
+              <div><span>{it ? "Valore contratto" : "Contract value"}</span><strong>{money(r.powerAidSupplierContractCost)}</strong></div>
+            </section>
           </div>
         </Card>
       )}
@@ -2812,14 +2818,31 @@ function PartnerTable({ rows, money }) {
   );
 }
 function PartnerReports({ projects, p, money }) {
+  const [scope, setScope] = useState("portfolio");
+  const [projectId, setProjectId] = useState(p.id);
+  const reportProjects = scope === "project"
+    ? projects.filter((project) => project.id === projectId)
+    : projects;
   return (
     <div className="cards-grid">
+      <Card className="partner-scope-card" title={p.language === "it" ? "Livello report partner" : "Partner report level"}>
+        <div className="partner-scope-controls">
+          <Field label={p.language === "it" ? "Vista" : "View"} value={scope} onChange={setScope}>
+            <option value="portfolio">{p.language === "it" ? "Portafoglio completo" : "Full portfolio"}</option>
+            <option value="project">{p.language === "it" ? "Singolo progetto" : "Single project"}</option>
+          </Field>
+          {scope === "project" && <Field label={p.language === "it" ? "Progetto" : "Project"} value={projectId} onChange={setProjectId}>
+            {projects.map((project) => <option key={project.id} value={project.id}>{project.customer.name || project.project.name} · {project.project.businessCaseId}</option>)}
+          </Field>}
+        </div>
+      </Card>
       {[
         ["VIMALUX", "VIMALUX"],
         ["DATEK", "DATEK"],
         ["Felicity / PowerAiD", "FELICITY"],
       ].map(([label, key]) => {
-        const totals = partnerTotals(projects, key);
+        const totals = partnerTotals(reportProjects, key);
+        const row = totals.rows[0];
         return (
           <Card title={label} key={key}>
             <div className="breakdown">
@@ -2828,6 +2851,12 @@ function PartnerReports({ projects, p, money }) {
                 <span></span>
                 <strong>{totals.projects}</strong>
               </div>
+              {scope === "project" && row && <>
+                <div><span>{p.language === "it" ? "Progetto" : "Project"}</span><span></span><strong>{row.project}</strong></div>
+                <div><span>{p.language === "it" ? "Apparecchi" : "Luminaires"}</span><span></span><strong>{row.luminaires}</strong></div>
+                <div><span>LCU</span><span></span><strong>{row.lcus || 0}</strong></div>
+                <div><span>{p.language === "it" ? "Valore annuo" : "Annual value"}</span><span></span><strong>{money(row.annualRevenue)}</strong></div>
+              </>}
               <div>
                 <span>Business value</span>
                 <span></span>
@@ -2844,7 +2873,7 @@ function PartnerReports({ projects, p, money }) {
               onClick={() =>
                 generatePartnerPdf(
                   key,
-                  projects,
+                  reportProjects,
                   p.language,
                   p.project.currency,
                 )
