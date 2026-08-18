@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { mergeProjectStates } from "./projectSync.js";
 import { calculateBusinessCase } from "./calculations.js";
 import { deleteProjectRow } from "./cloudProjects.js";
+import { buildBusinessCaseSnapshot } from "./businessCaseSync.js";
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -36,6 +37,7 @@ export async function saveCloudState(projects) {
   if (catalogueError) throw catalogueError;
   const rows = projects.map((project) => {
     const result = calculateBusinessCase(project);
+    const businessCase = buildBusinessCaseSnapshot(project, project.updatedAt || new Date().toISOString());
     const probability = project.crm?.status === "won" ? 100 : Math.min(100, Math.max(0, Number(project.crm?.closingProbability) || 0));
     const commercialSnapshot = {
       schemaVersion: 1,
@@ -61,7 +63,7 @@ export async function saveCloudState(projects) {
       powerAidAnnualRevenue: result.savingsAsAServiceRevenue,
       co2ReductionTons: result.co2ReductionKg / 1000
     };
-    return { id: project.id, data: { ...project, commercialSnapshot }, updated_by: userId };
+    return { id: project.id, data: { ...project, crm: { ...(project.crm || {}), goStatus: businessCase.goStatus, businessCase }, commercialSnapshot }, updated_by: userId };
   });
   const { error: projectsError } = await supabase.from("intelligence_projects").upsert(rows);
   if (projectsError) throw projectsError;

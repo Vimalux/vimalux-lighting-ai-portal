@@ -11,6 +11,10 @@ import {
 } from "./crm.js";
 import { growthForecast, partnerTotals } from "./partners.js";
 import { generatePartnerPdf } from "./partnerReport.js";
+import CrmOpportunity from "./CrmOpportunity.jsx";
+import { syncBusinessCaseResult } from "./businessCaseSync.js";
+import { mergeOpportunity } from "./opportunity.js";
+import { createImportAudit, validateOpportunity } from "./opportunityImport.js";
 import {
   buildImportedGroups,
   detectWorkbookType,
@@ -123,6 +127,8 @@ export default function App() {
   const project = projects.find((p) => p.id === activeId) || projects[0];
   const t = useT(project.language);
   const result = useMemo(() => calculateBusinessCase(project), [project]);
+  const syncedProjects = useMemo(() => projects.map((item) => syncBusinessCaseResult(item, item.updatedAt || item.createdAt)), [projects]);
+  const syncedProject = syncedProjects.find((item) => item.id === project.id) || syncBusinessCaseResult(project, project.updatedAt || project.createdAt);
   useEffect(
     () =>
       localStorage.setItem(
@@ -186,6 +192,14 @@ export default function App() {
     );
     return () => clearTimeout(timer);
   }, [projects, session, cloudReady]);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const opportunityId = params.get("opportunity_id");
+    const businessCaseId = params.get("business_case_id");
+    if (!opportunityId && !businessCaseId) return;
+    const match = projects.find((item) => item.crm?.opportunityId === opportunityId || item.crm?.uniqueProjectId === opportunityId || item.project?.businessCaseId === businessCaseId);
+    if (match) { setActiveId(match.id); setView("customer"); }
+  }, [cloudReady]);
   const update = (path, value) =>
     setProjects((all) => {
       const normalized = numeric.has(path.at(-1)) ? numberValue(value) : value;
@@ -233,6 +247,37 @@ export default function App() {
     setProjects((x) => [...x, p]);
     setActiveId(p.id);
     setView("customer");
+  };
+  const createManualOpportunity = () => {
+    const p = defaultProject();
+    p.crm.opportunityId = p.id;
+    p.crm.uniqueProjectId = p.id;
+    setProjects((all) => [...all, p]);
+    setActiveId(p.id);
+    setView("customer");
+  };
+  const importOpportunities = (parsed, meta) => {
+    let next = projects;
+    let selected = project;
+    let created = 0, updated = 0, skipped = 0, errors = 0;
+    const affected = [];
+    parsed.opportunities.forEach((opportunity) => {
+      const validation = validateOpportunity(opportunity);
+      if (validation.length) { errors += 1; return; }
+      const merged = mergeOpportunity(next, opportunity);
+      next = merged.projects;
+      selected = merged.project;
+      affected.push(selected.id);
+      if (merged.action === "created") created += 1; else updated += 1;
+    });
+    skipped += Math.max(0, parsed.opportunities.length - created - updated - errors);
+    const audit = createImportAudit({ ...meta, sourceFormat: parsed.sourceFormat, templateVersion: parsed.templateVersion, created, updated, skipped, errors });
+    if (!affected.length && project?.id) affected.push(project.id);
+    next = next.map((item) => affected.includes(item.id) ? { ...item, crm: { ...item.crm, importHistory: [...(item.crm?.importHistory || []), audit] } } : item);
+    setProjects(next);
+    setActiveId(selected.id);
+    setView("crm");
+    alert(`Import complete\nCreated: ${created}\nUpdated: ${updated}\nSkipped: ${skipped}\nErrors: ${errors}`);
   };
   const removeProject = async (id) => {
     const target = projects.find((item) => item.id === id);
@@ -567,18 +612,22 @@ export default function App() {
           />
         )}{" "}
         {view === "crm" && (
-          <Crm
-            projects={projects}
-            active={project}
+          <CrmOpportunity
+            projects={syncedProjects}
+            active={syncedProject}
             update={update}
             money={money}
+            onImport={importOpportunities}
+            onManual={createManualOpportunity}
+            setView={setView}
+            currentUser={session?.user?.email || "Local user"}
           />
         )}{" "}
         {view === "datek" && (
-          <DatekDashboard projects={projects} money={money} />
+          <DatekDashboard projects={syncedProjects} money={money} />
         )}{" "}
         {view === "partnerReports" && (
-          <PartnerReports projects={projects} p={project} money={money} />
+          <PartnerReports projects={syncedProjects} p={syncedProject} money={money} />
         )}{" "}
         {view === "projects" && (
           <Projects

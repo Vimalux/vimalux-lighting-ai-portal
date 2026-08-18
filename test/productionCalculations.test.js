@@ -4,6 +4,7 @@ import { calculateBusinessCase } from "../src/calculations.js";
 import { calculateWeightedTcv, crmMetrics, formatProbabilityPoints, pipelineStageTotals, pipelineTotals, probabilityFactor } from "../src/crm.js";
 import { defaultProject } from "../src/model.js";
 import { partnerTotals } from "../src/partners.js";
+import { syncBusinessCaseResult } from "../src/businessCaseSync.js";
 
 test("PowerAiD recurring revenue requires an active CMS connection", () => {
   const project = defaultProject();
@@ -72,8 +73,9 @@ test("stage averages use stored percentage points without multiplying display by
 test("pipeline keeps recurring totals separate and DATEK only receives CMS", () => {
   const project = defaultProject();
   project.solution.powerAidEnabled = true;
-  const pipeline = pipelineTotals([project]);
-  const datek = partnerTotals([project], "DATEK");
+  const synced = syncBusinessCaseResult(project);
+  const pipeline = pipelineTotals([synced]);
+  const datek = partnerTotals([synced], "DATEK");
   const result = calculateBusinessCase(project);
   assert.equal(pipeline.annualRecurringRevenue, result.annualRecurringRevenue);
   assert.equal(datek.arr, result.cmsRevenue);

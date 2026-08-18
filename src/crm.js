@@ -1,4 +1,4 @@
-import { calculateBusinessCase, numberValue } from "./calculations.js";
+import { numberValue } from "./calculations.js";
 
 const positive = (value) => Math.max(0, numberValue(value));
 
@@ -14,32 +14,37 @@ export function calculateWeightedTcv(totalContractValue, probability) {
   return positive(totalContractValue) * probabilityFactor(probability);
 }
 
+export function calculateWeightedArr(annualRecurringRevenue, probability) {
+  return positive(annualRecurringRevenue) * probabilityFactor(probability);
+}
+
 export function formatProbabilityPoints(value, language = "en") {
   const locale = language === "it" ? "it-IT" : language === "da" ? "da-DK" : "en-IE";
   return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(normalizeProbability(value))}%`;
 }
 
 export function crmMetrics(project) {
-  const result = calculateBusinessCase(project);
   const crm = project.crm || {};
+  const result = crm.businessCase || project.commercialSnapshot || {};
   const won = crm.status === "won";
   const probability = won ? 100 : normalizeProbability(crm.closingProbability);
-  const totalContractValue = crm.totalContractValue == null ? result.totalContractRevenue : positive(crm.totalContractValue);
-  const annualRecurringRevenue = result.annualRecurringRevenue;
+  const totalContractValue = crm.totalContractValue == null ? positive(result.tcv ?? result.totalContractRevenue) : positive(crm.totalContractValue);
+  const annualRecurringRevenue = positive(result.arr ?? result.annualRecurringRevenue);
   return {
     status: crm.status || "lead",
     probability,
     totalContractValue,
     probabilityFactor: probabilityFactor(probability),
     weightedTcv: calculateWeightedTcv(totalContractValue, probability),
-    dealType: result.dealType,
-    offerCapex: result.totalCapex,
-    customerAnnualPayment: result.customerAnnualPayment,
+    weightedArr: calculateWeightedArr(annualRecurringRevenue, probability),
+    dealType: result.dealType || project.assumptions?.dealType,
+    offerCapex: positive(result.capex ?? result.offerCapex),
+    customerAnnualPayment: positive(result.annualCustomerPayment ?? result.customerAnnualPayment),
     annualRecurringRevenue,
     monthlyRecurringRevenue: annualRecurringRevenue / 12,
     cmsAnnualRevenue: result.cmsRevenue,
     savingsAsAServiceRevenue: result.savingsAsAServiceRevenue,
-    contractYears: Math.max(1, Math.round(positive(project.assumptions.contractYears))),
+    contractYears: Math.max(1, Math.round(positive(project.assumptions.serviceAgreementPeriod ?? project.assumptions.contractYears))),
   };
 }
 
@@ -50,11 +55,12 @@ export function pipelineTotals(projects = []) {
     totals.weightedTcv += row.weightedTcv;
     totals.annualRecurringRevenue += row.annualRecurringRevenue;
     totals.monthlyRecurringRevenue += row.monthlyRecurringRevenue;
+    totals.weightedArr += row.weightedArr;
     return totals;
-  }, { totalContractValue: 0, weightedTcv: 0, annualRecurringRevenue: 0, monthlyRecurringRevenue: 0 });
+  }, { totalContractValue: 0, weightedTcv: 0, annualRecurringRevenue: 0, monthlyRecurringRevenue: 0, weightedArr: 0 });
 }
 
-export function pipelineStageTotals(projects = [], stages = ["proposal", "negotiation", "closing", "won"]) {
+export function pipelineStageTotals(projects = [], stages = ["lead", "qualified", "proposal", "negotiation", "closing", "won"]) {
   return stages.map((stage) => {
     const rows = projects.map(crmMetrics).filter((row) => row.status === stage);
     const count = rows.length;
