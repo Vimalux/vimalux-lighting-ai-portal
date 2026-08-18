@@ -13,7 +13,7 @@ import { growthForecast, partnerTotals } from "./partners.js";
 import { generatePartnerPdf } from "./partnerReport.js";
 import CrmOpportunity from "./CrmOpportunity.jsx";
 import { syncBusinessCaseResult } from "./businessCaseSync.js";
-import { mergeOpportunity } from "./opportunity.js";
+import { mergeOpportunity, opportunityFromSearchParams } from "./opportunity.js";
 import { createImportAudit, validateOpportunity } from "./opportunityImport.js";
 import {
   buildImportedGroups,
@@ -198,7 +198,17 @@ export default function App() {
     const businessCaseId = params.get("business_case_id");
     if (!opportunityId && !businessCaseId) return;
     const match = projects.find((item) => item.crm?.opportunityId === opportunityId || item.crm?.uniqueProjectId === opportunityId || item.project?.businessCaseId === businessCaseId);
-    if (match) { setActiveId(match.id); setView("customer"); }
+    if (match) { setActiveId(match.id); setView("customer"); return; }
+    const imported = opportunityFromSearchParams(params);
+    if (!imported) return;
+    setProjects((current) => {
+      const existing = current.find((item) => item.crm?.opportunityId === opportunityId || item.crm?.uniqueProjectId === opportunityId);
+      if (existing) { setActiveId(existing.id); return current; }
+      const merged = mergeOpportunity(current, imported);
+      setActiveId(merged.project.id);
+      return merged.projects;
+    });
+    setView("customer");
   }, [cloudReady]);
   const update = (path, value) =>
     setProjects((all) => {

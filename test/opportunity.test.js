@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { defaultProject } from "../src/model.js";
 import { applyAuthoritativeBusinessCase, buildBusinessCaseSnapshot } from "../src/businessCaseSync.js";
 import { calculateWeightedArr, calculateWeightedTcv, crmMetrics } from "../src/crm.js";
-import { applyOpportunityToProject, buildPlannerHandoff, canCreatePlannerProject, mergeOpportunity } from "../src/opportunity.js";
+import { applyOpportunityToProject, buildPlannerHandoff, canCreatePlannerProject, mergeOpportunity, opportunityFromSearchParams } from "../src/opportunity.js";
 import { parseOpportunityWorkbook, validateOpportunity } from "../src/opportunityImport.js";
 
 const agentSheet = (overrides = {}) => [{ name: "VML Agent Input Sheet", headers: ["opportunity_id", "municipality_name", "project_name", "total_luminaires", "average_existing_watt", "annual_operating_hours", "energy_price", "existing_dimming_profile", "existing_dimming_pct", "financing_model", "financing_period_years", "service_agreement_period_years", "analysis_period_years"], rows: [["OP-1", "Comune Test", "LED Test", "1250", "100", "4200", "0,25", "Fixed", "20", "Financed", 5, 10, 20].map((value, index) => overrides[index] ?? value)] }];
@@ -94,6 +94,18 @@ test("comma and dot numeric formats are accepted", () => {
   const parsed = parseOpportunityWorkbook(agentSheet({ 3: "1.250,00", 6: "0.25" }), "agent").opportunities[0];
   assert.equal(parsed.assumptions.totalLuminaires, 1250);
   assert.equal(parsed.assumptions.energyPrice, 0.25);
+});
+
+test("CRM Preliminary Business Case link prefills authoritative opportunity data", () => {
+  const opportunity = opportunityFromSearchParams("source=crm&opportunity_id=OP-URL&customer=Comune+URL&project=Relamping&luminaires=284&existing_technology=SAP&existing_watt=100&operating_hours=4196&energy_price=0.29&dimming_profile=fixed&dimming_pct=20&driver_type=1-10V&financing_model=finance&financing_years=5&service_years=10&analysis_years=20");
+  const project = applyOpportunityToProject(opportunity);
+  assert.equal(project.crm.opportunityId, "OP-URL");
+  assert.equal(project.customer.name, "Comune URL");
+  assert.equal(project.groups[0].quantity, 284);
+  assert.equal(project.groups[0].existingDimmingPercent, 20);
+  assert.equal(project.assumptions.financingPeriod, 5);
+  assert.equal(project.assumptions.serviceAgreementPeriod, 10);
+  assert.equal(project.assumptions.analysisPeriod, 20);
 });
 
 test("authoritative Business Case sync updates only the selected opportunity", () => {

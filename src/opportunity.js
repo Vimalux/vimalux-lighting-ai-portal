@@ -4,6 +4,39 @@ import { defaultProject, migrateProject, uid } from "./model.js";
 const n = (value) => Math.max(0, numberValue(value));
 const text = (value) => String(value ?? "").trim();
 
+export function opportunityFromSearchParams(searchParams) {
+  const params = searchParams instanceof URLSearchParams ? searchParams : new URLSearchParams(searchParams);
+  if (params.get("source") !== "crm" || !params.get("opportunity_id")) return null;
+  return {
+    customer: { municipalityName: text(params.get("customer")), country: "Italia" },
+    contact: {},
+    source: { source: "VIMALUX CRM" },
+    opportunity: {
+      opportunityId: text(params.get("opportunity_id")),
+      uniqueProjectId: text(params.get("opportunity_id")),
+      businessCaseId: text(params.get("business_case_id")),
+      projectName: text(params.get("project")) || text(params.get("customer")),
+      stage: "lead",
+    },
+    assumptions: {
+      totalLuminaires: n(params.get("luminaires")),
+      existingTechnology: text(params.get("existing_technology")),
+      averageExistingWatt: n(params.get("existing_watt")),
+      annualOperatingHours: n(params.get("operating_hours")),
+      energyPrice: n(params.get("energy_price")),
+      existingDimmingProfile: text(params.get("dimming_profile")) || "none",
+      existingDimmingPct: n(params.get("dimming_pct")),
+      existingDriverType: text(params.get("driver_type")),
+    },
+    commercial: {
+      financingModel: text(params.get("financing_model")) || "cash",
+      financingPeriodYears: n(params.get("financing_years")),
+      serviceAgreementPeriodYears: n(params.get("service_years")),
+      analysisPeriodYears: n(params.get("analysis_years")),
+    },
+  };
+}
+
 export function canonicalOpportunityFromProject(project) {
   const groups = project.groups || [];
   const total = groups.reduce((sum, group) => sum + n(group.quantity), 0);
