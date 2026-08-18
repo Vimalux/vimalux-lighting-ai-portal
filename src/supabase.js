@@ -11,6 +11,15 @@ export const supabase = supabaseConfigured
   ? createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } })
   : null;
 
+async function getCurrentProfile(fields = "id,email,full_name,role") {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  if (!user?.id) return null;
+  const { data, error } = await supabase.from("profiles").select(fields).eq("id", user.id).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export async function loadCloudState(localProjects, includeLocalProjects = true) {
   const [{ data: projectRows, error: projectError }, { data: catalogue, error: catalogueError }] = await Promise.all([
     supabase.rpc("list_business_cases"),
@@ -28,8 +37,7 @@ export async function loadCloudState(localProjects, includeLocalProjects = true)
 export async function saveCloudState(projects) {
   if (!projects.length) return;
   const catalogue = projects[0].catalogue;
-  const { data: profile, error: profileError } = await supabase.from("profiles").select("role").maybeSingle();
-  if (profileError) throw profileError;
+  const profile = await getCurrentProfile("role");
   if (["admin", "vimalux", "sales_manager"].includes(profile?.role)) {
     const { error: catalogueError } = await supabase.rpc("save_intelligence_catalogue", { catalogue_payload: catalogue });
     if (catalogueError) throw catalogueError;
@@ -90,7 +98,5 @@ export async function loadBusinessCase(caseId) {
 }
 
 export async function loadCurrentProfile() {
-  const { data, error } = await supabase.from("profiles").select("id,email,full_name,role").maybeSingle();
-  if (error) throw error;
-  return data;
+  return getCurrentProfile();
 }
