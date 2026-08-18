@@ -25,11 +25,14 @@ import {
 } from "./lightingImport.js";
 import {
   deleteCloudProject,
+  loadBusinessCase,
   loadCloudState,
+  loadCurrentProfile,
   saveCloudState,
   supabase,
   supabaseConfigured,
 } from "./supabase.js";
+import { isStableBusinessCaseLink } from "./businessCaseTransport.js";
 import "./styles.css";
 import "./business-case.css";
 import "./disabled-fields.css";
@@ -114,17 +117,24 @@ export default function App() {
     [],
   );
   const initial = useMemo(loadProjects, []);
+  const emptyProject = useMemo(defaultProject, []);
   const [projects, setProjects] = useState(initial);
   const [activeId, setActiveId] = useState(initial[0].id);
   const [view, setView] = useState("customer");
   const [session, setSession] = useState(null);
+  const [currentProfile, setCurrentProfile] = useState(null);
   const [authReady, setAuthReady] = useState(!supabaseConfigured);
   const [cloudReady, setCloudReady] = useState(!supabaseConfigured);
   const [syncState, setSyncState] = useState(
     supabaseConfigured ? "connecting" : "local",
   );
   const [syncError, setSyncError] = useState("");
-  const project = projects.find((p) => p.id === activeId) || projects[0];
+  const project =
+    projects.find((p) => p.id === activeId) || projects[0] || emptyProject;
+  const isAgent = currentProfile?.role === "agent";
+  const visibleWorkflow = isAgent
+    ? workflow.filter(([id]) => !["pricing", "assumptions"].includes(id))
+    : workflow;
   const t = useT(project.language);
   const result = useMemo(() => calculateBusinessCase(project), [project]);
   const syncedProjects = useMemo(() => projects.map((item) => syncBusinessCaseResult(item, item.updatedAt || item.createdAt)), [projects]);
@@ -154,13 +164,20 @@ export default function App() {
     if (!supabaseConfigured || !session) return;
     let active = true;
     setSyncState("loading");
-    loadCloudState(initial, hadStoredProjects)
-      .then((rows) => {
+    Promise.all([
+      loadCloudState(initial, hadStoredProjects),
+      loadCurrentProfile(),
+    ])
+      .then(([rows, profile]) => {
         if (!active) return;
         const migrated = rows.map(migrateProject);
+        setCurrentProfile(profile);
+        if (profile?.role === "agent") setView("customer");
         setProjects(migrated);
         setActiveId((current) =>
-          migrated.some((p) => p.id === current) ? current : migrated[0].id,
+          migrated.some((p) => p.id === current)
+            ? current
+            : migrated[0]?.id || "",
         );
         setCloudReady(true);
         setSyncState("saved");
@@ -197,8 +214,47 @@ export default function App() {
     const opportunityId = params.get("opportunity_id");
     const businessCaseId = params.get("business_case_id");
     if (!opportunityId && !businessCaseId) return;
-    const match = projects.find((item) => item.crm?.opportunityId === opportunityId || item.crm?.uniqueProjectId === opportunityId || item.project?.businessCaseId === businessCaseId);
+    const match = projects.find(
+      (item) =>
+        item.id === businessCaseId ||
+        item.crm?.businessCaseRecordId === businessCaseId ||
+        item.crm?.opportunityId === opportunityId ||
+        item.crm?.uniqueProjectId === opportunityId ||
+        item.project?.businessCaseId === businessCaseId,
+    );
     if (match) { setActiveId(match.id); setView("customer"); return; }
+    if (isStableBusinessCaseLink(params) && session) {
+      let active = true;
+      loadBusinessCase(businessCaseId)
+        .then((loaded) => {
+          if (!active || !loaded) return;
+          const migrated = migrateProject(loaded);
+          setProjects((current) =>
+            current.some((item) => item.id === migrated.id)
+              ? current
+              : [...current, migrated],
+          );
+          setActiveId(migrated.id);
+          setView("customer");
+        })
+        .catch((error) => {
+          if (!active) return;
+          setSyncError(error.message);
+          setSyncState("error");
+        });
+      return () => {
+        active = false;
+      };
+    }
+    if (supabaseConfigured) {
+      setSyncError(
+        "This legacy CRM link has no stable Business Case ID. Reopen the Opportunity in CRM and select Preliminary Business Case.",
+      );
+      setSyncState("error");
+      return;
+    }
+    // Local/offline compatibility only. Production never trusts source fields
+    // carried in the query string.
     const imported = opportunityFromSearchParams(params);
     if (!imported) return;
     setProjects((current) => {
@@ -209,7 +265,7 @@ export default function App() {
       return merged.projects;
     });
     setView("customer");
-  }, [cloudReady]);
+  }, [cloudReady, session]);
   const update = (path, value) =>
     setProjects((all) => {
       const normalized = numeric.has(path.at(-1)) ? numberValue(value) : value;
@@ -496,7 +552,7 @@ export default function App() {
           </div>
         </div>
         <nav>
-          {workflow.map(([id, key], i) => (
+          {visibleWorkflow.map(([id, key], i) => (
             <button
               className={view === id ? "active" : ""}
               onClick={() => setView(id)}
@@ -507,49 +563,49 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <hr />
-        <button
+        {!isAgent && <hr />}
+        {!isAgent && <button
           className={view === "crm" ? "active" : ""}
           onClick={() => setView("crm")}
         >
           CRM
-        </button>
-        <button
+        </button>}
+        {!isAgent && <button
           className={view === "datek" ? "active" : ""}
           onClick={() => setView("datek")}
         >
           DATEK
-        </button>
-        <button
+        </button>}
+        {!isAgent && <button
           className={view === "partnerReports" ? "active" : ""}
           onClick={() => setView("partnerReports")}
         >
           Partner reports
-        </button>
+        </button>}
         <button
           className={view === "projects" ? "active" : ""}
           onClick={() => setView("projects")}
         >
           {t("projects")}
         </button>
-        <button
+        {!isAgent && <button
           className={view === "catalogue" ? "active" : ""}
           onClick={() => setView("catalogue")}
         >
           {t("catalogue")}
-        </button>
-        <button
+        </button>}
+        {!isAgent && <button
           className={view === "admin" ? "active" : ""}
           onClick={() => setView("admin")}
         >
           {t("priceAdmin")}
-        </button>
-        <button
+        </button>}
+        {!isAgent && <button
           className={view === "internalReport" ? "active" : ""}
           onClick={() => setView("internalReport")}
         >
           {t("internalReport")}
-        </button>
+        </button>}
         {supabaseConfigured && (
           <button className="signout" onClick={() => supabase.auth.signOut()}>
             Esci / Sign out
@@ -564,7 +620,7 @@ export default function App() {
               {t(
                 view === "admin"
                   ? "priceAdmin"
-                  : workflow.find((x) => x[0] === view)?.[1] || view,
+                  : visibleWorkflow.find((x) => x[0] === view)?.[1] || view,
               )}
             </h1>
           </div>
@@ -591,6 +647,17 @@ export default function App() {
           </div>
         </header>
         {syncError && <div className="sync-error">{syncError}</div>}
+        {cloudReady && projects.length === 0 && (
+          <div className="card">
+            <h2>Nessun Business Case assegnato</h2>
+            <p className="muted">
+              Apri una Opportunity assegnata a te in VIMALUX CRM e seleziona
+              “Preliminary Business Case”.
+            </p>
+          </div>
+        )}
+        {projects.length > 0 && (
+          <>
         {view === "customer" && <Customer p={project} update={update} />}{" "}
         {view === "existing" && <Existing p={project} update={update} t={t} />}{" "}
         {view === "solution" && (
@@ -603,17 +670,17 @@ export default function App() {
             num={num}
           />
         )}{" "}
-        {view === "pricing" && (
+        {!isAgent && view === "pricing" && (
           <Pricing p={project} r={result} update={update} t={t} money={money} />
         )}{" "}
-        {view === "assumptions" && <Assumptions p={project} r={result} update={update} />}{" "}
+        {!isAgent && view === "assumptions" && <Assumptions p={project} r={result} update={update} />}{" "}
         {view === "business" && (
           <Business p={project} r={result} t={t} money={money} num={num} />
         )}{" "}
         {view === "report" && (
           <Report p={project} r={result} t={t} money={money} num={num} />
         )}{" "}
-        {view === "internalReport" && (
+        {!isAgent && view === "internalReport" && (
           <InternalReport
             p={project}
             r={result}
@@ -621,7 +688,7 @@ export default function App() {
             money={money}
           />
         )}{" "}
-        {view === "crm" && (
+        {!isAgent && view === "crm" && (
           <CrmOpportunity
             projects={syncedProjects}
             active={syncedProject}
@@ -633,10 +700,10 @@ export default function App() {
             currentUser={session?.user?.email || "Local user"}
           />
         )}{" "}
-        {view === "datek" && (
+        {!isAgent && view === "datek" && (
           <DatekDashboard projects={syncedProjects} money={money} />
         )}{" "}
-        {view === "partnerReports" && (
+        {!isAgent && view === "partnerReports" && (
           <PartnerReports projects={syncedProjects} p={syncedProject} money={money} />
         )}{" "}
         {view === "projects" && (
@@ -647,16 +714,18 @@ export default function App() {
               setActiveId(id);
               setView("customer");
             }}
-            remove={removeProject}
-            create={create}
-            importProjectFile={importProjectFile}
+            remove={isAgent ? undefined : removeProject}
+            create={isAgent ? undefined : create}
+            importProjectFile={isAgent ? undefined : importProjectFile}
             t={t}
           />
         )}{" "}
-        {view === "catalogue" && <Catalogue p={project} update={update} />}{" "}
-        {view === "admin" && (
+        {!isAgent && view === "catalogue" && <Catalogue p={project} update={update} />}{" "}
+        {!isAgent && view === "admin" && (
           <Admin p={project} r={result} setView={setView} reset={reset} t={t} />
         )}{" "}
+          </>
+        )}
       </main>
     </div>
   );
@@ -2697,7 +2766,7 @@ function Projects({
               <span>{p.customer.name || "—"}</span>
               <small>{p.project.businessCaseId}</small>
             </button>
-            <button
+            {remove && <button
               className="danger project-delete"
               onClick={() => remove(p.id)}
               aria-label={
@@ -2707,14 +2776,16 @@ function Projects({
               }
             >
               {language === "it" ? "Elimina" : "Delete"}
-            </button>
+            </button>}
           </div>
         ))}
       </div>
-      <div className="import-actions">
+      {(create || importProjectFile) && <div className="import-actions">
+        {create && (
         <button className="primary" onClick={create}>
           + {language === "it" ? "Nuovo progetto" : "New project"}
-        </button>
+        </button>)}
+        {importProjectFile && (
         <label className="file-button">
           <input
             type="file"
@@ -2725,13 +2796,13 @@ function Projects({
             }}
           />
           {language === "it" ? "Importa file progetto" : "Import project file"}
-        </label>
-      </div>
-      <p className="muted">
+        </label>)}
+      </div>}
+      {importProjectFile && <p className="muted">
         {language === "it"
           ? "Riconoscimento automatico: Planner, Noleggio Operativo o file lampade CSV/Excel. Vedrai sempre un'anteprima prima del salvataggio."
           : "Automatic detection: Planner, Noleggio Operativo, or lighting CSV/Excel. A preview is always shown before saving."}
-      </p>
+      </p>}
     </Card>
   );
 }
