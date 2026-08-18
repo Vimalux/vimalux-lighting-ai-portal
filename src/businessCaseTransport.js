@@ -68,7 +68,25 @@ export function projectFromBusinessCaseRow(row) {
   project.customer.province = crm.province || project.customer.province || "";
   project.customer.region = crm.region || project.customer.region || "";
   project.customer.country = crm.country || project.customer.country || "";
-  if (groups.length && !stored) project.groups = groups;
+
+  // CRM Opportunity owns the preliminary lamp count. Prefer an explicit CRM
+  // quantity over stale Intelligence groups or legacy commercial.lamps values.
+  const crmLampCount = number(crm.lamps ?? crm.luminaires ?? crm.lamp_count ?? crm.luminaire_count);
+  if (crmLampCount > 0) {
+    const currentTotal = Array.isArray(project.groups)
+      ? project.groups.reduce((sum, group) => sum + number(group?.quantity), 0)
+      : 0;
+    if (!Array.isArray(project.groups) || project.groups.length === 0) {
+      project.groups = groups.length ? groups : [sourceGroup({ name: "Gruppo 1", quantity: crmLampCount }, 0, existing)];
+    }
+    if (project.groups.length === 1 || currentTotal !== crmLampCount) {
+      const base = project.groups[0] || sourceGroup({ name: "Gruppo 1" }, 0, existing);
+      project.groups = [{ ...base, quantity: crmLampCount }];
+    }
+  } else if (groups.length && !stored) {
+    project.groups = groups;
+  }
+
   if (!stored) {
     const operatingHours = groups.length
       ? groups.reduce((sum, group, index) => sum + number(source.groups[index]?.annualHours) * group.quantity, 0) / groups.reduce((sum, group) => sum + group.quantity, 0)
