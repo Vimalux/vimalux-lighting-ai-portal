@@ -81,16 +81,12 @@ export async function saveCloudState(projects) {
       powerAidAnnualRevenue: result.savingsAsAServiceRevenue,
       co2ReductionTons: result.co2ReductionKg / 1000
     };
-    const payload = { ...project, crm: { ...(project.crm || {}), goStatus: businessCase.goStatus, businessCase }, commercialSnapshot };
+    let payload = { ...project, crm: { ...(project.crm || {}), goStatus: businessCase.goStatus, businessCase }, commercialSnapshot };
     let caseId = project.crm?.businessCaseRecordId || project.id;
     let crmOpportunityId = project.crm?.opportunityId || "";
 
     if (!stableUuid.test(String(caseId || ""))) {
       if (!canCreateLinkedCase) continue;
-
-      // File imports are persisted immediately as a cloud draft. This prevents
-      // the project disappearing on refresh before Customer/Municipality has
-      // been completed and before a CRM Opportunity exists.
       if (project.importedTechnical || project.importedCommercial) {
         const createdDraft = await supabase.rpc("create_intelligence_draft", {
           legacy_id: project.id,
@@ -108,9 +104,6 @@ export async function saveCloudState(projects) {
       }
     }
 
-    // A draft Business Case is promoted to a real CRM Opportunity only after
-    // its commercial identity is complete. Until then it remains safely stored
-    // in Business Cases and is visible only according to server-side ownership.
     if (
       stableUuid.test(String(caseId || "")) &&
       !String(crmOpportunityId || "").trim() &&
@@ -123,6 +116,22 @@ export async function saveCloudState(projects) {
       });
       if (promoted.error) throw promoted.error;
       crmOpportunityId = promoted.data || crmOpportunityId;
+      if (crmOpportunityId) {
+        payload = {
+          ...payload,
+          crm: {
+            ...(payload.crm || {}),
+            opportunityId: crmOpportunityId,
+            uniqueProjectId: crmOpportunityId,
+            status: "lead",
+          },
+        };
+        promotions.push({
+          legacyId: project.id,
+          caseId,
+          crmOpportunityId,
+        });
+      }
     }
 
     const { error } = await supabase.rpc("save_business_case_intelligence", { case_id: caseId, project_payload: payload, calculated_result: businessCase });
