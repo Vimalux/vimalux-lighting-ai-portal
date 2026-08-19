@@ -1,0 +1,87 @@
+name: Agent import flow hotfix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/agent-import-hotfix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Patch agent project import and VML Input Sheet mapping
+        shell: python
+        run: |
+          from pathlib import Path
+
+          app_path = Path('src/App.jsx')
+          app = app_path.read_text(encoding='utf-8')
+
+          old = 'importProjectFile={isAgent ? undefined : importProjectFile}'
+          new = 'importProjectFile={importProjectFile}'
+          if old not in app and new not in app:
+              raise SystemExit('Could not find Project import permission line in App.jsx')
+          app = app.replace(old, new)
+
+          old = '{cloudReady && projects.length === 0 && ('
+          new = '{cloudReady && projects.length === 0 && view !== "projects" && ('
+          if old not in app and new not in app:
+              raise SystemExit('Could not find empty-project condition in App.jsx')
+          app = app.replace(old, new, 1)
+
+          old = '{projects.length > 0 && ('
+          new = '{(projects.length > 0 || view === "projects") && ('
+          if old not in app and new not in app:
+              raise SystemExit('Could not find project rendering condition in App.jsx')
+          app = app.replace(old, new, 1)
+
+          app_path.write_text(app, encoding='utf-8')
+
+          lighting_path = Path('src/lightingImport.js')
+          lighting = lighting_path.read_text(encoding='utf-8')
+          old = '''    return {\n      name,\n      headers: uniqueHeaders(matrix[headerIndex]),\n      rows: matrix.slice(headerIndex + 1).filter((row) => row.some((cell) => String(cell).trim() !== "")),\n    };'''
+          new = '''    const headers = uniqueHeaders(matrix[headerIndex]);\n    // The official VML Input Sheet has a stable column layout even when the\n    // first visible row does not contain machine-readable field names.\n    // Apply semantic labels so the existing mapper preselects the right fields.\n    if (/^ProjectInputSheet_(ITA|ENG|DA)$/i.test(String(name || "")) && headers.length >= 7) {\n      headers[2] = "Tipo lampada";\n      headers[3] = "Quantità";\n      headers[6] = "Potenza (W)";\n    }\n    return {\n      name,\n      headers,\n      rows: matrix.slice(headerIndex + 1).filter((row) => row.some((cell) => String(cell).trim() !== "")),\n    };'''
+          if old not in lighting and new not in lighting:
+              raise SystemExit('Could not find workbook header block in lightingImport.js')
+          lighting = lighting.replace(old, new, 1)
+          lighting_path.write_text(lighting, encoding='utf-8')
+
+          test_path = Path('test/lightingImport.test.js')
+          test = test_path.read_text(encoding='utf-8')
+          marker = 'test("technology names are normalised", () => {'
+          addition = '''test("official VML Input Sheet semantic headers map automatically", () => {\n  assert.deepEqual(\n    guessLightingMapping(["Column 1", "Column 2", "Tipo lampada", "Quantità", "Column 5", "Column 6", "Potenza (W)"]),\n    { technology: "2", wattage: "6", quantity: "3", name: "", assetId: "" },\n  );\n});\n\n'''
+          if addition not in test:
+              if marker not in test:
+                  raise SystemExit('Could not find test insertion point')
+              test = test.replace(marker, addition + marker, 1)
+          test_path.write_text(test, encoding='utf-8')
+
+      - name: Test and build
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      - name: Commit patch and remove temporary workflow
+        run: |
+          rm .github/workflows/agent-import-hotfix.yml
+          git config user.name "VIMALUX"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          git add src/App.jsx src/lightingImport.js test/lightingImport.test.js .github/workflows/agent-import-hotfix.yml
+          git commit -m "Enable agent-first project import and automatic VML mapping"
+          git push origin main
