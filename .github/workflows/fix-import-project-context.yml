@@ -1,0 +1,68 @@
+name: Fix imported project context
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-import-project-context.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Keep imported project active across workflow
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('src/App.jsx')
+          app = path.read_text(encoding='utf-8')
+
+          marker = '''  const importProjectFile = async (file) => {\n'''
+          helper = '''  const activateImportedProject = (importedProject, nextView = "existing") => {\n    // A file imported from Progetti is a brand-new Business Case. Detach the\n    // browser from any CRM/business_case_id context that may have opened the\n    // previously active project, then make the imported record authoritative.\n    if (window.location.search)\n      window.history.replaceState({}, "", window.location.pathname);\n    setProjects((all) => {\n      const withoutDuplicate = all.filter((item) => item.id !== importedProject.id);\n      return [...withoutDuplicate, importedProject];\n    });\n    setActiveId(importedProject.id);\n    setView(nextView);\n  };\n\n  const importProjectFile = async (file) => {\n'''
+          if helper not in app:
+              if marker not in app:
+                  raise SystemExit('Could not find importProjectFile marker')
+              app = app.replace(marker, helper, 1)
+
+          replacements = {
+            '''        setProjects((all) => [...all, migrated]);\n        setActiveId(migrated.id);\n        setView("assumptions");\n        return;''': '''        activateImportedProject(migrated, "assumptions");\n        return;''',
+            '''        setProjects((all) => [...all, migrated]);\n        setActiveId(migrated.id);\n        setView("existing");\n        return;''': '''        activateImportedProject(migrated, "existing");\n        return;''',
+            '''      setProjects((all) => [...all, migrated]);\n      setActiveId(migrated.id);\n      setView("existing");''': '''      activateImportedProject(migrated, "existing");''',
+          }
+          for old, new in replacements.items():
+              if old in app:
+                  app = app.replace(old, new, 1)
+              elif new not in app:
+                  raise SystemExit('Could not find expected import activation block')
+
+          path.write_text(app, encoding='utf-8')
+
+      - name: Test and build
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      - name: Commit fix and remove workflow
+        run: |
+          rm .github/workflows/fix-import-project-context.yml
+          git config user.name "VIMALUX"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          git add src/App.jsx .github/workflows/fix-import-project-context.yml
+          git commit -m "Keep imported Business Case context active"
+          git push origin main
