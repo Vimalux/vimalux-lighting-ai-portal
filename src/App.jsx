@@ -647,7 +647,7 @@ export default function App() {
           </div>
         </header>
         {syncError && <div className="sync-error">{syncError}</div>}
-        {cloudReady && projects.length === 0 && (
+        {cloudReady && projects.length === 0 && view !== "projects" && (
           <div className="card">
             <h2>Nessun Business Case assegnato</h2>
             <p className="muted">
@@ -656,7 +656,7 @@ export default function App() {
             </p>
           </div>
         )}
-        {projects.length > 0 && (
+        {(projects.length > 0 || view === "projects") && (
           <>
         {view === "customer" && <Customer p={project} update={update} />}{" "}
         {view === "existing" && <Existing p={project} update={update} t={t} />}{" "}
@@ -716,7 +716,7 @@ export default function App() {
             }}
             remove={isAgent ? undefined : removeProject}
             create={isAgent ? undefined : create}
-            importProjectFile={isAgent ? undefined : importProjectFile}
+            importProjectFile={importProjectFile}
             t={t}
           />
         )}{" "}

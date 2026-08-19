@@ -6,6 +6,13 @@ test("column mapping recognises common lighting headers", () => {
   assert.deepEqual(guessLightingMapping(["Asset_ID", "Street", "Lamp Type", "Wattage", "Quantity"]), { technology: "2", wattage: "3", quantity: "4", name: "1", assetId: "0" });
 });
 
+test("official VML Input Sheet semantic headers map automatically", () => {
+  assert.deepEqual(
+    guessLightingMapping(["Column 1", "Column 2", "Tipo lampada", "Quantità", "Column 5", "Column 6", "Potenza (W)"]),
+    { technology: "2", wattage: "6", quantity: "3", name: "", assetId: "" },
+  );
+});
+
 test("technology names are normalised", () => {
   assert.equal(normalizeTechnology("Sodium HPS"), "SAP");
   assert.equal(normalizeTechnology("Metal Halide"), "MH");

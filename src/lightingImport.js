@@ -69,9 +69,18 @@ export async function readLightingWorkbook(file) {
     const matrix = data.filter((row) => row.some((cell) => String(cell ?? "").trim() !== ""));
     const headerIndex = matrix.findIndex((row) => row.some((cell) => String(cell).trim() !== ""));
     if (headerIndex < 0) return { name, headers: [], rows: [] };
+    const headers = uniqueHeaders(matrix[headerIndex]);
+    // The official VML Input Sheet has a stable column layout even when the
+    // first visible row does not contain machine-readable field names.
+    // Apply semantic labels so the existing mapper preselects the right fields.
+    if (/^ProjectInputSheet_(ITA|ENG|DA)$/i.test(String(name || "")) && headers.length >= 7) {
+      headers[2] = "Tipo lampada";
+      headers[3] = "Quantità";
+      headers[6] = "Potenza (W)";
+    }
     return {
       name,
-      headers: uniqueHeaders(matrix[headerIndex]),
+      headers,
       rows: matrix.slice(headerIndex + 1).filter((row) => row.some((cell) => String(cell).trim() !== "")),
     };
   });
