@@ -17,30 +17,18 @@ test("grouped agent import aggregates by technology and wattage, not street/name
     ["Street B", "SAP", 70, 2],
     ["Street C", "LED", 70, 1],
   ];
-  const result = buildImportedGroups(
-    rows,
-    { name: "0", technology: "1", wattage: "2", quantity: "3", assetId: "" },
-    products,
-    "en",
-    "grouped",
-  );
+  const result = buildImportedGroups(rows, { name: "0", technology: "1", wattage: "2", quantity: "3", assetId: "" }, products, "en", "grouped");
   assert.equal(result.totalQuantity, 4);
   assert.equal(result.groups.length, 2);
   assert.equal(result.groups.find((group) => group.technology === "SAP").quantity, 3);
   assert.equal(result.groups.find((group) => group.technology === "LED").quantity, 1);
 });
 
-test("individual UI mode falls back to grouped when no asset ID is mapped", () => {
+test("explicit individual mode keeps one row per luminaire", () => {
   const rows = [["Street A", "HPS", 70, 1], ["Street B", "HPS", 70, 1]];
-  const result = buildImportedGroups(
-    rows,
-    { name: "0", technology: "1", wattage: "2", quantity: "3", assetId: "" },
-    products,
-    "en",
-    "individual",
-  );
-  assert.equal(result.groups.length, 1);
-  assert.equal(result.groups[0].quantity, 2);
+  const result = buildImportedGroups(rows, { name: "0", technology: "1", wattage: "2", quantity: "3", assetId: "" }, products, "en", "individual");
+  assert.equal(result.groups.length, 2);
+  assert.ok(result.groups.every((group) => group.quantity === 1));
 });
 
 test("old technology uses approximately one third wattage for LED recommendation", () => {
