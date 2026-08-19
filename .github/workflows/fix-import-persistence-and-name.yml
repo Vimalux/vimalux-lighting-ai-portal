@@ -1,0 +1,110 @@
+name: Fix imported project persistence and naming
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-import-persistence-and-name.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Patch import persistence, promotion mapping and C6 project name
+        shell: python
+        run: |
+          from pathlib import Path
+
+          # 1) Preserve C6 metadata from the official VML Input Sheet
+          lighting_path = Path('src/lightingImport.js')
+          lighting = lighting_path.read_text(encoding='utf-8')
+          old = '''    return {\n      name,\n      headers,\n      rows: matrix.slice(headerIndex + 1).filter((row) => row.some((cell) => String(cell).trim() !== "")),\n    };'''
+          new = '''    return {\n      name,\n      headers,\n      projectIdCellC6: String(data?.[5]?.[2] ?? "").trim(),\n      rows: matrix.slice(headerIndex + 1).filter((row) => row.some((cell) => String(cell).trim() !== "")),\n    };'''
+          if old in lighting:
+              lighting = lighting.replace(old, new, 1)
+          elif 'projectIdCellC6:' not in lighting:
+              raise SystemExit('Could not patch C6 metadata in lightingImport.js')
+          lighting_path.write_text(lighting, encoding='utf-8')
+
+          # 2) Keep local imported projects visible until they are promoted to cloud,
+          #    and return promotion mappings when a cloud Business Case is created.
+          supa_path = Path('src/supabase.js')
+          supa = supa_path.read_text(encoding='utf-8')
+
+          old = '''  return (projectRows || []).map((row) => {\n    const project = projectFromBusinessCaseRow(row);\n    return masterCatalogue ? { ...project, catalogue: masterCatalogue } : project;\n  });'''
+          new = '''  const cloudProjects = (projectRows || []).map((row) => {\n    const project = projectFromBusinessCaseRow(row);\n    return masterCatalogue ? { ...project, catalogue: masterCatalogue } : project;\n  });\n  if (!includeLocalProjects) return cloudProjects;\n  const stableId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\n  const pendingImports = (localProjects || []).filter((item) =>\n    !stableId.test(String(item?.id || "")) &&\n    (item?.importedTechnical || item?.importedCommercial) &&\n    !cloudProjects.some((cloud) => cloud.id === item.id)\n  );\n  return [...cloudProjects, ...pendingImports.map((item) => masterCatalogue ? { ...item, catalogue: masterCatalogue } : item)];'''
+          if old in supa:
+              supa = supa.replace(old, new, 1)
+          elif 'const pendingImports' not in supa:
+              raise SystemExit('Could not patch loadCloudState merge')
+
+          old = '''export async function saveCloudState(projects) {\n  if (!projects.length) return;'''
+          new = '''export async function saveCloudState(projects) {\n  if (!projects.length) return [];\n  const promotions = [];'''
+          if old in supa:
+              supa = supa.replace(old, new, 1)
+          elif 'const promotions = [];' not in supa:
+              raise SystemExit('Could not add promotions array')
+
+          old = '''      const created = await supabase.rpc("create_internal_business_case", { legacy_id: project.id, project_payload: payload });\n      if (created.error) throw created.error;\n      caseId = created.data;'''
+          new = '''      const created = await supabase.rpc("create_internal_business_case", { legacy_id: project.id, project_payload: payload });\n      if (created.error) throw created.error;\n      caseId = created.data;\n      promotions.push({ legacyId: project.id, caseId });'''
+          if old in supa:
+              supa = supa.replace(old, new, 1)
+          elif 'promotions.push({ legacyId: project.id, caseId });' not in supa:
+              raise SystemExit('Could not patch promotion mapping')
+
+          old = '''    if (error) throw error;\n  }\n}'''
+          new = '''    if (error) throw error;\n  }\n  return promotions;\n}'''
+          if old in supa:
+              supa = supa.replace(old, new, 1)
+          elif 'return promotions;' not in supa:
+              raise SystemExit('Could not add promotions return')
+          supa_path.write_text(supa, encoding='utf-8')
+
+          # 3) Apply returned cloud IDs locally and use C6 as the imported project name.
+          app_path = Path('src/App.jsx')
+          app = app_path.read_text(encoding='utf-8')
+
+          old = '''        saveCloudState(projects)\n          .then(() => {\n            setSyncState("saved");\n            setSyncError("");\n          })'''
+          new = '''        saveCloudState(projects)\n          .then((promotions = []) => {\n            if (promotions.length) {\n              setProjects((current) => current.map((item) => {\n                const promotion = promotions.find((entry) => entry.legacyId === item.id);\n                return promotion\n                  ? { ...item, id: promotion.caseId, crm: { ...(item.crm || {}), businessCaseRecordId: promotion.caseId } }\n                  : item;\n              }));\n              setActiveId((current) => promotions.find((entry) => entry.legacyId === current)?.caseId || current);\n            }\n            setSyncState("saved");\n            setSyncError("");\n          })'''
+          if old in app:
+              app = app.replace(old, new, 1)
+          elif '.then((promotions = []) =>' not in app:
+              raise SystemExit('Could not patch saveCloudState promotion handling')
+
+          old = '''      p.project.name = file.name.replace(/\\.(xlsx?|csv)$/i, "");\n      p.name = p.project.name;'''
+          new = '''      const importedProjectName = String(sheet.projectIdCellC6 || "").trim() || file.name.replace(/\\.(xlsx?|csv)$/i, "");\n      p.project.name = importedProjectName;\n      p.name = importedProjectName;'''
+          if old in app:
+              app = app.replace(old, new, 1)
+          elif 'const importedProjectName = String(sheet.projectIdCellC6' not in app:
+              raise SystemExit('Could not patch imported project name')
+
+          app_path.write_text(app, encoding='utf-8')
+
+      - name: Test and build
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      - name: Commit fix and remove workflow
+        run: |
+          rm .github/workflows/fix-import-persistence-and-name.yml
+          git config user.name "VIMALUX"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          git add src/App.jsx src/supabase.js src/lightingImport.js .github/workflows/fix-import-persistence-and-name.yml
+          git commit -m "Persist imported projects and use VML C6 project name"
+          git push origin main
