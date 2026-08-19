@@ -197,7 +197,16 @@ export default function App() {
     const timer = setTimeout(
       () =>
         saveCloudState(projects)
-          .then(() => {
+          .then((promotions = []) => {
+            if (promotions.length) {
+              setProjects((current) => current.map((item) => {
+                const promotion = promotions.find((entry) => entry.legacyId === item.id);
+                return promotion
+                  ? { ...item, id: promotion.caseId, crm: { ...(item.crm || {}), businessCaseRecordId: promotion.caseId } }
+                  : item;
+              }));
+              setActiveId((current) => promotions.find((entry) => entry.legacyId === current)?.caseId || current);
+            }
             setSyncState("saved");
             setSyncError("");
           })
@@ -507,8 +516,9 @@ export default function App() {
         )
       )
         return;
-      p.project.name = file.name.replace(/\.(xlsx?|csv)$/i, "");
-      p.name = p.project.name;
+      const importedProjectName = String(sheet.projectIdCellC6 || "").trim() || file.name.replace(/\.(xlsx?|csv)$/i, "");
+      p.project.name = importedProjectName;
+      p.name = importedProjectName;
       p.groups = imported.groups;
       p.importedTechnical = {
         type: "lighting",

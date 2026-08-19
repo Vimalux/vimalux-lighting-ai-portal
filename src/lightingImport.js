@@ -81,6 +81,7 @@ export async function readLightingWorkbook(file) {
     return {
       name,
       headers,
+      projectIdCellC6: String(data?.[5]?.[2] ?? "").trim(),
       rows: matrix.slice(headerIndex + 1).filter((row) => row.some((cell) => String(cell).trim() !== "")),
     };
   });

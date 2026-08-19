@@ -28,14 +28,23 @@ export async function loadCloudState(localProjects, includeLocalProjects = true)
   if (projectError) throw projectError;
   if (catalogueError) throw catalogueError;
   const masterCatalogue = catalogue ? { led: catalogue.led || [], smart: catalogue.smart || [] } : null;
-  return (projectRows || []).map((row) => {
+  const cloudProjects = (projectRows || []).map((row) => {
     const project = projectFromBusinessCaseRow(row);
     return masterCatalogue ? { ...project, catalogue: masterCatalogue } : project;
   });
+  if (!includeLocalProjects) return cloudProjects;
+  const stableId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const pendingImports = (localProjects || []).filter((item) =>
+    !stableId.test(String(item?.id || "")) &&
+    (item?.importedTechnical || item?.importedCommercial) &&
+    !cloudProjects.some((cloud) => cloud.id === item.id)
+  );
+  return [...cloudProjects, ...pendingImports.map((item) => masterCatalogue ? { ...item, catalogue: masterCatalogue } : item)];
 }
 
 export async function saveCloudState(projects) {
-  if (!projects.length) return;
+  if (!projects.length) return [];
+  const promotions = [];
   const catalogue = projects[0].catalogue;
   const profile = await getCurrentProfile("role");
   if (["admin", "vimalux", "sales_manager"].includes(profile?.role)) {
@@ -82,10 +91,12 @@ export async function saveCloudState(projects) {
       const created = await supabase.rpc("create_internal_business_case", { legacy_id: project.id, project_payload: payload });
       if (created.error) throw created.error;
       caseId = created.data;
+      promotions.push({ legacyId: project.id, caseId });
     }
     const { error } = await supabase.rpc("save_business_case_intelligence", { case_id: caseId, project_payload: payload, calculated_result: businessCase });
     if (error) throw error;
   }
+  return promotions;
 }
 
 export async function deleteCloudProject(projectId) {
