@@ -377,6 +377,20 @@ export default function App() {
     if (id === activeId) setActiveId(next[0].id);
     setView("projects");
   };
+  const activateImportedProject = (importedProject, nextView = "existing") => {
+    // A file imported from Progetti is a brand-new Business Case. Detach the
+    // browser from any CRM/business_case_id context that may have opened the
+    // previously active project, then make the imported record authoritative.
+    if (window.location.search)
+      window.history.replaceState({}, "", window.location.pathname);
+    setProjects((all) => {
+      const withoutDuplicate = all.filter((item) => item.id !== importedProject.id);
+      return [...withoutDuplicate, importedProject];
+    });
+    setActiveId(importedProject.id);
+    setView(nextView);
+  };
+
   const importProjectFile = async (file) => {
     if (!file) return;
     try {
@@ -432,9 +446,7 @@ export default function App() {
         };
         p.updatedAt = new Date().toISOString();
         const migrated = migrateProject(p);
-        setProjects((all) => [...all, migrated]);
-        setActiveId(migrated.id);
-        setView("assumptions");
+        activateImportedProject(migrated, "assumptions");
         return;
       }
       if (type === "planner") {
@@ -472,9 +484,7 @@ export default function App() {
         };
         p.updatedAt = new Date().toISOString();
         const migrated = migrateProject(p);
-        setProjects((all) => [...all, migrated]);
-        setActiveId(migrated.id);
-        setView("existing");
+        activateImportedProject(migrated, "existing");
         return;
       }
       const sheet = sheets[0];
@@ -508,9 +518,7 @@ export default function App() {
         importedAt: new Date().toISOString(),
       };
       const migrated = migrateProject(p);
-      setProjects((all) => [...all, migrated]);
-      setActiveId(migrated.id);
-      setView("existing");
+      activateImportedProject(migrated, "existing");
     } catch (error) {
       alert(`Import failed: ${error.message}`);
     }
