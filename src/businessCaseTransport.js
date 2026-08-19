@@ -69,10 +69,15 @@ export function projectFromBusinessCaseRow(row) {
   project.customer.region = crm.region || project.customer.region || "";
   project.customer.country = crm.country || project.customer.country || "";
 
-  // CRM Opportunity owns the preliminary lamp count. Prefer an explicit CRM
-  // quantity over stale Intelligence groups or legacy commercial.lamps values.
+  // CRM owns the preliminary lamp count only until Intelligence has persisted a
+  // technical installation. Once saved Intelligence groups exist, those groups
+  // are authoritative; otherwise reopening a Business Case would overwrite a
+  // user's edited lamp quantities with the older CRM estimate.
   const crmLampCount = number(crm.lamps ?? crm.luminaires ?? crm.lamp_count ?? crm.luminaire_count);
-  if (crmLampCount > 0) {
+  const hasStoredGroups = Boolean(
+    stored && Array.isArray(project.groups) && project.groups.length > 0,
+  );
+  if (crmLampCount > 0 && !hasStoredGroups) {
     const currentTotal = Array.isArray(project.groups)
       ? project.groups.reduce((sum, group) => sum + number(group?.quantity), 0)
       : 0;
