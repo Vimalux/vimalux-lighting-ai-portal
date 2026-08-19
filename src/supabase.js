@@ -84,6 +84,7 @@ export async function saveCloudState(projects) {
     let payload = { ...project, crm: { ...(project.crm || {}), goStatus: businessCase.goStatus, businessCase }, commercialSnapshot };
     let caseId = project.crm?.businessCaseRecordId || project.id;
     let crmOpportunityId = project.crm?.opportunityId || "";
+    let createdImportDraft = false;
 
     if (!stableUuid.test(String(caseId || ""))) {
       if (!canCreateLinkedCase) continue;
@@ -94,6 +95,7 @@ export async function saveCloudState(projects) {
         });
         if (createdDraft.error) throw createdDraft.error;
         caseId = createdDraft.data;
+        createdImportDraft = true;
         promotions.push({ legacyId: project.id, caseId });
       } else {
         if (!String(project.customer?.name || "").trim() || !String(project.project?.name || "").trim()) continue;
@@ -104,7 +106,11 @@ export async function saveCloudState(projects) {
       }
     }
 
+    // Only a newly created import draft is promoted automatically here.
+    // Existing Intelligence cases without a CRM link must not be bulk-promoted
+    // during an ordinary save/synchronisation cycle.
     if (
+      createdImportDraft &&
       stableUuid.test(String(caseId || "")) &&
       !String(crmOpportunityId || "").trim() &&
       String(project.customer?.name || "").trim() &&
@@ -112,7 +118,7 @@ export async function saveCloudState(projects) {
     ) {
       const promoted = await supabase.rpc("promote_intelligence_draft", {
         case_id: caseId,
-        project_payload: payload,
+        project_payload: { ...payload, crm: { ...(payload.crm || {}), status: "lead" } },
       });
       if (promoted.error) throw promoted.error;
       crmOpportunityId = promoted.data || crmOpportunityId;
@@ -126,11 +132,7 @@ export async function saveCloudState(projects) {
             status: "lead",
           },
         };
-        promotions.push({
-          legacyId: project.id,
-          caseId,
-          crmOpportunityId,
-        });
+        promotions.push({ legacyId: project.id, caseId, crmOpportunityId });
       }
     }
 
