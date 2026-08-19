@@ -11,6 +11,8 @@ export const supabase = supabaseConfigured
   ? createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } })
   : null;
 
+const stableUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 async function getCurrentProfile(fields = "id,email,full_name,role") {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
@@ -33,9 +35,8 @@ export async function loadCloudState(localProjects, includeLocalProjects = true)
     return masterCatalogue ? { ...project, catalogue: masterCatalogue } : project;
   });
   if (!includeLocalProjects) return cloudProjects;
-  const stableId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   const pendingImports = (localProjects || []).filter((item) =>
-    !stableId.test(String(item?.id || "")) &&
+    !stableUuid.test(String(item?.id || "")) &&
     (item?.importedTechnical || item?.importedCommercial) &&
     !cloudProjects.some((cloud) => cloud.id === item.id)
   );
@@ -82,17 +83,48 @@ export async function saveCloudState(projects) {
     };
     const payload = { ...project, crm: { ...(project.crm || {}), goStatus: businessCase.goStatus, businessCase }, commercialSnapshot };
     let caseId = project.crm?.businessCaseRecordId || project.id;
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(caseId || "")) {
-      // A local upload is not promoted into CRM until its commercial identity
-      // is complete. Once complete, the server creates the CRM Opportunity and
-      // the linked Business Case under the authenticated user's ownership.
+    let crmOpportunityId = project.crm?.opportunityId || "";
+
+    if (!stableUuid.test(String(caseId || ""))) {
       if (!canCreateLinkedCase) continue;
-      if (!String(project.customer?.name || "").trim() || !String(project.project?.name || "").trim()) continue;
-      const created = await supabase.rpc("create_internal_business_case", { legacy_id: project.id, project_payload: payload });
-      if (created.error) throw created.error;
-      caseId = created.data;
-      promotions.push({ legacyId: project.id, caseId });
+
+      // File imports are persisted immediately as a cloud draft. This prevents
+      // the project disappearing on refresh before Customer/Municipality has
+      // been completed and before a CRM Opportunity exists.
+      if (project.importedTechnical || project.importedCommercial) {
+        const createdDraft = await supabase.rpc("create_intelligence_draft", {
+          legacy_id: project.id,
+          project_payload: payload,
+        });
+        if (createdDraft.error) throw createdDraft.error;
+        caseId = createdDraft.data;
+        promotions.push({ legacyId: project.id, caseId });
+      } else {
+        if (!String(project.customer?.name || "").trim() || !String(project.project?.name || "").trim()) continue;
+        const created = await supabase.rpc("create_internal_business_case", { legacy_id: project.id, project_payload: payload });
+        if (created.error) throw created.error;
+        caseId = created.data;
+        promotions.push({ legacyId: project.id, caseId });
+      }
     }
+
+    // A draft Business Case is promoted to a real CRM Opportunity only after
+    // its commercial identity is complete. Until then it remains safely stored
+    // in Business Cases and is visible only according to server-side ownership.
+    if (
+      stableUuid.test(String(caseId || "")) &&
+      !String(crmOpportunityId || "").trim() &&
+      String(project.customer?.name || "").trim() &&
+      String(project.project?.name || "").trim()
+    ) {
+      const promoted = await supabase.rpc("promote_intelligence_draft", {
+        case_id: caseId,
+        project_payload: payload,
+      });
+      if (promoted.error) throw promoted.error;
+      crmOpportunityId = promoted.data || crmOpportunityId;
+    }
+
     const { error } = await supabase.rpc("save_business_case_intelligence", { case_id: caseId, project_payload: payload, calculated_result: businessCase });
     if (error) throw error;
   }
