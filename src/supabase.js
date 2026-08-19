@@ -74,9 +74,11 @@ export async function saveCloudState(projects) {
     const payload = { ...project, crm: { ...(project.crm || {}), goStatus: businessCase.goStatus, businessCase }, commercialSnapshot };
     let caseId = project.crm?.businessCaseRecordId || project.id;
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(caseId || "")) {
-      // New Intelligence projects are linked server-side to a CRM Opportunity.
-      // The server assigns the authenticated user and enforces role ownership.
+      // A local upload is not promoted into CRM until its commercial identity
+      // is complete. Once complete, the server creates the CRM Opportunity and
+      // the linked Business Case under the authenticated user's ownership.
       if (!canCreateLinkedCase) continue;
+      if (!String(project.customer?.name || "").trim() || !String(project.project?.name || "").trim()) continue;
       const created = await supabase.rpc("create_internal_business_case", { legacy_id: project.id, project_payload: payload });
       if (created.error) throw created.error;
       caseId = created.data;
