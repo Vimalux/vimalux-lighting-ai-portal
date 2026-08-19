@@ -31,6 +31,27 @@ export function normalizeTechnology(value) {
   return "OTHER";
 }
 
+function targetLedWattage(existingWattage, technology) {
+  const wattage = Math.max(0, numberValue(existingWattage));
+  if (!wattage) return 0;
+  if (technology === "LED") return wattage * 0.70;
+  if (["SAP", "MH", "MERCURY"].includes(technology)) return wattage / 3;
+  return wattage * 0.50;
+}
+
+export function recommendLedProduct(existingWattage, technology, ledProducts = []) {
+  const target = targetLedWattage(existingWattage, technology);
+  const active = ledProducts.filter((product) => product.active !== false && numberValue(product.wattage) > 0);
+  const candidates = active.length ? active : ledProducts.filter((product) => numberValue(product.wattage) > 0);
+  if (!candidates.length) return { product: null, targetWattage: Math.round(target * 10) / 10 };
+  const product = [...candidates].sort((a, b) => {
+    const aDelta = Math.abs(numberValue(a.wattage) - target);
+    const bDelta = Math.abs(numberValue(b.wattage) - target);
+    return aDelta - bDelta || numberValue(a.wattage) - numberValue(b.wattage);
+  })[0];
+  return { product, targetWattage: Math.round(target * 10) / 10 };
+}
+
 const uniqueHeaders = (values) => {
   const used = new Map();
   return values.map((value, index) => {
@@ -57,7 +78,8 @@ export async function readLightingWorkbook(file) {
 }
 
 function parseCsv(text) {
-  const delimiter = (text.split(/\r?\n/, 1)[0].match(/;/g) || []).length > (text.split(/\r?\n/, 1)[0].match(/,/g) || []).length ? ";" : ",";
+  const firstLine = text.split(/\r?\n/, 1)[0];
+  const delimiter = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ";" : ",";
   const rows = []; let row = []; let value = ""; let quoted = false;
   for (let index = 0; index < text.length; index += 1) {
     const character = text[index];
@@ -73,42 +95,73 @@ function parseCsv(text) {
   return rows;
 }
 
+function importedGroupBase({ name, quantity, technology, wattage, ledProducts }) {
+  const recommendation = recommendLedProduct(wattage, technology, ledProducts);
+  return {
+    id: uid(),
+    name,
+    quantity,
+    technology,
+    existingWattage: wattage,
+    upgradeSelected: true,
+    proposedProductId: recommendation.product?.id || "",
+    projectLedWattage: recommendation.product ? numberValue(recommendation.product.wattage) : recommendation.targetWattage,
+    importedRecommendedWattage: recommendation.targetWattage,
+    smartAssigned: true,
+    powerAidAssigned: true,
+  };
+}
+
 export function buildImportedGroups(rows, mapping, ledProducts, language = "it", mode = "grouped") {
   const wattageIndex = Number(mapping.wattage);
   const technologyIndex = mapping.technology === "" ? null : Number(mapping.technology);
   const quantityIndex = mapping.quantity === "" ? null : Number(mapping.quantity);
   const nameIndex = mapping.name === "" ? null : Number(mapping.name);
   const assetIdIndex = mapping.assetId === "" || mapping.assetId == null ? null : Number(mapping.assetId);
-  const firstProduct = ledProducts.find((product) => product.active)?.id || ledProducts[0]?.id || "";
   const grouped = new Map();
   let skipped = 0;
 
   rows.forEach((row, rowIndex) => {
     const wattage = numberValue(row[wattageIndex]);
     const quantity = quantityIndex == null ? 1 : numberValue(row[quantityIndex]);
-    if (!(wattage > 0) || !(quantity > 0)) {
-      skipped += 1;
-      return;
-    }
+    if (!(wattage > 0) || !(quantity > 0)) { skipped += 1; return; }
+
     const technology = technologyIndex == null ? "OTHER" : normalizeTechnology(row[technologyIndex]);
     const suppliedName = nameIndex == null ? "" : String(row[nameIndex] ?? "").trim();
     const assetId = assetIdIndex == null ? "" : String(row[assetIdIndex] ?? "").trim();
-    if (mode === "individual") {
+
+    // Individual rows are only useful when the source actually supplies an asset/pole ID.
+    // Otherwise the safe/default behaviour is to aggregate by technology + wattage.
+    const trueIndividual = mode === "individual" && assetIdIndex != null;
+    if (trueIndividual) {
       const count = Math.max(1, Math.round(quantity));
       for (let item = 0; item < count; item += 1) {
         const suffix = count > 1 ? ` #${item + 1}` : "";
         const fallback = suppliedName ? `${suppliedName}${suffix || ` #${rowIndex + 1}`}` : `${language === "it" ? "Lampada" : "Luminaire"} ${rowIndex + 1}${suffix}`;
-        grouped.set(`individual-${rowIndex}-${item}`, { id: uid(), name: assetId ? `${assetId}${suffix}` : fallback, quantity: 1, technology, existingWattage: wattage, proposedProductId: firstProduct, smartAssigned: true, powerAidAssigned: true });
+        grouped.set(`individual-${rowIndex}-${item}`, importedGroupBase({
+          name: assetId ? `${assetId}${suffix}` : fallback,
+          quantity: 1,
+          technology,
+          wattage,
+          ledProducts,
+        }));
       }
       return;
     }
-    const key = `${suppliedName.toLowerCase()}|${technology}|${wattage}`;
+
+    const key = `${technology}|${wattage}`;
     const existing = grouped.get(key);
     if (existing) existing.quantity += quantity;
-    else grouped.set(key, { id: uid(), name: suppliedName || `${technology} ${wattage} W`, quantity, technology, existingWattage: wattage, proposedProductId: firstProduct, smartAssigned: true, powerAidAssigned: true });
+    else grouped.set(key, importedGroupBase({
+      name: `${technology} ${wattage} W`,
+      quantity,
+      technology,
+      wattage,
+      ledProducts,
+    }));
   });
 
-  const groups = [...grouped.values()].sort((a, b) => a.technology.localeCompare(b.technology) || a.existingWattage - b.existingWattage || a.name.localeCompare(b.name));
+  const groups = [...grouped.values()].sort((a, b) => a.technology.localeCompare(b.technology) || a.existingWattage - b.existingWattage);
   const totalQuantity = groups.reduce((sum, group) => sum + group.quantity, 0);
   return { groups, skipped, totalQuantity, message: language === "it" ? `${groups.length} gruppi, ${totalQuantity} apparecchi` : `${groups.length} groups, ${totalQuantity} luminaires` };
 }
@@ -128,15 +181,14 @@ export function parsePlannerWorkbook(sheets, ledProducts, fileName = "") {
     return label && !isTotalLabel(label) && numberValue(row?.[1]) > 0;
   });
   if (pivot && (codeIndex < 0 || quantityIndex < 0) && inferredRow) {
-    codeIndex = 0;
-    quantityIndex = 1;
+    codeIndex = 0; quantityIndex = 1;
     if (powerSumIndex < 0 && inferredRow.length > 2) powerSumIndex = 2;
   }
   if (pivot && (codeIndex < 0 || quantityIndex < 0)) throw new Error("PIVOT does not contain readable product rows.");
 
   const centreRows = centre ? [centre.headers, ...centre.rows] : [];
   const centreHeader = centreRows[0] || [];
-  const centreCodeIndex = centreHeader.findIndex(value => ["new code","codifica armature"].includes(clean(value)));
+  const centreCodeIndex = centreHeader.findIndex(value => ["new code", "codifica armature"].includes(clean(value)));
   const centreExistingPowerIndex = centreHeader.findIndex(value => clean(value) === "potm tot");
   const centreProposedPowerIndex = centreHeader.findIndex(value => clean(value) === "pow w");
   const technicalByCode = new Map();
@@ -154,7 +206,7 @@ export function parsePlannerWorkbook(sheets, ledProducts, fileName = "") {
     });
   }
 
-  const activeProducts = ledProducts.filter(product => product.active);
+  const activeProducts = ledProducts.filter(product => product.active !== false);
   const fallbackProducts = activeProducts.length ? activeProducts : ledProducts;
   const closestProduct = wattage => [...fallbackProducts].sort((a,b) => Math.abs(numberValue(a.wattage)-wattage)-Math.abs(numberValue(b.wattage)-wattage))[0];
   const groups = (pivot ? pivot.rows : []).map(row => {
@@ -162,25 +214,16 @@ export function parsePlannerWorkbook(sheets, ledProducts, fileName = "") {
     const quantity = Math.round(numberValue(row[quantityIndex]));
     if (!code || isTotalLabel(code) || !(quantity > 0)) return null;
     const technical = technicalByCode.get(code);
-    const proposedWattage = technical?.proposedCount
-      ? technical.proposedTotal / technical.proposedCount
-      : numberValue(row[powerSumIndex]) / quantity;
-    const existingWattage = technical?.existingCount
-      ? technical.existingTotal / technical.existingCount
-      : proposedWattage;
+    const proposedWattage = technical?.proposedCount ? technical.proposedTotal / technical.proposedCount : numberValue(row[powerSumIndex]) / quantity;
+    const existingWattage = technical?.existingCount ? technical.existingTotal / technical.existingCount : proposedWattage;
     const product = closestProduct(proposedWattage);
     return {
-      id: uid(),
-      name: code,
-      quantity,
-      technology: "OTHER",
+      id: uid(), name: code, quantity, technology: "OTHER",
       existingWattage: Math.round(existingWattage * 10) / 10,
-      proposedProductId: product?.id || "",
-      projectLedPrice: null,
-      smartAssigned: true,
-      powerAidAssigned: false,
-      importedProductCode: code,
-      importedProposedWattage: Math.round(proposedWattage * 10) / 10
+      proposedProductId: product?.id || "", projectLedPrice: null,
+      projectLedWattage: product?.wattage ?? Math.round(proposedWattage * 10) / 10,
+      upgradeSelected: true, smartAssigned: true, powerAidAssigned: false,
+      importedProductCode: code, importedProposedWattage: Math.round(proposedWattage * 10) / 10,
     };
   }).filter(Boolean);
 
@@ -192,22 +235,18 @@ export function parsePlannerWorkbook(sheets, ledProducts, fileName = "") {
   const warnings = [];
   const rawMappedCount = [...technicalByCode.entries()].filter(([code]) => groups.some(group => group.importedProductCode === code)).reduce((sum,[,item]) => sum + item.count, 0);
   if (rawMappedCount && rawMappedCount !== totalQuantity) warnings.push(`PIVOT total (${totalQuantity}) differs from mapped raw rows (${rawMappedCount}); PIVOT total was used.`);
-
   return {
-    type: "planner",
-    source: pivot ? "Planner PIVOT + Centro luminoso" : "Centro luminoso",
-    projectName: projectName || "Imported Planner project",
-    customerName: projectName || "",
-    totalQuantity,
-    groups,
+    type: "planner", source: pivot ? "Planner PIVOT + Centro luminoso" : "Centro luminoso",
+    projectName: projectName || "Imported Planner project", customerName: projectName || "",
+    totalQuantity, groups,
     productMix: groups.map(group => ({ code: group.importedProductCode, quantity: group.quantity, proposedWattage: group.importedProposedWattage })),
-    warnings
+    warnings,
   };
 }
 
 export function detectWorkbookType(sheets) {
   if (sheets.some(item => clean(item.name) === "crm import")) return "noleggio";
-  if (sheets.some(item => ["pivot","centro luminoso"].includes(clean(item.name)))) return "planner";
+  if (sheets.some(item => ["pivot", "centro luminoso"].includes(clean(item.name)))) return "planner";
   return "lighting";
 }
 
@@ -216,9 +255,7 @@ const crmImportNumberFields = new Set([
   "cms_connectivity_annual","saas_poweraid_annual","total_opex_annual","customer_cost_financed_annual",
   "customer_cost_cash_annual","co2_saving_annual_tons","energy_reduction_pct","customer_roi_years"
 ]);
-
 const rowsWithHeaders = (sheet) => sheet ? [sheet.headers || [], ...(sheet.rows || [])] : [];
-
 function findLabeledNumber(sheet, labels) {
   const wanted = labels.map(clean);
   for (const row of rowsWithHeaders(sheet)) {
@@ -233,7 +270,6 @@ function findLabeledNumber(sheet, labels) {
   }
   return 0;
 }
-
 const findSheet = (sheets, name) => sheets.find(item => clean(item.name) === clean(name));
 const cents = value => Math.round(numberValue(value) * 100) / 100;
 
@@ -252,12 +288,8 @@ export function parseNoleggioWorkbook(sheets) {
   if (!values.project_name) throw new Error("CRM_IMPORT is missing project_name.");
   if (!(values.capex > 0)) throw new Error("CRM_IMPORT is missing a valid CAPEX.");
 
-  // CRM_IMPORT can contain stale cached formula values. The visible customer offer and
-  // Dashboard are authoritative for period/rate/payment and therefore validate/override it.
   const dashboard = findSheet(sheets, "Dashboard");
-  const italianOffer = findSheet(sheets, "QuotationCustomer_ITA");
-  const englishOffer = findSheet(sheets, "QuotationCustomer_ENG");
-  const offer = italianOffer || englishOffer;
+  const offer = findSheet(sheets, "QuotationCustomer_ITA") || findSheet(sheets, "QuotationCustomer_ENG");
   const dashboardContractYears = findLabeledNumber(dashboard, ["contract period in years"]);
   const dashboardFinancingYears = findLabeledNumber(dashboard, ["finance / years"]);
   const dashboardInterestDecimal = findLabeledNumber(dashboard, ["interest rate for customer"]);
@@ -267,46 +299,26 @@ export function parseNoleggioWorkbook(sheets) {
   const sourceFinancingYears = Math.max(1, Math.round(values.financing_years || sourceContractYears));
   const contractYears = Math.max(1, Math.round(dashboardContractYears || sourceContractYears));
   const financingYears = Math.max(1, Math.round(dashboardFinancingYears || sourceFinancingYears));
-  const interestRate = dashboardInterestDecimal > 0 && dashboardInterestDecimal < 1
-    ? dashboardInterestDecimal * 100
-    : dashboardInterestDecimal;
-
-  const rawAnnualPayment = offerTotalPayments > 0
-    ? offerTotalPayments / financingYears
-    : (values.customer_cost_cash_annual || (values.customer_cost_financed_annual + values.total_opex_annual));
+  const interestRate = dashboardInterestDecimal > 0 && dashboardInterestDecimal < 1 ? dashboardInterestDecimal * 100 : dashboardInterestDecimal;
+  const rawAnnualPayment = offerTotalPayments > 0 ? offerTotalPayments / financingYears : (values.customer_cost_cash_annual || (values.customer_cost_financed_annual + values.total_opex_annual));
   const allInclusiveAnnualPayment = cents(rawAnnualPayment);
   if (!(allInclusiveAnnualPayment > 0)) throw new Error("CRM_IMPORT is missing the all-inclusive customer payment.");
 
   const warnings = [];
   if (sourceContractYears !== contractYears) warnings.push(`CRM_IMPORT contract period (${sourceContractYears}) was stale; customer offer uses ${contractYears} years.`);
   if (sourceFinancingYears !== financingYears) warnings.push(`CRM_IMPORT financing period (${sourceFinancingYears}) was stale; customer offer uses ${financingYears} years.`);
-  if (offerTotalPayments > 0 && Math.abs((values.customer_cost_cash_annual || 0) * financingYears - offerTotalPayments) > 1) {
-    warnings.push("Annual payment was recalculated from the customer offer total.");
-  }
+  if (offerTotalPayments > 0 && Math.abs((values.customer_cost_cash_annual || 0) * financingYears - offerTotalPayments) > 1) warnings.push("Annual payment was recalculated from the customer offer total.");
 
   return {
-    source: "CRM_IMPORT + customer offer validation",
-    mappingVersion: 2,
-    projectName: values.project_name,
-    customerName: values.customer_name || values.project_name,
-    quotationId: values.quotation_id || "",
-    lamps: Math.max(0, Math.round(values.lamps || 0)),
-    capex: cents(values.capex),
-    contractYears,
-    financingYears,
-    serviceContractYears: contractYears,
-    interestRate: cents(interestRate),
-    allInclusiveAnnualPayment,
+    source: "CRM_IMPORT + customer offer validation", mappingVersion: 2,
+    projectName: values.project_name, customerName: values.customer_name || values.project_name,
+    quotationId: values.quotation_id || "", lamps: Math.max(0, Math.round(values.lamps || 0)),
+    capex: cents(values.capex), contractYears, financingYears, serviceContractYears: contractYears,
+    interestRate: cents(interestRate), allInclusiveAnnualPayment,
     totalCustomerPayments: cents(offerTotalPayments || allInclusiveAnnualPayment * financingYears),
-    annualOpex: cents(values.total_opex_annual || 0),
-    cmsAnnual: cents(values.cms_connectivity_annual || 0),
-    maintenanceAnnual: cents(values.maintenance_opex_annual || 0),
-    powerAidAnnual: cents(values.saas_poweraid_annual || 0),
-    co2SavingTons: values.co2_saving_annual_tons || 0,
-    energyReductionPercent: (values.energy_reduction_pct || 0) * 100,
-    customerRoiYears: values.customer_roi_years || 0,
-    pdfFile: values.pdf_file || "",
-    warnings,
-    raw: values
+    annualOpex: cents(values.total_opex_annual || 0), cmsAnnual: cents(values.cms_connectivity_annual || 0),
+    maintenanceAnnual: cents(values.maintenance_opex_annual || 0), powerAidAnnual: cents(values.saas_poweraid_annual || 0),
+    co2SavingTons: values.co2_saving_annual_tons || 0, energyReductionPercent: (values.energy_reduction_pct || 0) * 100,
+    customerRoiYears: values.customer_roi_years || 0, pdfFile: values.pdf_file || "", warnings, raw: values,
   };
 }
