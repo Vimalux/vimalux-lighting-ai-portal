@@ -42,7 +42,7 @@ export async function saveCloudState(projects) {
     const { error: catalogueError } = await supabase.rpc("save_intelligence_catalogue", { catalogue_payload: catalogue });
     if (catalogueError) throw catalogueError;
   }
-  const isInternal = ["admin", "vimalux", "sales_manager"].includes(profile?.role);
+  const canCreateLinkedCase = ["admin", "vimalux", "sales_manager", "agent"].includes(profile?.role);
   for (const project of projects) {
     const result = calculateBusinessCase(project);
     const businessCase = buildBusinessCaseSnapshot(project, project.updatedAt || new Date().toISOString());
@@ -74,9 +74,9 @@ export async function saveCloudState(projects) {
     const payload = { ...project, crm: { ...(project.crm || {}), goStatus: businessCase.goStatus, businessCase }, commercialSnapshot };
     let caseId = project.crm?.businessCaseRecordId || project.id;
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(caseId || "")) {
-      // Agents may only update a server-created business case linked to an
-      // opportunity they own. Local placeholder projects are never uploaded.
-      if (!isInternal) continue;
+      // New Intelligence projects are linked server-side to a CRM Opportunity.
+      // The server assigns the authenticated user and enforces role ownership.
+      if (!canCreateLinkedCase) continue;
       const created = await supabase.rpc("create_internal_business_case", { legacy_id: project.id, project_payload: payload });
       if (created.error) throw created.error;
       caseId = created.data;
