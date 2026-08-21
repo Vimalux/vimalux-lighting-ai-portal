@@ -219,12 +219,39 @@ export function generateCustomerPdf(project, result) {
     columnStyles: { 0: { halign: "left" }, 1: { halign: "right" } },
   });
 
+  const additionalCostRows = (type, formatter) => (project.additionalCosts || [])
+    .filter((item) => item?.costType === type && Number(item.quantity || 0) * Number(item.unitSalesPrice || 0) > 0)
+    .map((item) => {
+      const quantity = Number(item.quantity || 0);
+      const unitPrice = Number(item.unitSalesPrice || 0);
+      const label = item.description?.trim() || (it ? "Costo aggiuntivo" : "Additional cost");
+      const details = `${formatNumber(quantity, lang)} ${item.unit || ""} × ${money2(unitPrice)}`.trim();
+      return [`${label} · ${details}`, formatter(quantity * unitPrice)];
+    });
+  const additionalCapexRows = additionalCostRows("capex", money);
+  const additionalAnnualOpexRows = additionalCostRows("opex_annual", money2);
+
   section(it ? "Dettaglio CAPEX e OPEX" : "CAPEX and OPEX breakdown", doc.lastAutoTable.finalY + 9);
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 14,
     margin: { bottom: 18 },
     head: [[it ? "Voce" : "Item", it ? "Importo" : "Amount"]],
-    body: rows([[it ? "Apparecchi LED" : "LED luminaires", money(result.ledCapex)], ["LCU", money(result.smartHardwareCapex)], [it ? "Implementazione" : "Implementation", money(result.implementationCapex)], ["Gateway", money(result.gatewayCapex)], [it ? "Antenne" : "Antennas", money(result.antennaCapex)], [it ? "Contatori" : "Meters", money(result.meterCapex)], [it ? "Trasporto" : "Freight", money(result.freight)], [t("capex"), money(result.totalCapex)], ["CMS", money2(result.cmsOpex)], ["Gateway OPEX", money2(result.gatewayOpex)], ["PowerAiD fee", money2(result.powerAidFee)], [t("annualOpex"), money2(result.totalAnnualOpex)]]),
+    body: rows([
+      [it ? "Apparecchi LED" : "LED luminaires", money(result.ledCapex)],
+      ["LCU", money(result.smartHardwareCapex)],
+      [it ? "Implementazione" : "Implementation", money(result.implementationCapex)],
+      ["Gateway", money(result.gatewayCapex)],
+      [it ? "Antenne" : "Antennas", money(result.antennaCapex)],
+      [it ? "Contatori" : "Meters", money(result.meterCapex)],
+      [it ? "Trasporto" : "Freight", money(result.freight)],
+      ...additionalCapexRows,
+      [t("capex"), money(result.totalCapex)],
+      ["CMS", money2(result.cmsOpex)],
+      ["Gateway OPEX", money2(result.gatewayOpex)],
+      ["PowerAiD fee", money2(result.powerAidFee)],
+      ...additionalAnnualOpexRows,
+      [t("annualOpex"), money2(result.totalAnnualOpex)],
+    ]),
     headStyles: { fillColor: [15, 118, 110] },
     styles: { font: "helvetica", fontSize: 6.6, cellPadding: 0.55 },
     columnStyles: { 0: { halign: "left" }, 1: { halign: "right", cellWidth: 46 } },
