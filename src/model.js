@@ -11,6 +11,7 @@ export const defaultProject = () => ({
   groups: [{ id: uid(), name: "Gruppo 1", quantity: 100, technology: "SAP", existingWattage: 100, existingSystemFactor: 0, existingDimmingProfile: "none", existingDimmingMethod: "average", existingDimmingPercent: 0, existingFullPowerHours: 0, existingReducedHours: 0, existingReducedLoadPercent: 100, existingDimmingNote: "", existingDriverType: "non_dimmable", upgradeSelected: true, proposedProductId: "led-40", projectLedWattage: null, smartAssigned: true, powerAidAssigned: true }],
   solution: { smartEnabled: true, cmsEnabled: true, powerAidEnabled: false, lcuProductId: "lcu-1", panelEquipmentEnabled: false, gatewayProductId: "gateway-1", gatewayQuantity: 0, antennaProductId: "antenna-1", antennaQuantity: 0, meterProductId: "meter-1", meterQuantity: 0 },
   assumptions: { operatingHours: 4200, energyPrice: .25, sapFactor: 1.2, mhFactor: 1.15, mercuryFactor: 1.15, co2KgPerKwh: .233, cloPercent: 10, powerAidPercent: 40, powerAidCustomerFeePercent: 30, powerAidSupplierSharePercent: 70, existingMaintenance: 25, newMaintenance: 5, financingModel: "cash", dealType: "cash", financingPeriod: 5, serviceAgreementPeriod: 10, analysisPeriod: 20, contractYears: 10, financingYears: 5, rateProfileId: "custom", interestRate: 5, interestRateSnapshot: { profileId: "custom", annualRate: 5, capturedAt: null }, allInclusiveAnnualPayment: 0, officialOfferCapex: 0, officialAnnualOpex: 0, upfrontPayment: 0, energyEscalation: 2, opexEscalation: 2, discountRate: 5, freightCostPerLamp: 4, freightSalesPerLamp: 6, dutyCost: 0, commissionPercent: 0, agent1Name: "", agent1CommissionPercent: 0, agent2Name: "", agent2CommissionPercent: 0, warrantyReservePercent: 0, fundingCostPercent: 0, otherDirectCosts: 0, minimumMarginPercent: 30 },
+  additionalCosts: [],
   pricing: { overrides: {} },
   catalogue: {
     led: [{ id: "led-40", brand: "VIMALUX", name: "VIMA LED 40", wattage: 40, lumen: 6000, costPrice: 90, salesPrice: 150, active: true }, { id: "led-70", brand: "VIMALUX", name: "VIMA LED 70", wattage: 70, lumen: 10500, costPrice: 125, salesPrice: 210, active: true }],
@@ -39,6 +40,17 @@ export function migrateProject(saved) {
   project.groups = (Array.isArray(project.groups) ? project.groups : [])
     .filter((group) => !isImportedTotalGroup(group))
     .map((g) => ({ existingSystemFactor: 0, existingDimmingProfile: "none", existingDimmingMethod: "average", existingDimmingPercent: 0, existingFullPowerHours: 0, existingReducedHours: 0, existingReducedLoadPercent: 100, existingDimmingNote: "", existingDriverType: "non_dimmable", upgradeSelected: true, ...g, projectLedWattage: g.projectLedWattage ?? g.importedProposedWattage ?? null, id: g.id || uid() }));
+  project.additionalCosts = (Array.isArray(project.additionalCosts) ? project.additionalCosts : []).map((item) => ({
+    id: item?.id || uid(),
+    description: String(item?.description || ""),
+    category: ["material", "labor", "civil_works", "services", "other"].includes(item?.category) ? item.category : "other",
+    costType: item?.costType === "opex" ? "opex" : "capex",
+    quantity: numberValue(item?.quantity),
+    unit: String(item?.unit || "pz"),
+    unitCost: numberValue(item?.unitCost),
+    unitSalesPrice: numberValue(item?.unitSalesPrice),
+    note: String(item?.note || ""),
+  }));
   const legacyDealType = project.assumptions.financingModel === "finance" ? "finance" : ["laas", "ppp"].includes(project.assumptions.financingModel) ? "noleggio_operativo" : "cash";
   project.assumptions.dealType = ["cash", "noleggio_operativo", "finance"].includes(saved?.assumptions?.dealType) ? saved.assumptions.dealType : legacyDealType;
   const legacyContractYears = numberValue(saved?.assumptions?.contractYears ?? saved?.assumptions?.years);
