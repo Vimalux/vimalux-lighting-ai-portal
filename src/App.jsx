@@ -13,6 +13,7 @@ import { growthForecast, partnerTotals } from "./partners.js";
 import { generatePartnerPdf } from "./partnerReport.js";
 import CrmOpportunity from "./CrmOpportunity.jsx";
 import AdditionalCostsCard from "./AdditionalCostsCard.jsx";
+import { isAgentViewAllowed, sanitizeAgentAdditionalCosts } from "./additionalCostsAccess.js";
 import { syncBusinessCaseResult } from "./businessCaseSync.js";
 import { mergeOpportunity, opportunityFromSearchParams } from "./opportunity.js";
 import { createImportAudit, validateOpportunity } from "./opportunityImport.js";
@@ -51,6 +52,12 @@ const workflow = [
   ["business", "business"],
   ["report", "report"],
 ];
+const agentWorkflow = [
+  ...workflow.slice(0, 3),
+  ["additionalCosts", "additionalCosts"],
+  ...workflow.slice(5),
+];
+const agentAllowedViews = new Set([...agentWorkflow.map(([id]) => id), "projects"]);
 const RATE_PROFILES = [
   { id: "municipality", label: "Municipality / Comune", annualRate: 4.8 },
   { id: "standard_eur", label: "Standard EUR", annualRate: 5.5 },
@@ -134,7 +141,7 @@ export default function App() {
     projects.find((p) => p.id === activeId) || projects[0] || emptyProject;
   const isAgent = currentProfile?.role === "agent";
   const visibleWorkflow = isAgent
-    ? workflow.filter(([id]) => !["pricing", "assumptions"].includes(id))
+    ? agentWorkflow
     : workflow;
   const t = useT(project.language);
   const result = useMemo(() => calculateBusinessCase(project), [project]);
@@ -148,6 +155,9 @@ export default function App() {
       ),
     [projects],
   );
+  useEffect(() => {
+    if (isAgent && !isAgentViewAllowed(view, agentAllowedViews)) setView("customer");
+  }, [isAgent, view]);
   useEffect(() => {
     if (!supabaseConfigured) return;
     supabase.auth.getSession().then(({ data }) => {
@@ -276,6 +286,11 @@ export default function App() {
   }, [cloudReady, session]);
   const update = (path, value) =>
     setProjects((all) => {
+      if (isAgent && ["pricing", "assumptions"].includes(path[0])) return all;
+      if (isAgent && path[0] === "additionalCosts") {
+        if (path.length !== 1 || !Array.isArray(value)) return all;
+        value = sanitizeAgentAdditionalCosts(project.additionalCosts, value);
+      }
       const normalized = numeric.has(path.at(-1)) ? numberValue(value) : value;
       const changedAt = new Date().toISOString();
       if (path[0] === "catalogue") {
@@ -492,6 +507,7 @@ export default function App() {
           {view === "customer" && <Customer p={project} update={update} />}
           {view === "existing" && <Existing p={project} update={update} t={t} />}
           {view === "solution" && <Solution p={project} r={result} update={update} t={t} money={money} num={num} />}
+          {isAgent && view === "additionalCosts" && <AdditionalCostsCard p={project} update={update} mode="agent" />}
           {!isAgent && view === "pricing" && <Pricing p={project} r={result} update={update} t={t} money={money} />}
           {!isAgent && view === "assumptions" && <Assumptions p={project} r={result} update={update} />}
           {view === "business" && <Business p={project} r={result} t={t} money={money} num={num} />}
