@@ -43,12 +43,12 @@ export function migrateProject(saved) {
   project.additionalCosts = (Array.isArray(project.additionalCosts) ? project.additionalCosts : []).map((item) => ({
     id: item?.id || uid(),
     description: String(item?.description || ""),
-    category: ["material", "labor", "civil_works", "services", "other"].includes(item?.category) ? item.category : "other",
-    costType: item?.costType === "opex" ? "opex" : "capex",
-    quantity: numberValue(item?.quantity),
+    category: ["materiale", "lavoro", "opere_civili", "servizi", "altro"].includes(item?.category) ? item.category : "altro",
+    costType: item?.costType === "opex_annual" ? "opex_annual" : "capex",
+    quantity: Math.max(0, numberValue(item?.quantity)),
     unit: String(item?.unit || "pz"),
-    unitCost: numberValue(item?.unitCost),
-    unitSalesPrice: numberValue(item?.unitSalesPrice),
+    unitCost: Math.max(0, numberValue(item?.unitCost)),
+    unitSalesPrice: Math.max(0, numberValue(item?.unitSalesPrice)),
     note: String(item?.note || ""),
   }));
   const legacyDealType = project.assumptions.financingModel === "finance" ? "finance" : ["laas", "ppp"].includes(project.assumptions.financingModel) ? "noleggio_operativo" : "cash";
