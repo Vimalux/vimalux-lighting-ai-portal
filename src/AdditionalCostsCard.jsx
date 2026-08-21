@@ -39,8 +39,9 @@ const numberValue = (value) => {
   return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
 };
 
-export default function AdditionalCostsCard({ p, update }) {
+export default function AdditionalCostsCard({ p, update, mode = "admin" }) {
   const it = p.language === "it";
+  const showInternalCosts = mode !== "agent";
   const rows = Array.isArray(p.additionalCosts) ? p.additionalCosts : [];
   const totals = calculateAdditionalCosts(rows);
   const formatter = new Intl.NumberFormat(it ? "it-IT" : "en-GB", {
@@ -91,9 +92,9 @@ export default function AdditionalCostsCard({ p, update }) {
                 <th>{it ? "Tipo" : "Type"}</th>
                 <th>{it ? "Quantità" : "Quantity"}</th>
                 <th>{it ? "Unità" : "Unit"}</th>
-                <th>{it ? "Costo unitario" : "Unit cost"}</th>
+                {showInternalCosts && <th>{it ? "Costo unitario" : "Unit cost"}</th>}
                 <th>{it ? "Prezzo unitario" : "Unit sales price"}</th>
-                <th>{it ? "Costo totale" : "Total cost"}</th>
+                {showInternalCosts && <th>{it ? "Costo totale" : "Total cost"}</th>}
                 <th>{it ? "Prezzo totale" : "Total sales"}</th>
                 <th>{it ? "Note" : "Notes"}</th>
                 <th />
@@ -129,13 +130,13 @@ export default function AdditionalCostsCard({ p, update }) {
                         {units.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
                       </select>
                     </td>
-                    <td>
+                    {showInternalCosts && <td>
                       <input type="number" min="0" step="any" value={row.unitCost ?? 0} onChange={(e) => change(index, "unitCost", numberValue(e.target.value))} />
-                    </td>
+                    </td>}
                     <td>
                       <input type="number" min="0" step="any" value={row.unitSalesPrice ?? 0} onChange={(e) => change(index, "unitSalesPrice", numberValue(e.target.value))} />
                     </td>
-                    <td>{formatter.format(calculated.costTotal || 0)}</td>
+                    {showInternalCosts && <td>{formatter.format(calculated.costTotal || 0)}</td>}
                     <td>{formatter.format(calculated.salesTotal || 0)}</td>
                     <td>
                       <input value={row.note || ""} onChange={(e) => change(index, "note", e.target.value)} />
@@ -152,8 +153,8 @@ export default function AdditionalCostsCard({ p, update }) {
       )}
 
       <div className="additional-costs-summary">
-        <span>CAPEX: <strong>{formatter.format(totals.capexSales)}</strong> ({it ? "costo" : "cost"} {formatter.format(totals.capexCost)})</span>
-        <span>OPEX/{it ? "anno" : "year"}: <strong>{formatter.format(totals.annualOpexSales)}</strong> ({it ? "costo" : "cost"} {formatter.format(totals.annualOpexCost)})</span>
+        <span>CAPEX: <strong>{formatter.format(totals.capexSales)}</strong>{showInternalCosts && <> ({it ? "costo" : "cost"} {formatter.format(totals.capexCost)})</>}</span>
+        <span>OPEX/{it ? "anno" : "year"}: <strong>{formatter.format(totals.annualOpexSales)}</strong>{showInternalCosts && <> ({it ? "costo" : "cost"} {formatter.format(totals.annualOpexCost)})</>}</span>
       </div>
     </section>
   );
