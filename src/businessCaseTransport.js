@@ -106,7 +106,15 @@ export function projectFromBusinessCaseRow(row) {
     project.assumptions.analysisPeriod = number(commercial.analysisYears) || project.assumptions.analysisPeriod;
   }
   project.name = project.project.name;
-  return migrateProject(project);
+
+  // migrateProject() historically falls back to project.id when crm.opportunityId
+  // is empty. For cloud Business Cases, project.id is the Business Case record ID,
+  // not a CRM Opportunity ID. Re-assert the authoritative relation after migration
+  // so an unlinked Business Case remains unlinked and can be promoted to CRM once.
+  const migrated = migrateProject(project);
+  migrated.crm.opportunityId = row.crm_opportunity_id || "";
+  migrated.crm.uniqueProjectId = row.crm_opportunity_id || "";
+  return migrated;
 }
 
 export function businessCaseOpenUrl(caseId, origin = "https://app.vimalux.com") {
