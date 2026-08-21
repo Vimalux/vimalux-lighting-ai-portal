@@ -1,0 +1,14 @@
+.additional-costs-solution-summary {
+  margin-top: .75rem;
+  padding-top: .65rem;
+  border-top: 1px solid var(--border, #dfe4ea);
+}
+.additional-costs-solution-title {
+  margin: 0 0 .35rem;
+}
+.additional-costs-solution-summary .breakdown {
+  margin-bottom: .4rem;
+}
+.additional-costs-solution-summary .breakdown > div {
+  background: rgba(15, 118, 110, .035);
+}
