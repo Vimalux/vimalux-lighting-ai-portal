@@ -3,9 +3,9 @@ import { numberValue } from "./calculations.js";
 import { uid } from "./model.js";
 
 const aliases = {
-  technology: ["technology", "tecnologia", "lamp type", "lampetype", "luminaire type", "fixture type", "light source", "tipo lampada", "tipo apparecchio"],
-  wattage: ["wattage", "watt", "watts", "power", "potenza", "potenza w", "effekt", "w"],
-  quantity: ["quantity", "qty", "count", "number", "numero", "quantita", "quantità", "antal", "number of lamps", "numero lampade"],
+  technology: ["technology", "tecnologia", "lamp type", "lampetype", "luminaire type", "fixture type", "light source", "tipo lampada", "tipo apparecchio", "tipo di tecnologia"],
+  wattage: ["wattage", "watt", "watts", "power", "potenza", "potenza w", "effekt", "w", "wattagi"],
+  quantity: ["quantity", "qty", "count", "number", "numero", "quantita", "quantità", "antal", "number of lamps", "numero lampade", "numero di apparecchi"],
   name: ["group", "group name", "name", "street", "location", "gruppo", "nome", "via", "strada", "gruppe", "gade"],
   assetId: ["asset id", "asset_id", "pole id", "pole_id", "lamp id", "luminaire id", "id lampada", "id palo", "matricola"],
 };
@@ -62,6 +62,29 @@ const uniqueHeaders = (values) => {
   });
 };
 
+export function applyOfficialInputSheetLayout(name, headers) {
+  const sheetName = String(name || "");
+  if (/^ProjectInputSheet_ITA$/i.test(sheetName) && headers.length >= 4) {
+    // Italian template: B=technology, C=wattage, D=quantity.
+    headers[1] = "Tipo di Tecnologia";
+    headers[2] = "Wattagi";
+    headers[3] = "Numero di apparecchi";
+  } else if (/^ProjectInputSheet(?:_(ENG|DA))?$/i.test(sheetName) && headers.length >= 7) {
+    // English/Danish template: C=technology, D=quantity, G=nominal wattage.
+    headers[2] = "Tipo lampada";
+    headers[3] = "Quantità";
+    headers[6] = "Potenza (W)";
+  }
+  return headers;
+}
+
+export function parseWattageValue(value) {
+  const direct = numberValue(value);
+  if (direct > 0) return direct;
+  const match = String(value ?? "").trim().match(/[-+]?\d+(?:[.,]\d+)?/);
+  return match ? Math.max(0, numberValue(match[0])) : 0;
+}
+
 export async function readLightingWorkbook(file) {
   const isCsv = /\.csv$/i.test(file.name);
   const inputSheets = isCsv ? [{ sheet: file.name, data: parseCsv(await file.text()) }] : await readExcelFile(file);
@@ -69,15 +92,7 @@ export async function readLightingWorkbook(file) {
     const matrix = data.filter((row) => row.some((cell) => String(cell ?? "").trim() !== ""));
     const headerIndex = matrix.findIndex((row) => row.some((cell) => String(cell).trim() !== ""));
     if (headerIndex < 0) return { name, headers: [], rows: [] };
-    const headers = uniqueHeaders(matrix[headerIndex]);
-    // The official VML Input Sheet has a stable column layout even when the
-    // first visible row does not contain machine-readable field names.
-    // Apply semantic labels so the existing mapper preselects the right fields.
-    if (/^ProjectInputSheet_(ITA|ENG|DA)$/i.test(String(name || "")) && headers.length >= 7) {
-      headers[2] = "Tipo lampada";
-      headers[3] = "Quantità";
-      headers[6] = "Potenza (W)";
-    }
+    const headers = applyOfficialInputSheetLayout(name, uniqueHeaders(matrix[headerIndex]));
     return {
       name,
       headers,
@@ -127,7 +142,7 @@ export function buildImportedGroups(rows, mapping, ledProducts, language = "it",
   let skipped = 0;
 
   rows.forEach((row, rowIndex) => {
-    const wattage = numberValue(row[wattageIndex]);
+    const wattage = parseWattageValue(row[wattageIndex]);
     const quantity = quantityIndex == null ? 1 : numberValue(row[quantityIndex]);
     if (!(wattage > 0) || !(quantity > 0)) { skipped += 1; return; }
     const technology = technologyIndex == null ? "OTHER" : normalizeTechnology(row[technologyIndex]);
