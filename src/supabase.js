@@ -84,7 +84,6 @@ export async function saveCloudState(projects) {
     let payload = { ...project, crm: { ...(project.crm || {}), goStatus: businessCase.goStatus, businessCase }, commercialSnapshot };
     let caseId = project.crm?.businessCaseRecordId || project.id;
     let crmOpportunityId = project.crm?.opportunityId || "";
-    let createdImportDraft = false;
 
     if (!stableUuid.test(String(caseId || ""))) {
       if (!canCreateLinkedCase) continue;
@@ -95,7 +94,6 @@ export async function saveCloudState(projects) {
         });
         if (createdDraft.error) throw createdDraft.error;
         caseId = createdDraft.data;
-        createdImportDraft = true;
         promotions.push({ legacyId: project.id, caseId });
       } else {
         if (!String(project.customer?.name || "").trim() || !String(project.project?.name || "").trim()) continue;
@@ -106,11 +104,10 @@ export async function saveCloudState(projects) {
       }
     }
 
-    // Only a newly created import draft is promoted automatically here.
-    // Existing Intelligence cases without a CRM link must not be bulk-promoted
-    // during an ordinary save/synchronisation cycle.
+    // Every complete Intelligence Business Case must have one CRM Opportunity.
+    // If the case is not linked yet, promote it once as a Lead. The database RPC
+    // is idempotent and returns the existing Opportunity when a link already exists.
     if (
-      createdImportDraft &&
       stableUuid.test(String(caseId || "")) &&
       !String(crmOpportunityId || "").trim() &&
       String(project.customer?.name || "").trim() &&
