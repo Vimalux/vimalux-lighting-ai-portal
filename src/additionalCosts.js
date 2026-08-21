@@ -1,4 +1,16 @@
-import { numberValue } from "./calculations.js";
+const numberValue = (value) => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (value == null || value === "") return 0;
+  let text = String(value).trim().replace(/\s/g, "");
+  const comma = text.lastIndexOf(",");
+  const dot = text.lastIndexOf(".");
+  if (comma >= 0 && dot >= 0)
+    text = comma > dot
+      ? text.replace(/\./g, "").replace(",", ".")
+      : text.replace(/,/g, "");
+  else if (comma >= 0) text = text.replace(/\./g, "").replace(",", ".");
+  return Number.isFinite(Number(text)) ? Number(text) : 0;
+};
 
 const positive = (value) => Math.max(0, numberValue(value));
 
