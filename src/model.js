@@ -61,8 +61,8 @@ export function migrateProject(saved) {
   project.assumptions.analysisPeriod = Math.max(1, Math.round(numberValue(saved?.assumptions?.analysisPeriod) || Math.max(legacyContractYears, 20)));
   project.assumptions.financingYears = project.assumptions.financingPeriod;
   project.assumptions.contractYears = project.assumptions.serviceAgreementPeriod;
-  project.crm.opportunityId = project.crm.opportunityId || project.id;
-  project.crm.uniqueProjectId = project.crm.uniqueProjectId || project.crm.opportunityId || project.id;
+  project.crm.opportunityId = project.crm.opportunityId || "";
+  project.crm.uniqueProjectId = project.crm.uniqueProjectId || project.crm.opportunityId || "";
   project.crm.importHistory = Array.isArray(project.crm.importHistory) ? project.crm.importHistory : [];
   if (!project.solution.smartEnabled) project.solution.cmsEnabled = false;
   if (!project.solution.smartEnabled || !project.solution.cmsEnabled) project.solution.powerAidEnabled = false;
