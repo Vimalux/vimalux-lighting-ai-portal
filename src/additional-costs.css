@@ -1,0 +1,10 @@
+.additional-costs-card { grid-column: 1 / -1; }
+.additional-costs-card .card-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.additional-costs-card .card-title-row h3 { margin: 0 0 .35rem; }
+.additional-costs-card table input,
+.additional-costs-card table select { min-width: 92px; }
+.additional-costs-card table td:first-child input { min-width: 180px; }
+.additional-costs-card table td:nth-last-child(2) input { min-width: 160px; }
+.additional-costs-summary { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; margin-top: 1rem; padding-top: .85rem; border-top: 1px solid var(--border, #dfe4ea); }
+.additional-costs-summary span { display: inline-flex; gap: .35rem; align-items: baseline; }
+@media (max-width: 900px) { .additional-costs-card .card-title-row { flex-direction: column; } }
