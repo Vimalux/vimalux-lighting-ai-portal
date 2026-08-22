@@ -25,6 +25,82 @@ export const defaultProject = () => ({
 });
 
 const isImportedTotalGroup = (group) => /^(grand total|hovedtotal|total|totale generale|totale complessivo|i alt)$/i.test(String(group?.name ?? "").trim());
+const normalizeIdentity = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+const commercialAssumptionKeys = [
+  "dealType", "financingModel", "contractYears", "financingYears", "financingPeriod", "serviceAgreementPeriod",
+  "interestRate", "rateProfileId", "interestRateSnapshot", "allInclusiveAnnualPayment", "officialOfferCapex", "officialAnnualOpex",
+];
+
+const mergeNonEmpty = (existing = {}, incoming = {}) => {
+  const result = { ...existing };
+  Object.entries(incoming || {}).forEach(([key, value]) => {
+    if (value !== "" && value != null) result[key] = value;
+  });
+  return result;
+};
+
+export function reconcileReimportIdentity(incoming, candidates = []) {
+  if (!incoming || typeof incoming !== "object") return incoming;
+  if (!incoming.importedTechnical && !incoming.importedCommercial) return incoming;
+  const incomingName = normalizeIdentity(incoming.project?.name || incoming.name);
+  if (!incomingName || incomingName === "nuovo progetto") return incoming;
+
+  const incomingCustomer = normalizeIdentity(incoming.customer?.name);
+  const matches = (Array.isArray(candidates) ? candidates : [])
+    .filter((candidate) => candidate && candidate.id !== incoming.id)
+    .filter((candidate) => normalizeIdentity(candidate.project?.name || candidate.name) === incomingName)
+    .filter((candidate) => {
+      if (!incomingCustomer) return true;
+      const candidateCustomer = normalizeIdentity(candidate.customer?.name);
+      return !candidateCustomer || candidateCustomer === incomingCustomer;
+    })
+    .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
+
+  const existing = matches[0];
+  if (!existing) return incoming;
+
+  const isCommercial = Boolean(incoming.importedCommercial);
+  const assumptions = isCommercial
+    ? commercialAssumptionKeys.reduce((next, key) => {
+        if (incoming.assumptions?.[key] !== undefined) next[key] = incoming.assumptions[key];
+        return next;
+      }, { ...(existing.assumptions || {}) })
+    : (existing.assumptions || incoming.assumptions);
+
+  return {
+    ...existing,
+    ...incoming,
+    id: existing.id,
+    createdAt: existing.createdAt || incoming.createdAt,
+    customer: mergeNonEmpty(existing.customer, incoming.customer),
+    project: {
+      ...(existing.project || {}),
+      ...(incoming.project || {}),
+      businessCaseId: existing.project?.businessCaseId || incoming.project?.businessCaseId || "",
+    },
+    crm: { ...(existing.crm || {}) },
+    groups: Array.isArray(incoming.groups) ? incoming.groups : existing.groups,
+    assumptions,
+    solution: existing.solution || incoming.solution,
+    additionalCosts: existing.additionalCosts || incoming.additionalCosts || [],
+    pricing: existing.pricing || incoming.pricing,
+    catalogue: existing.catalogue || incoming.catalogue,
+    importedTechnical: incoming.importedTechnical || existing.importedTechnical,
+    importedCommercial: incoming.importedCommercial || existing.importedCommercial,
+    updatedAt: incoming.updatedAt || new Date().toISOString(),
+  };
+}
+
+const storedProjectsForReimport = () => {
+  if (typeof localStorage === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("vimalux-intelligence-projects");
+    const parsed = raw ? JSON.parse(raw) : null;
+    return Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.projects) ? parsed.projects : []);
+  } catch {
+    return [];
+  }
+};
 
 const merge = (base, saved) => {
   if (Array.isArray(base)) return Array.isArray(saved) ? saved : base;
@@ -33,6 +109,8 @@ const merge = (base, saved) => {
 };
 
 export function migrateProject(saved) {
+  const reconciled = reconcileReimportIdentity(saved, storedProjectsForReimport());
+  saved = reconciled;
   const previousUpdatedAt = saved?.updatedAt || saved?.createdAt || "";
   const project = merge(defaultProject(), saved && typeof saved === "object" ? saved : {});
   project.updatedAt = previousUpdatedAt;
