@@ -49,6 +49,33 @@ test("technical reimport reuses Business Case and CRM identity", () => {
   assert.equal(result.customer.name, "Comune di Test");
 });
 
+test("explicitly selected Business Case wins when duplicate project names exist", () => {
+  const olderDuplicate = {
+    ...structuredClone(existing),
+    id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    updatedAt: "2026-08-20T10:00:00.000Z",
+    project: { name: "P. test", businessCaseId: "BC-570260" },
+    crm: {
+      ...existing.crm,
+      opportunityId: "22222222-3333-4444-8555-666666666666",
+      businessCaseRecordId: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    },
+  };
+  const previousLocalStorage = globalThis.localStorage;
+  globalThis.localStorage = {
+    getItem(key) { return key === "vimalux-reimport-target-id" ? olderDuplicate.id : null; },
+  };
+  try {
+    const result = reconcileReimportIdentity(incoming, [existing, olderDuplicate]);
+    assert.equal(result.id, olderDuplicate.id);
+    assert.equal(result.project.businessCaseId, "BC-570260");
+    assert.equal(result.crm.opportunityId, olderDuplicate.crm.opportunityId);
+  } finally {
+    if (previousLocalStorage === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = previousLocalStorage;
+  }
+});
+
 test("different project name remains a new project", () => {
   const result = reconcileReimportIdentity({ ...incoming, project: { ...incoming.project, name: "P. test fase 2" }, name: "P. test fase 2" }, [existing]);
   assert.equal(result.id, "newlocal1");
