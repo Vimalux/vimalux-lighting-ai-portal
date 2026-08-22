@@ -101,9 +101,13 @@ const render = async () => {
     const project = activeProject();
     if (!project) return;
     const text = languageText(project);
+    const renderKey = `${project.id}|${project.language}`;
 
-    // Re-check after the async profile lookup in case another render already created the card.
+    // Re-check after the async profile lookup. If this card already represents
+    // the active Business Case, leave its DOM untouched so users can type.
     existing = dedupeCards();
+    if (existing?.dataset.projectInputsKey === renderKey) return;
+
     let card = existing;
     if (!card) {
       card = document.createElement("section");
@@ -113,6 +117,7 @@ const render = async () => {
       if (contentRoot?.parentNode) contentRoot.parentNode.insertBefore(card, contentRoot.nextSibling);
       else main.appendChild(card);
     }
+    card.dataset.projectInputsKey = renderKey;
 
     card.innerHTML = `
       <h2>${text.title}</h2>
