@@ -95,7 +95,7 @@ const render = async () => {
   if (!card) {
     card = document.createElement("section");
     card.className = "card";
-    card.dataset[MARKER] = "true";
+    card.setAttribute(`data-${MARKER}`, "true");
     const contentRoot = main.querySelector(":scope > .two-col") || main.querySelector(".two-col");
     if (contentRoot?.parentNode) contentRoot.parentNode.insertBefore(card, contentRoot.nextSibling);
     else main.appendChild(card);
