@@ -8,14 +8,16 @@ export function buildBusinessCaseSnapshot(project, calculatedAt = new Date().toI
   const upgradeLuminaires = positive(result.upgradedQuantity);
   const smartConnectedLuminaires = positive(result.lcuQuantity);
   const energyPrice = positive(project.assumptions?.energyPrice);
-  return {
+  const legacyKpis = project.importedCommercial?.standardKpis && typeof project.importedCommercial.standardKpis === "object"
+    ? project.importedCommercial.standardKpis
+    : null;
+  const calculated = {
     source: "VIMALUX Intelligence calculation engine",
     sourceStatus: "calculated",
     version: Number(project.version) || 1,
     calculatedAt,
     businessCaseId: project.project?.businessCaseId || "",
 
-    // Shared VIMALUX KPI dictionary. Intelligence is authoritative for these fields.
     existingLuminaires,
     upgradeLuminaires,
     smartConnectedLuminaires,
@@ -42,7 +44,6 @@ export function buildBusinessCaseSnapshot(project, calculatedAt = new Date().toI
     energyReductionPct: result.energyReductionPercent,
     co2ReductionTons: result.co2ReductionKg / 1000,
 
-    // Legacy alias retained for existing consumers.
     smartNodeCount: smartConnectedLuminaires,
     datekArr: result.cmsRevenue,
     datekContractValue: result.cmsRevenue && result.serviceAgreementPeriod
@@ -53,6 +54,19 @@ export function buildBusinessCaseSnapshot(project, calculatedAt = new Date().toI
     powerAidVimaluxMargin: result.powerAidVimaluxMargin,
     goStatus: result.customerDecisionStatus,
   };
+  if (!legacyKpis) return calculated;
+  const imported = Object.fromEntries(Object.entries(legacyKpis).filter(([, value]) => value != null && Number.isFinite(Number(value))));
+  const merged = {
+    ...calculated,
+    ...imported,
+    source: "VIMALUX Legacy Excel CRM_IMPORT",
+    sourceStatus: "calculated",
+    calculatedAt,
+  };
+  merged.smartNodeCount = merged.smartConnectedLuminaires ?? calculated.smartNodeCount;
+  merged.annualCustomerPayment = merged.annualContractRevenue ?? calculated.annualCustomerPayment;
+  merged.monthlyCustomerPayment = merged.annualContractRevenue != null ? merged.annualContractRevenue / 12 : calculated.monthlyCustomerPayment;
+  return merged;
 }
 
 export function syncBusinessCaseResult(project, calculatedAt) {
