@@ -71,6 +71,25 @@ const dedupeCards = () => {
   return all[0] || null;
 };
 
+let observer = null;
+let profilePromise = null;
+let cachedProfile = null;
+const getProfile = async () => {
+  if (cachedProfile) return cachedProfile;
+  if (!profilePromise) {
+    profilePromise = loadCurrentProfile()
+      .then((profile) => {
+        cachedProfile = profile;
+        return profile;
+      })
+      .catch((error) => {
+        profilePromise = null;
+        throw error;
+      });
+  }
+  return profilePromise;
+};
+
 let rendering = false;
 const render = async () => {
   if (rendering) return;
@@ -89,12 +108,13 @@ const render = async () => {
 
     let profile;
     try {
-      profile = await loadCurrentProfile();
+      profile = await getProfile();
     } catch {
       return;
     }
     if (profile?.role !== "agent") {
       cards().forEach((node) => node.remove());
+      observer?.disconnect();
       return;
     }
 
@@ -103,8 +123,6 @@ const render = async () => {
     const text = languageText(project);
     const renderKey = `${project.id}|${project.language}`;
 
-    // Re-check after the async profile lookup. If this card already represents
-    // the active Business Case, leave its DOM untouched so users can type.
     existing = dedupeCards();
     if (existing?.dataset.projectInputsKey === renderKey) return;
 
@@ -183,7 +201,8 @@ const schedule = () => {
 };
 
 if (typeof window !== "undefined") {
-  new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+  observer = new MutationObserver(schedule);
+  observer.observe(document.documentElement, { childList: true, subtree: true });
   window.addEventListener("storage", schedule);
   schedule();
 }
