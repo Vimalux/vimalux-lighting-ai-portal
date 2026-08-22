@@ -4,4 +4,5 @@ import App from "./App.jsx";
 import "./additional-costs.css";
 import "./solution-additional-costs.css";
 import "./solutionAdditionalCosts.js";
+import "./agentProjectInputs.js";
 ReactDOM.createRoot(document.getElementById("root")).render(<React.StrictMode><App/></React.StrictMode>);
