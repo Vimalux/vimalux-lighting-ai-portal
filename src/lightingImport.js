@@ -65,12 +65,10 @@ const uniqueHeaders = (values) => {
 export function applyOfficialInputSheetLayout(name, headers) {
   const sheetName = String(name || "");
   if (/^ProjectInputSheet_ITA$/i.test(sheetName) && headers.length >= 4) {
-    // Italian template: B=technology, C=wattage, D=quantity.
     headers[1] = "Tipo di Tecnologia";
     headers[2] = "Wattagi";
     headers[3] = "Numero di apparecchi";
   } else if (/^ProjectInputSheet(?:_(ENG|DA))?$/i.test(sheetName) && headers.length >= 7) {
-    // English/Danish template: C=technology, D=quantity, G=nominal wattage.
     headers[2] = "Tipo lampada";
     headers[3] = "Quantità";
     headers[6] = "Potenza (W)";
@@ -224,7 +222,10 @@ export function detectWorkbookType(sheets) {
   return "lighting";
 }
 
-const crmImportNumberFields = new Set(["lamps","capex","contract_years","financing_years","saas_years","maintenance_opex_annual","cms_connectivity_annual","saas_poweraid_annual","total_opex_annual","customer_cost_financed_annual","customer_cost_cash_annual","co2_saving_annual_tons","energy_reduction_pct","customer_roi_years"]);
+const crmImportNumberFields = new Set([
+  "lamps","capex","contract_years","financing_years","saas_years","maintenance_opex_annual","cms_connectivity_annual","saas_poweraid_annual","total_opex_annual","customer_cost_financed_annual","customer_cost_cash_annual","co2_saving_annual_tons","energy_reduction_pct","customer_roi_years",
+  "existing_luminaires","upgrade_luminaires","smart_connected_luminaires","upgrade_coverage_pct","annual_contract_revenue","tcv","npv","annual_energy_cost_before","annual_energy_cost_after","annual_energy_saving_eur","energy_saving_kwh","co2_reduction_tons","payback_years"
+]);
 const rowsWithHeaders = (sheet) => sheet ? [sheet.headers || [], ...(sheet.rows || [])] : [];
 function findLabeledNumber(sheet, labels) {
   const wanted = labels.map(clean);
@@ -236,17 +237,41 @@ function findLabeledNumber(sheet, labels) {
 }
 const findSheet = (sheets, name) => sheets.find(item => clean(item.name) === clean(name));
 const cents = value => Math.round(numberValue(value) * 100) / 100;
+const percentPoints = value => { const n = numberValue(value); return Math.abs(n) <= 1 ? n * 100 : n; };
+const presentPositive = (values, key) => numberValue(values[key]) > 0 ? numberValue(values[key]) : undefined;
 
 export function parseNoleggioWorkbook(sheets) {
   const sheet = findSheet(sheets, "CRM_IMPORT"); if (!sheet) throw new Error("Workbook must contain a CRM_IMPORT sheet.");
   const fieldIndex = sheet.headers.findIndex(value => clean(value) === "field"); const valueIndex = sheet.headers.findIndex(value => clean(value) === "value");
   if (fieldIndex < 0 || valueIndex < 0) throw new Error("CRM_IMPORT must contain Field and Value columns.");
   const values = {}; sheet.rows.forEach(row => { const key = String(row[fieldIndex] ?? "").trim().toLowerCase(); if (!key) return; values[key] = crmImportNumberFields.has(key) ? numberValue(row[valueIndex]) : String(row[valueIndex] ?? "").trim(); });
-  if (!values.project_name) throw new Error("CRM_IMPORT is missing project_name."); if (!(values.capex > 0)) throw new Error("CRM_IMPORT is missing a valid CAPEX.");
+  if (!values.project_name) throw new Error("CRM_IMPORT is missing project_name.");
   const dashboard = findSheet(sheets, "Dashboard"); const offer = findSheet(sheets, "QuotationCustomer_ITA") || findSheet(sheets, "QuotationCustomer_ENG");
   const dashboardContractYears = findLabeledNumber(dashboard, ["contract period in years"]); const dashboardFinancingYears = findLabeledNumber(dashboard, ["finance / years"]); const dashboardInterestDecimal = findLabeledNumber(dashboard, ["interest rate for customer"]); const offerTotalPayments = Math.abs(findLabeledNumber(offer, ["totale pagamenti per il progetto", "total payments for the project"]));
   const sourceContractYears = Math.max(1, Math.round(values.contract_years || 1)); const sourceFinancingYears = Math.max(1, Math.round(values.financing_years || sourceContractYears)); const contractYears = Math.max(1, Math.round(dashboardContractYears || sourceContractYears)); const financingYears = Math.max(1, Math.round(dashboardFinancingYears || sourceFinancingYears)); const interestRate = dashboardInterestDecimal > 0 && dashboardInterestDecimal < 1 ? dashboardInterestDecimal * 100 : dashboardInterestDecimal;
-  const rawAnnualPayment = offerTotalPayments > 0 ? offerTotalPayments / financingYears : (values.customer_cost_cash_annual || (values.customer_cost_financed_annual + values.total_opex_annual)); const allInclusiveAnnualPayment = cents(rawAnnualPayment); if (!(allInclusiveAnnualPayment > 0)) throw new Error("CRM_IMPORT is missing the all-inclusive customer payment.");
-  const warnings = []; if (sourceContractYears !== contractYears) warnings.push(`CRM_IMPORT contract period (${sourceContractYears}) was stale; customer offer uses ${contractYears} years.`); if (sourceFinancingYears !== financingYears) warnings.push(`CRM_IMPORT financing period (${sourceFinancingYears}) was stale; customer offer uses ${financingYears} years.`); if (offerTotalPayments > 0 && Math.abs((values.customer_cost_cash_annual || 0) * financingYears - offerTotalPayments) > 1) warnings.push("Annual payment was recalculated from the customer offer total.");
-  return { source: "CRM_IMPORT + customer offer validation", mappingVersion: 2, projectName: values.project_name, customerName: values.customer_name || values.project_name, quotationId: values.quotation_id || "", lamps: Math.max(0, Math.round(values.lamps || 0)), capex: cents(values.capex), contractYears, financingYears, serviceContractYears: contractYears, interestRate: cents(interestRate), allInclusiveAnnualPayment, totalCustomerPayments: cents(offerTotalPayments || allInclusiveAnnualPayment * financingYears), annualOpex: cents(values.total_opex_annual || 0), cmsAnnual: cents(values.cms_connectivity_annual || 0), maintenanceAnnual: cents(values.maintenance_opex_annual || 0), powerAidAnnual: cents(values.saas_poweraid_annual || 0), co2SavingTons: values.co2_saving_annual_tons || 0, energyReductionPercent: (values.energy_reduction_pct || 0) * 100, customerRoiYears: values.customer_roi_years || 0, pdfFile: values.pdf_file || "", warnings, raw: values };
+  const rawAnnualPayment = values.annual_contract_revenue || (offerTotalPayments > 0 ? offerTotalPayments / financingYears : (values.customer_cost_cash_annual || (values.customer_cost_financed_annual + values.total_opex_annual))); const allInclusiveAnnualPayment = cents(rawAnnualPayment); if (!(allInclusiveAnnualPayment > 0)) throw new Error("CRM_IMPORT is missing annual_contract_revenue or the legacy all-inclusive customer payment.");
+  const warnings = []; if (sourceContractYears !== contractYears) warnings.push(`CRM_IMPORT contract period (${sourceContractYears}) was stale; customer offer uses ${contractYears} years.`); if (sourceFinancingYears !== financingYears) warnings.push(`CRM_IMPORT financing period (${sourceFinancingYears}) was stale; customer offer uses ${financingYears} years.`); if (offerTotalPayments > 0 && values.customer_cost_cash_annual && Math.abs(values.customer_cost_cash_annual * financingYears - offerTotalPayments) > 1) warnings.push("Annual payment was recalculated from the customer offer total.");
+  const existingLuminaires = Math.max(0, Math.round(values.existing_luminaires || values.lamps || values.upgrade_luminaires || 0));
+  const upgradeLuminaires = Math.max(0, Math.round(values.upgrade_luminaires || values.lamps || existingLuminaires));
+  const smartConnectedLuminaires = Math.max(0, Math.round(values.smart_connected_luminaires || 0));
+  const standardKpis = {
+    existingLuminaires,
+    upgradeLuminaires,
+    smartConnectedLuminaires,
+    upgradeCoveragePct: values.upgrade_coverage_pct ? percentPoints(values.upgrade_coverage_pct) : (existingLuminaires ? upgradeLuminaires / existingLuminaires * 100 : 0),
+    contractYears,
+    capex: presentPositive(values, "capex"),
+    annualContractRevenue: presentPositive(values, "annual_contract_revenue"),
+    tcv: presentPositive(values, "tcv"),
+    npv: presentPositive(values, "npv"),
+    annualEnergyCostBefore: presentPositive(values, "annual_energy_cost_before"),
+    annualEnergyCostAfter: presentPositive(values, "annual_energy_cost_after"),
+    annualEnergySavingEUR: presentPositive(values, "annual_energy_saving_eur"),
+    energySavingKwh: presentPositive(values, "energy_saving_kwh"),
+    energyReductionPct: values.energy_reduction_pct != null ? percentPoints(values.energy_reduction_pct) : undefined,
+    co2ReductionTons: presentPositive(values, "co2_reduction_tons") || presentPositive(values, "co2_saving_annual_tons"),
+    paybackYears: presentPositive(values, "payback_years") || presentPositive(values, "customer_roi_years"),
+  };
+  Object.keys(standardKpis).forEach(key => standardKpis[key] == null && delete standardKpis[key]);
+  return { source: "CRM_IMPORT + customer offer validation", mappingVersion: 3, projectName: values.project_name, customerName: values.customer_name || values.project_name, quotationId: values.quotation_id || "", lamps: upgradeLuminaires, capex: cents(values.capex || 0), contractYears, financingYears, serviceContractYears: contractYears, interestRate: cents(interestRate), allInclusiveAnnualPayment, totalCustomerPayments: cents(offerTotalPayments || allInclusiveAnnualPayment * financingYears), annualOpex: cents(values.total_opex_annual || 0), cmsAnnual: cents(values.cms_connectivity_annual || 0), maintenanceAnnual: cents(values.maintenance_opex_annual || 0), powerAidAnnual: cents(values.saas_poweraid_annual || 0), co2SavingTons: standardKpis.co2ReductionTons || 0, energyReductionPercent: standardKpis.energyReductionPct || 0, customerRoiYears: standardKpis.paybackYears || 0, pdfFile: values.pdf_file || "", standardKpis, warnings, raw: values };
 }
