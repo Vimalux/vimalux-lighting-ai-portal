@@ -64,91 +64,107 @@ const languageText = (project) => {
   };
 };
 
+const cards = () => [...document.querySelectorAll(`[data-${MARKER}]`)];
+const dedupeCards = () => {
+  const all = cards();
+  all.slice(1).forEach((node) => node.remove());
+  return all[0] || null;
+};
+
+let rendering = false;
 const render = async () => {
-  const main = document.querySelector("main");
-  if (!main) return;
-
-  const heading = main.querySelector("header h1")?.textContent?.trim();
-  const customerPage = ["Cliente e Progetto", "Customer and Project", "Kunde og projekt"].includes(heading);
-  const existing = document.querySelector(`[data-${MARKER}]`);
-  if (!customerPage) {
-    existing?.remove();
-    return;
-  }
-
-  let profile;
+  if (rendering) return;
+  rendering = true;
   try {
-    profile = await loadCurrentProfile();
-  } catch {
-    return;
-  }
-  if (profile?.role !== "agent") {
-    existing?.remove();
-    return;
-  }
+    const main = document.querySelector("main");
+    if (!main) return;
 
-  const project = activeProject();
-  if (!project) return;
-  const text = languageText(project);
-
-  let card = existing;
-  if (!card) {
-    card = document.createElement("section");
-    card.className = "card";
-    card.setAttribute(`data-${MARKER}`, "true");
-    const contentRoot = main.querySelector(":scope > .two-col") || main.querySelector(".two-col");
-    if (contentRoot?.parentNode) contentRoot.parentNode.insertBefore(card, contentRoot.nextSibling);
-    else main.appendChild(card);
-  }
-
-  card.innerHTML = `
-    <h2>${text.title}</h2>
-    <div class="form-grid">
-      <label><span>${text.energy}</span><input data-agent-energy inputmode="decimal" value="${Number(project.assumptions?.energyPrice ?? 0)}"></label>
-      <label><span>${text.hours}</span><input data-agent-hours inputmode="numeric" value="${Number(project.assumptions?.operatingHours ?? 0)}"></label>
-    </div>
-    <p class="muted">${text.help}</p>
-    <div class="import-actions"><button class="primary" data-agent-save>${text.save}</button><span data-agent-status></span></div>
-  `;
-
-  const saveButton = card.querySelector("[data-agent-save]");
-  saveButton?.addEventListener("click", async () => {
-    const energyPrice = numberValue(card.querySelector("[data-agent-energy]")?.value);
-    const operatingHours = Math.max(0, Math.round(numberValue(card.querySelector("[data-agent-hours]")?.value)));
-    const status = card.querySelector("[data-agent-status]");
-    if (energyPrice <= 0 || operatingHours <= 0) {
-      if (status) status.textContent = text.error;
+    const heading = main.querySelector("header h1")?.textContent?.trim();
+    const customerPage = ["Cliente e Progetto", "Customer and Project", "Kunde og projekt"].includes(heading);
+    let existing = dedupeCards();
+    if (!customerPage) {
+      cards().forEach((node) => node.remove());
       return;
     }
 
-    if (status) status.textContent = text.saving;
-    if (saveButton) saveButton.disabled = true;
+    let profile;
     try {
-      const projects = readProjects();
-      const changedAt = new Date().toISOString();
-      const updatedProjects = projects.map((item) => {
-        if (item.id !== project.id) return item;
-        return {
-          ...item,
-          updatedAt: changedAt,
-          assumptions: {
-            ...(item.assumptions || {}),
-            energyPrice,
-            operatingHours,
-          },
-        };
-      });
-      const updated = updatedProjects.find((item) => item.id === project.id);
-      if (!updated) throw new Error("Active Business Case not found");
-      writeProjects(updatedProjects);
-      await saveCloudState([updated]);
-      if (status) status.textContent = text.saved;
-      window.setTimeout(() => window.location.reload(), 350);
-    } catch (error) {
-      if (status) status.textContent = `${text.error}: ${error.message}`;
-      if (saveButton) saveButton.disabled = false;
+      profile = await loadCurrentProfile();
+    } catch {
+      return;
     }
-  });
+    if (profile?.role !== "agent") {
+      cards().forEach((node) => node.remove());
+      return;
+    }
+
+    const project = activeProject();
+    if (!project) return;
+    const text = languageText(project);
+
+    // Re-check after the async profile lookup in case another render already created the card.
+    existing = dedupeCards();
+    let card = existing;
+    if (!card) {
+      card = document.createElement("section");
+      card.className = "card";
+      card.setAttribute(`data-${MARKER}`, "true");
+      const contentRoot = main.querySelector(":scope > .two-col") || main.querySelector(".two-col");
+      if (contentRoot?.parentNode) contentRoot.parentNode.insertBefore(card, contentRoot.nextSibling);
+      else main.appendChild(card);
+    }
+
+    card.innerHTML = `
+      <h2>${text.title}</h2>
+      <div class="form-grid">
+        <label><span>${text.energy}</span><input data-agent-energy inputmode="decimal" value="${Number(project.assumptions?.energyPrice ?? 0)}"></label>
+        <label><span>${text.hours}</span><input data-agent-hours inputmode="numeric" value="${Number(project.assumptions?.operatingHours ?? 0)}"></label>
+      </div>
+      <p class="muted">${text.help}</p>
+      <div class="import-actions"><button class="primary" data-agent-save>${text.save}</button><span data-agent-status></span></div>
+    `;
+
+    const saveButton = card.querySelector("[data-agent-save]");
+    saveButton?.addEventListener("click", async () => {
+      const energyPrice = numberValue(card.querySelector("[data-agent-energy]")?.value);
+      const operatingHours = Math.max(0, Math.round(numberValue(card.querySelector("[data-agent-hours]")?.value)));
+      const status = card.querySelector("[data-agent-status]");
+      if (energyPrice <= 0 || operatingHours <= 0) {
+        if (status) status.textContent = text.error;
+        return;
+      }
+
+      if (status) status.textContent = text.saving;
+      if (saveButton) saveButton.disabled = true;
+      try {
+        const projects = readProjects();
+        const changedAt = new Date().toISOString();
+        const updatedProjects = projects.map((item) => {
+          if (item.id !== project.id) return item;
+          return {
+            ...item,
+            updatedAt: changedAt,
+            assumptions: {
+              ...(item.assumptions || {}),
+              energyPrice,
+              operatingHours,
+            },
+          };
+        });
+        const updated = updatedProjects.find((item) => item.id === project.id);
+        if (!updated) throw new Error("Active Business Case not found");
+        writeProjects(updatedProjects);
+        await saveCloudState([updated]);
+        if (status) status.textContent = text.saved;
+        window.setTimeout(() => window.location.reload(), 350);
+      } catch (error) {
+        if (status) status.textContent = `${text.error}: ${error.message}`;
+        if (saveButton) saveButton.disabled = false;
+      }
+    });
+  } finally {
+    rendering = false;
+  }
 };
 
 let scheduled = false;
