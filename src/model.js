@@ -3,6 +3,44 @@ import { numberValue } from "./calculations.js";
 export const today = () => new Date().toISOString().slice(0, 10);
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
+const FALLBACK_CATALOGUE = {
+  led: [
+    { id: "led-40", brand: "VIMALUX", name: "VIMA LED 40", wattage: 40, lumen: 6000, costPrice: 90, salesPrice: 150, active: true },
+    { id: "led-70", brand: "VIMALUX", name: "VIMA LED 70", wattage: 70, lumen: 10500, costPrice: 125, salesPrice: 210, active: true },
+  ],
+  smart: [
+    { id: "lcu-1", brand: "VIMALUX", name: "LCU One", type: "LCU", costPrice: 25, salesPrice: 45, implementationCost: 8, implementationSalesPrice: 15, annualCost: 2, annualSalesPrice: 5, active: true },
+    { id: "gateway-1", brand: "VIMALUX", name: "Gateway", type: "Gateway", costPrice: 500, salesPrice: 850, implementationCost: 0, implementationSalesPrice: 0, annualCost: 100, annualSalesPrice: 180, active: true },
+    { id: "antenna-1", brand: "VIMALUX", name: "Antenna", type: "Antenna", costPrice: 80, salesPrice: 140, implementationCost: 0, implementationSalesPrice: 0, annualCost: 0, annualSalesPrice: 0, active: true },
+    { id: "meter-1", brand: "VIMALUX", name: "Energy Meter", type: "Energy Meter", costPrice: 120, salesPrice: 220, implementationCost: 0, implementationSalesPrice: 0, annualCost: 0, annualSalesPrice: 0, active: true },
+  ],
+};
+
+const cloneCatalogue = (catalogue) => ({
+  led: Array.isArray(catalogue?.led) ? catalogue.led.map((item) => ({ ...item })) : [],
+  smart: Array.isArray(catalogue?.smart) ? catalogue.smart.map((item) => ({ ...item })) : [],
+});
+
+export function storedMasterCatalogue() {
+  if (typeof localStorage === "undefined") return null;
+  try {
+    const raw = localStorage.getItem("vimalux-intelligence-projects");
+    const parsed = raw ? JSON.parse(raw) : null;
+    const list = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.projects) ? parsed.projects : []);
+    let best = null;
+    let bestScore = -1;
+    for (const item of list) {
+      const catalogue = item?.catalogue;
+      if (!Array.isArray(catalogue?.led) || !Array.isArray(catalogue?.smart)) continue;
+      const score = catalogue.led.length + catalogue.smart.length;
+      if (score > bestScore) { best = catalogue; bestScore = score; }
+    }
+    return best ? cloneCatalogue(best) : null;
+  } catch {
+    return null;
+  }
+}
+
 export const defaultProject = () => ({
   id: uid(), version: 1, language: "it", name: "Nuovo progetto", createdAt: today(), updatedAt: new Date().toISOString(),
   customer: { name: "", province: "", region: "", country: "Italia", contact: "", title: "", email: "", telephone: "" },
@@ -13,15 +51,7 @@ export const defaultProject = () => ({
   assumptions: { operatingHours: 4200, energyPrice: .25, sapFactor: 1.2, mhFactor: 1.15, mercuryFactor: 1.15, co2KgPerKwh: .233, cloPercent: 10, powerAidPercent: 40, powerAidCustomerFeePercent: 30, powerAidSupplierSharePercent: 70, existingMaintenance: 25, newMaintenance: 5, financingModel: "cash", dealType: "cash", financingPeriod: 5, serviceAgreementPeriod: 10, analysisPeriod: 20, contractYears: 10, financingYears: 5, rateProfileId: "custom", interestRate: 5, interestRateSnapshot: { profileId: "custom", annualRate: 5, capturedAt: null }, allInclusiveAnnualPayment: 0, officialOfferCapex: 0, officialAnnualOpex: 0, upfrontPayment: 0, energyEscalation: 2, opexEscalation: 2, discountRate: 5, freightCostPerLamp: 4, freightSalesPerLamp: 6, dutyCost: 0, commissionPercent: 0, agent1Name: "", agent1CommissionPercent: 0, agent2Name: "", agent2CommissionPercent: 0, warrantyReservePercent: 0, fundingCostPercent: 0, otherDirectCosts: 0, minimumMarginPercent: 30 },
   additionalCosts: [],
   pricing: { overrides: {} },
-  catalogue: {
-    led: [{ id: "led-40", brand: "VIMALUX", name: "VIMA LED 40", wattage: 40, lumen: 6000, costPrice: 90, salesPrice: 150, active: true }, { id: "led-70", brand: "VIMALUX", name: "VIMA LED 70", wattage: 70, lumen: 10500, costPrice: 125, salesPrice: 210, active: true }],
-    smart: [
-      { id: "lcu-1", brand: "VIMALUX", name: "LCU One", type: "LCU", costPrice: 25, salesPrice: 45, implementationCost: 8, implementationSalesPrice: 15, annualCost: 2, annualSalesPrice: 5, active: true },
-      { id: "gateway-1", brand: "VIMALUX", name: "Gateway", type: "Gateway", costPrice: 500, salesPrice: 850, implementationCost: 0, implementationSalesPrice: 0, annualCost: 100, annualSalesPrice: 180, active: true },
-      { id: "antenna-1", brand: "VIMALUX", name: "Antenna", type: "Antenna", costPrice: 80, salesPrice: 140, implementationCost: 0, implementationSalesPrice: 0, annualCost: 0, annualSalesPrice: 0, active: true },
-      { id: "meter-1", brand: "VIMALUX", name: "Energy Meter", type: "Energy Meter", costPrice: 120, salesPrice: 220, implementationCost: 0, implementationSalesPrice: 0, annualCost: 0, annualSalesPrice: 0, active: true },
-    ],
-  },
+  catalogue: storedMasterCatalogue() || cloneCatalogue(FALLBACK_CATALOGUE),
 });
 
 const isImportedTotalGroup = (group) => /^(grand total|hovedtotal|total|totale generale|totale complessivo|i alt)$/i.test(String(group?.name ?? "").trim());
