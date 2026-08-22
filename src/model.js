@@ -56,7 +56,8 @@ export function reconcileReimportIdentity(incoming, candidates = []) {
     })
     .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
 
-  const existing = matches[0];
+  const preferredId = typeof localStorage !== "undefined" ? String(localStorage.getItem("vimalux-reimport-target-id") || "") : "";
+  const existing = (preferredId && matches.find((candidate) => String(candidate.id) === preferredId)) || matches[0];
   if (!existing) return incoming;
 
   const isCommercial = Boolean(incoming.importedCommercial);
