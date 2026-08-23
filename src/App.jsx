@@ -13,6 +13,7 @@ import { growthForecast, partnerTotals } from "./partners.js";
 import { generatePartnerPdf } from "./partnerReport.js";
 import CrmOpportunity from "./CrmOpportunity.jsx";
 import AdditionalCostsCard from "./AdditionalCostsCard.jsx";
+import CatalogueExtended from "./CatalogueExtended.jsx";
 import { isAgentViewAllowed, sanitizeAgentAdditionalCosts } from "./additionalCostsAccess.js";
 import { syncBusinessCaseResult } from "./businessCaseSync.js";
 import { mergeOpportunity, opportunityFromSearchParams } from "./opportunity.js";
@@ -517,7 +518,7 @@ export default function App() {
           {!isAgent && view === "datek" && <DatekDashboard projects={syncedProjects} money={money} />}
           {!isAgent && view === "partnerReports" && <PartnerReports projects={syncedProjects} p={syncedProject} money={money} />}
           {view === "projects" && <Projects list={projects} activeId={activeId} select={(id) => { setActiveId(id); setView("customer"); }} remove={isAgent ? undefined : removeProject} create={isAgent ? undefined : create} importProjectFile={importProjectFile} t={t} />}
-          {!isAgent && view === "catalogue" && <Catalogue p={project} update={update} />}
+          {!isAgent && view === "catalogue" && <CatalogueExtended p={project} update={update} />}
           {!isAgent && view === "admin" && <Admin p={project} r={result} setView={setView} reset={reset} t={t} />}
         </>}
       </main>
