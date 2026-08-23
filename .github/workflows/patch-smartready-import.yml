@@ -1,1 +1,39 @@
-placeholder
+name: Patch Smart-ready import
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/patch-smartready-import.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch lighting import
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/lightingImport.js')
+          s=p.read_text()
+          s=s.replace('  installationHeight: ["installation height m", "installation height", "altezza installazione m", "altezza installazione"],\n};', '  installationHeight: ["installation height m", "installation height", "altezza installazione m", "altezza installazione"],\n  zhagaReady: ["zhaga ready", "zhaga", "predisposizione zhaga"],\n  d4iDriver: ["d4i driver", "driver d4i", "d4i"],\n};')
+          s=s.replace('    description: "", usefulLifetime: "", kelvin: "", socket: "", installationHeight: "",\n  };', '    description: "", usefulLifetime: "", kelvin: "", socket: "", installationHeight: "",\n    zhagaReady: "", d4iDriver: "",\n  };')
+          marker='export function normalizeReplacementRequirement(value) {\n'
+          insert='export function normalizeTriState(value) {\n  const text = clean(value);\n  if (!text) return "UNKNOWN";\n  if (/^(yes|si|sì|true|1)$/.test(text)) return "YES";\n  if (/^(no|false|0)$/.test(text)) return "NO";\n  return "UNKNOWN";\n}\n\n'
+          if insert not in s: s=s.replace(marker, insert+marker)
+          s=s.replace('function importedGroupBase({ name, quantity, technology, wattage, ledProducts, category = "OTHER", replacementRequirement = "UNKNOWN", operatingHours = 0, lumen = 0, description = "", usefulLifetime = 0, kelvin = 0, socket = "", installationHeight = 0 }) {', 'function importedGroupBase({ name, quantity, technology, wattage, ledProducts, category = "OTHER", replacementRequirement = "UNKNOWN", operatingHours = 0, lumen = 0, description = "", usefulLifetime = 0, kelvin = 0, socket = "", installationHeight = 0, zhagaReady = "UNKNOWN", d4iDriver = "UNKNOWN" }) {')
+          s=s.replace('    installationHeight,\n    upgradeSelected: true,', '    installationHeight,\n    existingZhagaReady: zhagaReady,\n    existingD4iDriver: d4iDriver,\n    smartReadyExisting: technology === "LED" && zhagaReady === "YES" && d4iDriver === "YES",\n    upgradeSelected: true,')
+          s=s.replace('  const heightIndex = optionalIndex(mapping, "installationHeight");', '  const heightIndex = optionalIndex(mapping, "installationHeight");\n  const zhagaReadyIndex = optionalIndex(mapping, "zhagaReady");\n  const d4iDriverIndex = optionalIndex(mapping, "d4iDriver");')
+          s=s.replace('    const installationHeight = heightIndex == null ? 0 : Math.max(0, numberValue(row[heightIndex]));', '    const installationHeight = heightIndex == null ? 0 : Math.max(0, numberValue(row[heightIndex]));\n    const zhagaReady = zhagaReadyIndex == null ? "UNKNOWN" : normalizeTriState(row[zhagaReadyIndex]);\n    const d4iDriver = d4iDriverIndex == null ? "UNKNOWN" : normalizeTriState(row[d4iDriverIndex]);')
+          s=s.replace('    const baseArgs = { technology, wattage, ledProducts, category, replacementRequirement, operatingHours, lumen, description, usefulLifetime, kelvin, socket, installationHeight };', '    const baseArgs = { technology, wattage, ledProducts, category, replacementRequirement, operatingHours, lumen, description, usefulLifetime, kelvin, socket, installationHeight, zhagaReady, d4iDriver };')
+          p.write_text(s)
+          PY
+      - name: Test
+        run: npm test -- --runInBand || npm test
+      - name: Commit patch
+        run: |
+          git config user.name "VIMALUX Automation"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          git add src/lightingImport.js
+          git diff --cached --quiet || git commit -m "Import existing Zhaga and D4i Smart-ready data"
+          git push origin HEAD:main
