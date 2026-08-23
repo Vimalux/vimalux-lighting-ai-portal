@@ -24,7 +24,7 @@ async function getCurrentProfile(fields = "id,email,full_name,role") {
 
 export async function loadCloudState(localProjects, includeLocalProjects = true) {
   const [{ data: projectRows, error: projectError }, { data: catalogue, error: catalogueError }] = await Promise.all([
-    supabase.rpc("list_business_cases"),
+    supabase.rpc("list_business_cases_v2"),
     supabase.rpc("get_intelligence_catalogue"),
   ]);
   if (projectError) throw projectError;
@@ -104,9 +104,6 @@ export async function saveCloudState(projects) {
       }
     }
 
-    // Every complete Intelligence Business Case must have one CRM Opportunity.
-    // If the case is not linked yet, promote it once as a Lead. The database RPC
-    // is idempotent and returns the existing Opportunity when a link already exists.
     if (
       stableUuid.test(String(caseId || "")) &&
       !String(crmOpportunityId || "").trim() &&
@@ -145,9 +142,21 @@ export async function deleteCloudProject(projectId) {
 }
 
 export async function loadBusinessCase(caseId) {
-  const { data, error } = await supabase.rpc("get_business_case", { case_id: caseId });
+  const { data, error } = await supabase.rpc("get_business_case_v2", { case_id: caseId });
   if (error) throw error;
   return data?.[0] ? projectFromBusinessCaseRow(data[0]) : null;
+}
+
+export async function publishPreliminaryProposal(caseId, options = {}) {
+  const { data, error } = await supabase.rpc("publish_intelligence_preliminary_proposal", {
+    case_id: caseId,
+    quotation_id: options.quotationId || null,
+    proposal_status: options.status || "draft",
+    pdf_reference: options.pdfReference || null,
+    savings_report_reference: options.savingsReportReference || null,
+  });
+  if (error) throw error;
+  return data;
 }
 
 export async function loadCurrentProfile() {
