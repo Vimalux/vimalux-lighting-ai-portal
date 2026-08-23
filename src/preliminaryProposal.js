@@ -110,7 +110,7 @@ function generatePdf(row, version) {
 
   autoTable(doc, {
     startY: 86, theme: "grid",
-    head: [["CAPEX", it ? "OPEX annuo" : "Annual OPEX", it ? "Ricavo annuo contratto" : "Annual Contract Revenue", "TCV"]],
+    head: [[it ? "Investimento iniziale (CAPEX)" : "Initial investment (CAPEX)", it ? "Servizi annuali / OPEX" : "Annual services / OPEX", it ? "Ricavo annuo contratto" : "Annual Contract Revenue", it ? `TCV - valore totale ${Math.round(Number(result.contractYears) || 0)} anni` : `TCV - total value ${Math.round(Number(result.contractYears) || 0)} years`]],
     body: [[money(result.capex, lang), money(result.annualOpex, lang), money(result.annualContractRevenue, lang), money(result.tcv, lang)]],
     headStyles: { fillColor: teal }, styles: { font: "helvetica", fontSize: 8, cellPadding: 2.2 },
     columnStyles: { 0: { halign: "right" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" } },
@@ -146,11 +146,11 @@ function generatePdf(row, version) {
     startY: y + 5, theme: "grid",
     head: [[it ? "Voce" : "Item", it ? "Valore" : "Value"]],
     body: [
-      ["CAPEX", money(result.capex, lang)],
-      [it ? "OPEX annuo" : "Annual OPEX", money(result.annualOpex, lang)],
+      [it ? "Investimento iniziale (CAPEX)" : "Initial investment (CAPEX)", money(result.capex, lang)],
+      [it ? "Servizi annuali / OPEX" : "Annual services / OPEX", money(result.annualOpex, lang)],
       [it ? "Ricavo contrattuale annuo" : "Annual Contract Revenue", money(result.annualContractRevenue, lang)],
       [it ? "Durata contratto" : "Contract term", `${Math.round(Number(result.contractYears) || 0)} ${it ? "anni" : "years"}`],
-      ["TCV", money(result.tcv, lang)],
+      [it ? `TCV - valore contrattuale totale ${Math.round(Number(result.contractYears) || 0)} anni` : `TCV - total contract value ${Math.round(Number(result.contractYears) || 0)} years`, money(result.tcv, lang)],
       [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],
     ],
     headStyles: { fillColor: teal }, styles: { font: "helvetica", fontSize: 8, cellPadding: 1.6 }, columnStyles: { 1: { halign: "right" } },

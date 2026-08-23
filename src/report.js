@@ -120,7 +120,7 @@ export function generateCustomerPdf(project, result) {
   autoTable(doc, {
     startY: 57,
     theme: "grid",
-    head: [[t("preliminary"), t("capex"), paymentLabel, it ? "OPEX mensile" : "Monthly OPEX", `${t("annualNet")}*`, t("roi"), paybackLabel]],
+    head: [[t("preliminary"), it ? "Investimento iniziale (CAPEX)" : "Initial investment (CAPEX)", paymentLabel, it ? "OPEX mensile" : "Monthly OPEX", `${t("annualNet")}*`, t("roi"), paybackLabel]],
     body: [[result.customerDecisionStatus.replace("_", "-"), money(result.totalCapex), money2(paymentValue), money2(result.totalAnnualOpex / 12), money(result.customerAnnualNetBenefit), percent(result.roiPercent), result.payback == null ? t("notAvailable") : `${formatNumber(result.payback, lang, 1)} ${t("years")}`]],
     headStyles: { fillColor: [15, 118, 110] },
     styles: { font: "helvetica", fontSize: 6.9, cellPadding: 1.8, valign: "middle" },
