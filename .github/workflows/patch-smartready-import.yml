@@ -1,3 +1,4 @@
+# trigger smart-ready import patch
 name: Patch Smart-ready import
 on:
   push:
