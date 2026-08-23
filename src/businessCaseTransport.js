@@ -45,13 +45,16 @@ export function projectFromBusinessCaseRow(row) {
         .filter((group) => group.quantity > 0)
     : [];
   const commercial = source.commercial || {};
+  const projectLineageId = row?.project_lineage_id || crm.project_lineage_id || project.crm?.projectLineageId || project.project?.projectLineageId || "";
 
   project.id = row.id;
   project.customer.name = crm.customer || crm.municipality || project.customer.name;
   project.project.name = crm.project || project.project.name;
   project.project.businessCaseId = row.business_case_code || project.project.businessCaseId;
+  project.project.projectLineageId = projectLineageId;
   project.crm = {
     ...(project.crm || {}),
+    projectLineageId,
     customerId: row.customer_id || "",
     opportunityId: row.crm_opportunity_id || "",
     uniqueProjectId: row.crm_opportunity_id || "",
@@ -63,7 +66,7 @@ export function projectFromBusinessCaseRow(row) {
     syncSource: row.sync_source,
     syncVersion: row.sync_version,
     lastSyncedAt: row.last_synced_at,
-    businessCase: row.result_summary && Object.keys(row.result_summary).length ? row.result_summary : project.crm?.businessCase,
+    businessCase: row.result_summary && Object.keys(row.result_summary).length ? { ...row.result_summary, projectLineageId } : project.crm?.businessCase,
   };
   project.customer.province = crm.province || project.customer.province || "";
   project.customer.region = crm.region || project.customer.region || "";
@@ -107,13 +110,11 @@ export function projectFromBusinessCaseRow(row) {
   }
   project.name = project.project.name;
 
-  // migrateProject() historically falls back to project.id when crm.opportunityId
-  // is empty. For cloud Business Cases, project.id is the Business Case record ID,
-  // not a CRM Opportunity ID. Re-assert the authoritative relation after migration
-  // so an unlinked Business Case remains unlinked and can be promoted to CRM once.
   const migrated = migrateProject(project);
   migrated.crm.opportunityId = row.crm_opportunity_id || "";
   migrated.crm.uniqueProjectId = row.crm_opportunity_id || "";
+  migrated.crm.projectLineageId = projectLineageId;
+  migrated.project.projectLineageId = projectLineageId;
   return migrated;
 }
 
