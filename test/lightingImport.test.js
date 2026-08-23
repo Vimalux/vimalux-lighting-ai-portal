@@ -1,21 +1,45 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildImportedGroups, detectWorkbookType, guessLightingMapping, normalizeTechnology, parseNoleggioWorkbook, parsePlannerWorkbook } from "../src/lightingImport.js";
+import { buildImportedGroups, detectWorkbookType, guessLightingMapping, normalizeLuminaireCategory, normalizeReplacementRequirement, normalizeTechnology, parseNoleggioWorkbook, parsePlannerWorkbook } from "../src/lightingImport.js";
+
+const emptyExtended = {
+  category: "", replacementRequirement: "", operatingHours: "", lumen: "", description: "", usefulLifetime: "", kelvin: "", socket: "", installationHeight: "",
+};
 
 test("column mapping recognises common lighting headers", () => {
-  assert.deepEqual(guessLightingMapping(["Asset_ID", "Street", "Lamp Type", "Wattage", "Quantity"]), { technology: "2", wattage: "3", quantity: "4", name: "1", assetId: "0" });
+  assert.deepEqual(guessLightingMapping(["Asset_ID", "Street", "Lamp Type", "Wattage", "Quantity"]), { technology: "2", wattage: "3", quantity: "4", name: "1", assetId: "0", ...emptyExtended });
 });
 
 test("official VML Input Sheet semantic headers map automatically", () => {
   assert.deepEqual(
     guessLightingMapping(["Column 1", "Column 2", "Tipo lampada", "Quantità", "Column 5", "Column 6", "Potenza (W)"]),
-    { technology: "2", wattage: "6", quantity: "3", name: "", assetId: "" },
+    { technology: "2", wattage: "6", quantity: "3", name: "", assetId: "", ...emptyExtended },
   );
+});
+
+test("v2.3 Italian input template maps by header, independent of column order", () => {
+  const headers = ["Localizzazione / gruppo *", "Categoria apparecchio *", "Wattaggio attuale (W) *", "Tecnologia attuale *", "N. apparecchi *", "Ore funzionamento annue *", "Modalità di sostituzione"];
+  const mapping = guessLightingMapping(headers);
+  assert.equal(mapping.name, "0");
+  assert.equal(mapping.category, "1");
+  assert.equal(mapping.wattage, "2");
+  assert.equal(mapping.technology, "3");
+  assert.equal(mapping.quantity, "4");
+  assert.equal(mapping.operatingHours, "5");
+  assert.equal(mapping.replacementRequirement, "6");
+});
+
+test("Italian dropdown labels normalise to stable internal codes", () => {
+  assert.equal(normalizeLuminaireCategory("Lanterna"), "LANTERN");
+  assert.equal(normalizeLuminaireCategory("Proiettore"), "FLOODLIGHT");
+  assert.equal(normalizeReplacementRequirement("Sostituzione completa"), "REPLACE");
+  assert.equal(normalizeReplacementRequirement("Entrambe le opzioni"), "EITHER");
 });
 
 test("technology names are normalised", () => {
   assert.equal(normalizeTechnology("Sodium HPS"), "SAP");
   assert.equal(normalizeTechnology("Metal Halide"), "MH");
+  assert.equal(normalizeTechnology("Ioduri metallici / MH"), "MH");
   assert.equal(normalizeTechnology("HQL Mercury"), "MERCURY");
   assert.equal(normalizeTechnology("Existing LED"), "LED");
 });
@@ -27,6 +51,16 @@ test("individual rows aggregate into wattage and technology groups", () => {
   assert.equal(result.groups.length, 2);
   assert.equal(result.groups.find((group) => group.technology === "SAP").quantity, 2);
   assert.equal(result.skipped, 1);
+});
+
+test("v2.3 groups retain category, replacement strategy and operating hours", () => {
+  const rows = [["Via Roma", "Lanterna", 70, "SAP", 24, 4200, "Retrofit"]];
+  const mapping = guessLightingMapping(["Localizzazione / gruppo *", "Categoria apparecchio *", "Wattaggio attuale (W) *", "Tecnologia attuale *", "N. apparecchi *", "Ore funzionamento annue *", "Modalità di sostituzione"]);
+  const result = buildImportedGroups(rows, mapping, [{ id: "led-1", wattage: 25, active: true }], "it");
+  assert.equal(result.totalQuantity, 24);
+  assert.equal(result.groups[0].existingCategory, "LANTERN");
+  assert.equal(result.groups[0].replacementRequirement, "RETROFIT");
+  assert.equal(result.groups[0].annualOperatingHours, 4200);
 });
 
 test("an optional quantity column imports already summarised sheets", () => {
@@ -62,7 +96,6 @@ test("Noleggio CRM_IMPORT fallback maps official commercial values and warns on 
   assert.equal(result.warnings.length,0);
 });
 
-
 test("Larciano import validates stale CRM cache against the visible customer offer", () => {
   const sheets = [
     { name: "CRM_IMPORT", headers: ["Field","Value","Source","Notes"], rows: [
@@ -90,7 +123,6 @@ test("Larciano import validates stale CRM cache against the visible customer off
   assert.equal(result.totalCustomerPayments,1018871.07);
   assert.equal(result.warnings.length,2);
 });
-
 
 test("Ricigliano Planner workbook imports the verified 623-luminaire product mix", () => {
   const sheets = [
@@ -122,7 +154,6 @@ test("workbook type detection keeps Noleggio and generic imports separate", () =
   assert.equal(detectWorkbookType([{name:"CRM_IMPORT"}]),"noleggio");
   assert.equal(detectWorkbookType([{name:"Lighting data"}]),"lighting");
 });
-
 
 test("Planner PIVOT import infers columns when browser headers are generic", () => {
   const sheets = [{name:"PIVOT",headers:["Column 1","Column 2","Column 3"],rows:[
