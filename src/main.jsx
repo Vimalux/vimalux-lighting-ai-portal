@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import "./additional-costs.css";
 import "./solution-additional-costs.css";
+import "./catalogueExtended.css";
 import "./solutionAdditionalCosts.js";
 import "./agentProjectInputs.js";
 import "./preliminaryProposal.js";
