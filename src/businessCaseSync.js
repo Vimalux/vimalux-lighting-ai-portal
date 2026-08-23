@@ -8,6 +8,7 @@ export function buildBusinessCaseSnapshot(project, calculatedAt = new Date().toI
   const upgradeLuminaires = positive(result.upgradedQuantity);
   const smartConnectedLuminaires = positive(result.lcuQuantity);
   const energyPrice = positive(project.assumptions?.energyPrice);
+  const projectLineageId = project.crm?.projectLineageId || project.project?.projectLineageId || "";
   const legacyKpis = project.importedCommercial?.standardKpis && typeof project.importedCommercial.standardKpis === "object"
     ? project.importedCommercial.standardKpis
     : null;
@@ -17,6 +18,7 @@ export function buildBusinessCaseSnapshot(project, calculatedAt = new Date().toI
     version: Number(project.version) || 1,
     calculatedAt,
     businessCaseId: project.project?.businessCaseId || "",
+    projectLineageId,
 
     existingLuminaires,
     upgradeLuminaires,
@@ -59,6 +61,7 @@ export function buildBusinessCaseSnapshot(project, calculatedAt = new Date().toI
   const merged = {
     ...calculated,
     ...imported,
+    projectLineageId,
     source: "VIMALUX Legacy Excel CRM_IMPORT",
     sourceStatus: "calculated",
     calculatedAt,
@@ -73,20 +76,35 @@ export function syncBusinessCaseResult(project, calculatedAt) {
   const businessCase = buildBusinessCaseSnapshot(project, calculatedAt);
   return {
     ...project,
-    crm: { ...(project.crm || {}), goStatus: businessCase.goStatus, businessCase },
+    crm: {
+      ...(project.crm || {}),
+      projectLineageId: businessCase.projectLineageId || project.crm?.projectLineageId || "",
+      goStatus: businessCase.goStatus,
+      businessCase,
+    },
   };
 }
 
 export function applyAuthoritativeBusinessCase(project, values = {}) {
   const current = project.crm?.businessCase || {};
+  const projectLineageId = values.projectLineageId || current.projectLineageId || project.crm?.projectLineageId || project.project?.projectLineageId || "";
   const businessCase = {
     ...current,
     ...values,
+    projectLineageId,
     source: values.source || "VIMALUX Intelligence sync",
     sourceStatus: values.sourceStatus || "synced",
     version: Number(values.version ?? current.version ?? project.version) || 1,
     calculatedAt: values.calculatedAt || new Date().toISOString(),
     businessCaseId: values.businessCaseId || project.project?.businessCaseId || "",
   };
-  return { ...project, crm: { ...(project.crm || {}), goStatus: businessCase.goStatus || project.crm?.goStatus || "", businessCase } };
+  return {
+    ...project,
+    crm: {
+      ...(project.crm || {}),
+      projectLineageId,
+      goStatus: businessCase.goStatus || project.crm?.goStatus || "",
+      businessCase,
+    },
+  };
 }
