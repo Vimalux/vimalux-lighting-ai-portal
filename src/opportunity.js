@@ -14,6 +14,7 @@ export function opportunityFromSearchParams(searchParams) {
     opportunity: {
       opportunityId: text(params.get("opportunity_id")),
       uniqueProjectId: text(params.get("opportunity_id")),
+      projectLineageId: text(params.get("project_lineage_id")),
       businessCaseId: text(params.get("business_case_id")),
       projectName: text(params.get("project")) || text(params.get("customer")),
       stage: "lead",
@@ -44,6 +45,7 @@ export function canonicalOpportunityFromProject(project) {
   const technologies = [...new Set(groups.map((group) => text(group.technology)).filter(Boolean))];
   const dimming = groups.find((group) => group.existingDimmingProfile === "fixed") || groups[0] || {};
   const crm = project.crm || {};
+  const projectLineageId = crm.projectLineageId || project.project?.projectLineageId || "";
   return {
     customer: {
       customerId: crm.customerId || "",
@@ -67,6 +69,7 @@ export function canonicalOpportunityFromProject(project) {
     opportunity: {
       opportunityId: crm.opportunityId || project.id,
       uniqueProjectId: crm.uniqueProjectId || crm.opportunityId || project.id,
+      projectLineageId,
       projectName: project.project?.name || project.name || "",
       businessCaseId: project.project?.businessCaseId || "",
       createdAt: project.createdAt || "",
@@ -123,6 +126,7 @@ export function applyOpportunityToProject(opportunity, existingProject = null) {
     existingDimmingPercent: n(assumptions.existingDimmingPct),
     existingDriverType: assumptions.existingDriverType || "non_dimmable",
   };
+  const projectLineageId = data.projectLineageId || base.crm?.projectLineageId || base.project?.projectLineageId || "";
   const project = {
     ...base,
     id: existingProject?.id || data.uniqueProjectId || data.opportunityId || uid(),
@@ -144,6 +148,7 @@ export function applyOpportunityToProject(opportunity, existingProject = null) {
       ...base.project,
       name: data.projectName || opportunity.customer?.municipalityName || base.project.name,
       businessCaseId: data.businessCaseId || base.project.businessCaseId,
+      projectLineageId,
       consultant: source.agentName || base.project.consultant,
     },
     groups: total > 0 ? [group] : base.groups,
@@ -164,6 +169,7 @@ export function applyOpportunityToProject(opportunity, existingProject = null) {
     },
     crm: {
       ...base.crm,
+      projectLineageId,
       customerId: opportunity.customer?.customerId || base.crm?.customerId || "",
       contactId: opportunity.contact?.contactId || base.crm?.contactId || "",
       agentId: source.agentId || base.crm?.agentId || "",
@@ -223,14 +229,18 @@ export function buildPlannerHandoff(project) {
   if (!canCreatePlannerProject(project)) throw new Error("Planner handoff requires GO and a calculated Preliminary Business Case.");
   const canonical = canonicalOpportunityFromProject(project);
   return {
+    schemaVersion: 1,
     status: "ready",
     createdAt: new Date().toISOString(),
+    projectLineageId: canonical.opportunity.projectLineageId,
     customer: canonical.customer,
     project: {
+      projectLineageId: canonical.opportunity.projectLineageId,
       opportunityId: canonical.opportunity.opportunityId,
       businessCaseId: canonical.opportunity.businessCaseId,
       projectName: canonical.opportunity.projectName,
     },
+    preliminaryBusinessCase: canonical.businessCase,
     preliminaryAggregateAssumptions: canonical.assumptions,
     commercialStructure: canonical.commercial,
     selectedConcept: {
