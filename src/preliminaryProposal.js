@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { supabase } from "./supabase.js";
+import { warrantyLabel } from "./warranty.js";
 
 const money = (value, lang = "en") => new Intl.NumberFormat(lang === "it" ? "it-IT" : "en-GB", {
   style: "currency", currency: "EUR", maximumFractionDigits: 0,
@@ -150,6 +151,7 @@ function generatePdf(row, version) {
       [it ? "Ricavo contrattuale annuo" : "Annual Contract Revenue", money(result.annualContractRevenue, lang)],
       [it ? "Durata contratto" : "Contract term", `${Math.round(Number(result.contractYears) || 0)} ${it ? "anni" : "years"}`],
       ["TCV", money(result.tcv, lang)],
+      [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],
     ],
     headStyles: { fillColor: teal }, styles: { font: "helvetica", fontSize: 8, cellPadding: 1.6 }, columnStyles: { 1: { halign: "right" } },
   });
@@ -199,6 +201,7 @@ function generatePdf(row, version) {
       [it ? "Periodo di analisi" : "Analysis period", `${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} ${it ? "anni" : "years"}`],
       [it ? "Periodo servizi" : "Service agreement period", `${Math.round(Number(project.assumptions?.serviceAgreementPeriod) || Number(result.contractYears) || 0)} ${it ? "anni" : "years"}`],
       [it ? "Modello commerciale" : "Commercial model", String(project.assumptions?.dealType || project.assumptions?.financingModel || "cash")],
+      [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],
     ],
     headStyles: { fillColor: teal }, alternateRowStyles: { fillColor: light },
     styles: { font: "helvetica", fontSize: 7.6, cellPadding: 1.35 }, columnStyles: { 1: { halign: "right" } },

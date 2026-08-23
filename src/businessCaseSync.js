@@ -1,9 +1,11 @@
 import { calculateBusinessCase, numberValue } from "./calculations.js";
+import { applyWarrantyPricing, projectWarranty } from "./warranty.js";
 
 const positive = (value) => Math.max(0, numberValue(value));
 
 export function buildBusinessCaseSnapshot(project, calculatedAt = new Date().toISOString()) {
-  const result = calculateBusinessCase(project);
+  const result = calculateBusinessCase(applyWarrantyPricing(project));
+  const warranty = projectWarranty(project);
   const existingLuminaires = positive(result.totalQuantity);
   const upgradeLuminaires = positive(result.upgradedQuantity);
   const smartConnectedLuminaires = positive(result.lcuQuantity);
@@ -25,6 +27,8 @@ export function buildBusinessCaseSnapshot(project, calculatedAt = new Date().toI
     smartConnectedLuminaires,
     upgradeCoveragePct: existingLuminaires ? upgradeLuminaires / existingLuminaires * 100 : 0,
     contractYears: positive(result.serviceAgreementPeriod),
+    warrantyYears: warranty.selectedYears,
+    warrantyUpliftPercent: warranty.isExtended ? warranty.upliftPercentSnapshot : 0,
 
     capex: result.totalCapex,
     annualContractRevenue: result.customerAnnualPayment,

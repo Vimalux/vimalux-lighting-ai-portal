@@ -4,6 +4,7 @@ import autoTable from "jspdf-autotable";
 import { formatMoney, formatNumber, formatPercent, useT } from "./i18n.js";
 import { aggregateReplacementRows } from "./reportSummary.js";
 import { reportCommercialContext } from "./reportCommercial.js";
+import { warrantyLabel } from "./warranty.js";
 
 export function generateCustomerPdf(project, result) {
   const lang = project.language;
@@ -140,7 +141,7 @@ export function generateCustomerPdf(project, result) {
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 38,
     theme: "plain",
-    body: rows([[it ? "Cliente" : "Customer", project.customer.name], [it ? "Provincia" : "Province", project.customer.province], [it ? "Regione" : "Region", project.customer.region], [it ? "Contatto" : "Contact", project.customer.contact], ["Email", project.customer.email], [it ? "Telefono" : "Telephone", project.customer.telephone], [it ? "Progetto" : "Project", project.project.name], [it ? "Consulente" : "Consultant", project.project.consultant], [it ? "Data" : "Date", project.project.date]]),
+    body: rows([[it ? "Cliente" : "Customer", project.customer.name], [it ? "Provincia" : "Province", project.customer.province], [it ? "Regione" : "Region", project.customer.region], [it ? "Contatto" : "Contact", project.customer.contact], ["Email", project.customer.email], [it ? "Telefono" : "Telephone", project.customer.telephone], [it ? "Progetto" : "Project", project.project.name], [it ? "Consulente" : "Consultant", project.project.consultant], [it ? "Data" : "Date", project.project.date], [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)]]),
     columnStyles: { 0: { fontStyle: "bold", cellWidth: 48 } },
     styles: { font: "helvetica", fontSize: 9, cellPadding: 1.4, halign: "left" },
   });

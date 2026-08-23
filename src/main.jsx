@@ -4,6 +4,7 @@ import App from "./App.jsx";
 import "./additional-costs.css";
 import "./solution-additional-costs.css";
 import "./catalogueExtended.css";
+import "./warranty.css";
 import "./solutionAdditionalCosts.js";
 import "./agentProjectInputs.js";
 import "./preliminaryProposal.js";

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { uid } from "./model.js";
 import { normalizeCatalogueProduct } from "./productCatalogue.js";
+import { catalogueWarranty } from "./warranty.js";
 
 const CATEGORIES = ["STREET", "URBAN", "GLOBO", "FLOODLIGHT", "UPLIGHT", "LANTERN", "RETROFIT_KIT", "OTHER"];
 const STRATEGIES = ["REPLACE", "RETROFIT", "EITHER"];
@@ -34,6 +35,7 @@ function TechnicalDetails({ product, index, update, it }) {
 export default function CatalogueExtended({ p, update }) {
   const it = p.language === "it";
   const [expanded, setExpanded] = useState({});
+  const warranty = catalogueWarranty(p.catalogue);
   const products = useMemo(() => (p.catalogue?.led || []).map(normalizeCatalogueProduct), [p.catalogue?.led]);
 
   const addLed = () => update(["catalogue", "led"], [
@@ -89,6 +91,13 @@ export default function CatalogueExtended({ p, update }) {
             : "Intelligence master catalogue. Category, compatibility, strategy, performance, pricing and Smart capabilities are used in the Business Case; exact CCT, optics, interface, colour and final variant code are configured in Planner."}</p>
         </div>
         <button className="primary" onClick={addLed}>+ {it ? "Nuovo prodotto" : "New product"}</button>
+      </div>
+      <div className="catalogue-warranty-settings">
+        <strong>{it ? "Garanzia standard catalogo" : "Catalogue warranty standard"}</strong>
+        <label><span>{it ? "Standard (anni)" : "Standard (years)"}</span><NumericField value={warranty.standardYears} onChange={(v) => update(["catalogue", "warranty", "standardYears"], Math.max(1, Math.round(v)))} /></label>
+        <label><span>{it ? "Estesa (anni)" : "Extended (years)"}</span><NumericField value={warranty.extendedYears} onChange={(v) => update(["catalogue", "warranty", "extendedYears"], Math.max(1, Math.round(v)))} /></label>
+        <label><span>{it ? "Maggiorazione (%)" : "Uplift (%)"}</span><NumericField value={warranty.upliftPercent} onChange={(v) => update(["catalogue", "warranty", "upliftPercent"], Math.max(0, v))} /></label>
+        <small>{it ? "Default: 5 anni. La garanzia estesa applica la maggiorazione al prezzo standard LED; il Business Case salva uno snapshot della percentuale utilizzata." : "Default: 5 years. Extended warranty applies the uplift to standard LED sales prices; the Business Case saves a snapshot of the percentage used."}</small>
       </div>
       <div className="table-scroll catalogue-main-table"><table><thead><tr>{[
         "Brand",
