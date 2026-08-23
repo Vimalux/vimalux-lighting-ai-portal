@@ -1,0 +1,101 @@
+name: Apply warranty v1
+on:
+  push:
+    branches: [warranty-v1]
+    paths:
+      - '.github/workflows/apply-warranty-v1.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: warranty-v1
+      - name: Patch warranty integration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              p=Path(path); s=p.read_text()
+              if old not in s:
+                  if new in s: return
+                  raise SystemExit(f'Anchor not found in {path}: {old[:100]}')
+              p.write_text(s.replace(old,new,count))
+
+          # model.js: preserve global warranty settings and project selection snapshot.
+          replace('src/model.js',
+          'const cloneCatalogue = (catalogue) => ({\n  led: Array.isArray(catalogue?.led) ? catalogue.led.map((item) => ({ ...item })) : [],\n  smart: Array.isArray(catalogue?.smart) ? catalogue.smart.map((item) => ({ ...item })) : [],\n});',
+          'const cloneCatalogue = (catalogue) => ({\n  led: Array.isArray(catalogue?.led) ? catalogue.led.map((item) => ({ ...item })) : [],\n  smart: Array.isArray(catalogue?.smart) ? catalogue.smart.map((item) => ({ ...item })) : [],\n  warranty: {\n    standardYears: Number(catalogue?.warranty?.standardYears) || 5,\n    extendedYears: Number(catalogue?.warranty?.extendedYears) || 10,\n    upliftPercent: Number(catalogue?.warranty?.upliftPercent) || 18.19,\n  },\n});')
+          replace('src/model.js',
+          'solution: { smartEnabled: true, cmsEnabled: true, powerAidEnabled: false,',
+          'solution: { warrantyYears: 5, warrantyUpliftPercentSnapshot: 18.19, smartEnabled: true, cmsEnabled: true, powerAidEnabled: false,')
+
+          # App.jsx: calculate with warranty-adjusted luminaire sales prices and show selector in Solution.
+          replace('src/App.jsx',
+          'import AdditionalCostsCard from "./AdditionalCostsCard.jsx";\n',
+          'import AdditionalCostsCard from "./AdditionalCostsCard.jsx";\nimport WarrantySelector from "./WarrantySelector.jsx";\nimport { applyWarrantyPricing } from "./warranty.js";\n')
+          replace('src/App.jsx',
+          'const result = useMemo(() => calculateBusinessCase(project), [project]);',
+          'const result = useMemo(() => calculateBusinessCase(applyWarrantyPricing(project)), [project]);')
+          replace('src/App.jsx',
+          'onChange={(v) => update(["solution","powerAidEnabled"],v)} /></div><p className="hint">',
+          'onChange={(v) => update(["solution","powerAidEnabled"],v)} /></div><WarrantySelector p={p} update={update} /><p className="hint">')
+
+          # Sync: CRM and proposal snapshot KPIs must use warranty-adjusted CAPEX.
+          replace('src/businessCaseSync.js',
+          'import { calculateBusinessCase, numberValue } from "./calculations.js";\n',
+          'import { calculateBusinessCase, numberValue } from "./calculations.js";\nimport { applyWarrantyPricing, projectWarranty } from "./warranty.js";\n')
+          replace('src/businessCaseSync.js',
+          'const result = calculateBusinessCase(project);',
+          'const result = calculateBusinessCase(applyWarrantyPricing(project));\n  const warranty = projectWarranty(project);')
+          replace('src/businessCaseSync.js',
+          'contractYears: positive(result.serviceAgreementPeriod),',
+          'contractYears: positive(result.serviceAgreementPeriod),\n    warrantyYears: warranty.selectedYears,\n    warrantyUpliftPercent: warranty.isExtended ? warranty.upliftPercentSnapshot : 0,')
+
+          # Customer Business Case PDF: display warranty in project section.
+          replace('src/report.js',
+          'import { reportCommercialContext } from "./reportCommercial.js";\n',
+          'import { reportCommercialContext } from "./reportCommercial.js";\nimport { warrantyLabel } from "./warranty.js";\n')
+          replace('src/report.js',
+          '[it ? "Data" : "Date", project.project.date]]),',
+          '[it ? "Data" : "Date", project.project.date], [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)]]),')
+
+          # Preliminary proposal: warranty in commercial structure and key assumptions.
+          replace('src/preliminaryProposal.js',
+          'import { supabase } from "./supabase.js";\n',
+          'import { supabase } from "./supabase.js";\nimport { warrantyLabel } from "./warranty.js";\n')
+          replace('src/preliminaryProposal.js',
+          '["TCV", money(result.tcv, lang)],\n    ],',
+          '["TCV", money(result.tcv, lang)],\n      [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],\n    ],', 1)
+          replace('src/preliminaryProposal.js',
+          '[it ? "Modello commerciale" : "Commercial model", String(project.assumptions?.dealType || project.assumptions?.financingModel || "cash")],',
+          '[it ? "Modello commerciale" : "Commercial model", String(project.assumptions?.dealType || project.assumptions?.financingModel || "cash")],\n      [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],')
+
+          # Catalogue editor: global admin warranty settings.
+          replace('src/CatalogueExtended.jsx',
+          'import { normalizeCatalogueProduct } from "./productCatalogue.js";\n',
+          'import { normalizeCatalogueProduct } from "./productCatalogue.js";\nimport { catalogueWarranty } from "./warranty.js";\n')
+          replace('src/CatalogueExtended.jsx',
+          'const [expanded, setExpanded] = useState({});\n  const products',
+          'const [expanded, setExpanded] = useState({});\n  const warranty = catalogueWarranty(p.catalogue);\n  const products')
+          replace('src/CatalogueExtended.jsx',
+          '</div>\n      <div className="table-scroll catalogue-main-table">',
+          '</div>\n      <div className="catalogue-warranty-settings">\n        <strong>{it ? "Garanzia standard catalogo" : "Catalogue warranty standard"}</strong>\n        <label><span>{it ? "Standard (anni)" : "Standard (years)"}</span><NumericField value={warranty.standardYears} onChange={(v) => update(["catalogue", "warranty", "standardYears"], Math.max(1, Math.round(v)))} /></label>\n        <label><span>{it ? "Estesa (anni)" : "Extended (years)"}</span><NumericField value={warranty.extendedYears} onChange={(v) => update(["catalogue", "warranty", "extendedYears"], Math.max(1, Math.round(v)))} /></label>\n        <label><span>{it ? "Maggiorazione (%)" : "Uplift (%)"}</span><NumericField value={warranty.upliftPercent} onChange={(v) => update(["catalogue", "warranty", "upliftPercent"], Math.max(0, v))} /></label>\n        <small>{it ? "Default: 5 anni. La garanzia estesa applica la maggiorazione al prezzo standard LED; il Business Case salva uno snapshot della percentuale utilizzata." : "Default: 5 years. Extended warranty applies the uplift to standard LED sales prices; the Business Case saves a snapshot of the percentage used."}</small>\n      </div>\n      <div className="table-scroll catalogue-main-table">')
+
+          # Warranty styling.
+          p=Path('src/warranty.css')
+          p.write_text('.warranty-selector{margin:.85rem 0;padding:.85rem 1rem;border:1px solid #dbe4ee;border-radius:10px;background:#f8fafc;display:flex;align-items:flex-end;gap:1rem;flex-wrap:wrap}.warranty-selector label{display:flex;flex-direction:column;gap:.35rem;min-width:260px}.warranty-selector label span,.catalogue-warranty-settings label span{font-size:.78rem;font-weight:600;color:#344054}.warranty-selector small{color:#667085;max-width:620px}.catalogue-warranty-settings{margin:0 0 1rem;padding:.8rem 1rem;border:1px solid #dbe4ee;border-radius:10px;background:#f8fafc;display:flex;align-items:flex-end;gap:.8rem;flex-wrap:wrap}.catalogue-warranty-settings>strong{width:100%}.catalogue-warranty-settings label{display:flex;flex-direction:column;gap:.3rem;min-width:150px}.catalogue-warranty-settings small{color:#667085;max-width:620px}.catalogue-warranty-settings input{max-width:160px}')
+          replace('src/main.jsx',
+          'import "./catalogueExtended.css";\n',
+          'import "./catalogueExtended.css";\nimport "./warranty.css";\n')
+          PY
+      - name: Commit warranty integration
+        run: |
+          git config user.name "VIMALUX Automation"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          git add src
+          git diff --cached --quiet || git commit -m "Integrate selectable warranty into pricing and proposals"
+          git push origin HEAD:warranty-v1
