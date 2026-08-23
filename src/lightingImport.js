@@ -3,20 +3,45 @@ import { numberValue } from "./calculations.js";
 import { uid } from "./model.js";
 
 const aliases = {
-  technology: ["technology", "tecnologia", "lamp type", "lampetype", "luminaire type", "fixture type", "light source", "tipo lampada", "tipo apparecchio", "tipo di tecnologia"],
-  wattage: ["wattage", "watt", "watts", "power", "potenza", "potenza w", "effekt", "w", "wattagi"],
-  quantity: ["quantity", "qty", "count", "number", "numero", "quantita", "quantità", "antal", "number of lamps", "numero lampade", "numero di apparecchi"],
-  name: ["group", "group name", "name", "street", "location", "gruppo", "nome", "via", "strada", "gruppe", "gade"],
+  technology: ["technology", "current technology", "tecnologia", "tecnologia attuale", "lamp type", "lampetype", "light source", "tipo lampada", "tipo di tecnologia"],
+  wattage: ["wattage", "current wattage", "current wattage w", "wattaggio attuale", "wattaggio attuale w", "watt", "watts", "power", "potenza", "potenza attuale", "potenza w", "effekt", "w", "wattagi"],
+  quantity: ["quantity", "qty", "count", "number", "numero", "quantita", "quantità", "antal", "number of lamps", "no of luminaires", "no. of luminaires", "numero lampade", "numero di apparecchi", "n apparecchi", "n. apparecchi"],
+  name: ["group", "group name", "name", "street", "location", "location group", "localizzazione", "localizzazione gruppo", "gruppo", "nome", "via", "strada", "gruppe", "gade"],
   assetId: ["asset id", "asset_id", "pole id", "pole_id", "lamp id", "luminaire id", "id lampada", "id palo", "matricola"],
+  category: ["luminaire category", "fixture category", "category", "categoria apparecchio", "categoria lampada"],
+  replacementRequirement: ["replacement requirement", "replacement strategy", "modalita di sostituzione", "modalità di sostituzione", "strategia di sostituzione"],
+  operatingHours: ["annual burning hours", "annual burning hours *", "annual operating hours", "burning hours", "operating hours", "ore funzionamento annue", "ore di funzionamento annue"],
+  lumen: ["lumen output luminaire", "lumen output", "flusso luminoso apparecchio", "flusso luminoso"],
+  description: ["current luminaire description model", "current luminaire description", "luminaire description", "descrizione modello apparecchio attuale", "descrizione apparecchio attuale"],
+  usefulLifetime: ["current useful lifetime h", "current useful lifetime", "vita utile attuale h", "vita utile attuale"],
+  kelvin: ["kelvin", "cct"],
+  socket: ["socket", "presa attacco", "presa", "attacco"],
+  installationHeight: ["installation height m", "installation height", "altezza installazione m", "altezza installazione"],
 };
 
-const clean = (value) => String(value ?? "").trim().toLowerCase().replace(/[_/()-]+/g, " ").replace(/\s+/g, " ");
+const clean = (value) => String(value ?? "")
+  .trim()
+  .toLowerCase()
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .replace(/[_/()*.:-]+/g, " ")
+  .replace(/\s+/g, " ")
+  .trim();
+
 const isTotalLabel = (value) => /^(grand total|hovedtotal|total|totale generale|totale complessivo|i alt)$/.test(clean(value));
+const matchAlias = (header, list) => {
+  const text = clean(header);
+  return list.some(alias => text === clean(alias) || text.includes(clean(alias)));
+};
 
 export function guessLightingMapping(headers) {
-  const mapping = { technology: "", wattage: "", quantity: "", name: "", assetId: "" };
+  const mapping = {
+    technology: "", wattage: "", quantity: "", name: "", assetId: "",
+    category: "", replacementRequirement: "", operatingHours: "", lumen: "",
+    description: "", usefulLifetime: "", kelvin: "", socket: "", installationHeight: "",
+  };
   Object.keys(mapping).forEach((field) => {
-    const index = headers.findIndex((header) => aliases[field].some((alias) => clean(header) === alias || clean(header).includes(alias)));
+    const index = headers.findIndex(header => matchAlias(header, aliases[field] || []));
     if (index >= 0) mapping[field] = String(index);
   });
   return mapping;
@@ -26,9 +51,31 @@ export function normalizeTechnology(value) {
   const text = clean(value);
   if (/\bled\b/.test(text)) return "LED";
   if (/\b(sap|hps|sodium|natrium|sodio)\b/.test(text)) return "SAP";
-  if (/\b(mh|metal halide|halogenuri|metalhalogen)\b/.test(text)) return "MH";
+  if (/\b(mh|metal halide|halogenuri|ioduri metallici|metalhalogen)\b/.test(text)) return "MH";
   if (/\b(mercury|hql|kviksølv|mercurio)\b/.test(text)) return "MERCURY";
+  if (/\b(halogen|halogena|alogena)\b/.test(text)) return "HALOGEN";
   return "OTHER";
+}
+
+export function normalizeLuminaireCategory(value) {
+  const text = clean(value);
+  if (!text) return "OTHER";
+  if (/^(street|stradale|road|streetlight)/.test(text)) return "STREET";
+  if (/^(urban|arredo urbano)/.test(text)) return "URBAN";
+  if (/\b(globo|globe)\b/.test(text)) return "GLOBO";
+  if (/\b(floodlight|flood|proiettore)\b/.test(text)) return "FLOODLIGHT";
+  if (/\b(uplight|incasso|in ground|inground)\b/.test(text)) return "UPLIGHT";
+  if (/\b(lantern|lanterna|lanterne)\b/.test(text)) return "LANTERN";
+  return "OTHER";
+}
+
+export function normalizeReplacementRequirement(value) {
+  const text = clean(value);
+  if (!text) return "UNKNOWN";
+  if (/^(replace|sostituzione completa|complete replacement)/.test(text)) return "REPLACE";
+  if (/\bretrofit\b/.test(text)) return "RETROFIT";
+  if (/^(either|entrambe le opzioni|both)/.test(text)) return "EITHER";
+  return "UNKNOWN";
 }
 
 function targetLedWattage(existingWattage, technology) {
@@ -41,8 +88,8 @@ function targetLedWattage(existingWattage, technology) {
 
 export function recommendLedProduct(existingWattage, technology, ledProducts = []) {
   const target = targetLedWattage(existingWattage, technology);
-  const active = ledProducts.filter((product) => product.active !== false && numberValue(product.wattage) > 0);
-  const candidates = active.length ? active : ledProducts.filter((product) => numberValue(product.wattage) > 0);
+  const active = ledProducts.filter(product => product.active !== false && numberValue(product.wattage) > 0);
+  const candidates = active.length ? active : ledProducts.filter(product => numberValue(product.wattage) > 0);
   if (!candidates.length) return { product: null, targetWattage: Math.round(target * 10) / 10 };
   const product = [...candidates].sort((a, b) => {
     const aDelta = Math.abs(numberValue(a.wattage) - target);
@@ -62,17 +109,8 @@ const uniqueHeaders = (values) => {
   });
 };
 
-export function applyOfficialInputSheetLayout(name, headers) {
-  const sheetName = String(name || "");
-  if (/^ProjectInputSheet_ITA$/i.test(sheetName) && headers.length >= 4) {
-    headers[1] = "Tipo di Tecnologia";
-    headers[2] = "Wattagi";
-    headers[3] = "Numero di apparecchi";
-  } else if (/^ProjectInputSheet(?:_(ENG|DA))?$/i.test(sheetName) && headers.length >= 7) {
-    headers[2] = "Tipo lampada";
-    headers[3] = "Quantità";
-    headers[6] = "Potenza (W)";
-  }
+// Kept for backwards API compatibility. New official sheets are header-based and order-independent.
+export function applyOfficialInputSheetLayout(_name, headers) {
   return headers;
 }
 
@@ -83,20 +121,45 @@ export function parseWattageValue(value) {
   return match ? Math.max(0, numberValue(match[0])) : 0;
 }
 
+function headerScore(row) {
+  const headers = uniqueHeaders(row);
+  const mapping = guessLightingMapping(headers);
+  return ["name", "category", "wattage", "technology", "quantity", "operatingHours"]
+    .reduce((score, key) => score + (mapping[key] !== "" ? 1 : 0), 0);
+}
+
+function findHeaderIndex(data) {
+  let bestIndex = -1;
+  let bestScore = 0;
+  data.forEach((row, index) => {
+    const score = headerScore(row || []);
+    if (score > bestScore) { bestScore = score; bestIndex = index; }
+  });
+  if (bestScore >= 2) return bestIndex;
+  return data.findIndex(row => row.some(cell => String(cell ?? "").trim() !== ""));
+}
+
 export async function readLightingWorkbook(file) {
   const isCsv = /\.csv$/i.test(file.name);
   const inputSheets = isCsv ? [{ sheet: file.name, data: parseCsv(await file.text()) }] : await readExcelFile(file);
-  return inputSheets.map(({ sheet: name, data }) => {
-    const matrix = data.filter((row) => row.some((cell) => String(cell ?? "").trim() !== ""));
-    const headerIndex = matrix.findIndex((row) => row.some((cell) => String(cell).trim() !== ""));
+  const parsed = inputSheets.map(({ sheet: name, data }) => {
+    const headerIndex = findHeaderIndex(data || []);
     if (headerIndex < 0) return { name, headers: [], rows: [] };
-    const headers = applyOfficialInputSheetLayout(name, uniqueHeaders(matrix[headerIndex]));
+    const headers = uniqueHeaders(data[headerIndex] || []);
+    const rows = (data || []).slice(headerIndex + 1).filter(row => row.some(cell => String(cell ?? "").trim() !== ""));
     return {
       name,
       headers,
       projectIdCellC6: String(data?.[5]?.[2] ?? "").trim(),
-      rows: matrix.slice(headerIndex + 1).filter((row) => row.some((cell) => String(cell).trim() !== "")),
+      projectName: String(data?.[3]?.[1] ?? data?.[3]?.[2] ?? "").trim(),
+      customerName: String(data?.[5]?.[1] ?? data?.[5]?.[2] ?? "").trim(),
+      rows,
     };
+  });
+  // Italian official sheet is preferred for the current platform, regardless of workbook tab order.
+  return parsed.sort((a, b) => {
+    const rank = item => /^ProjectInputSheet_ITA$/i.test(item.name) ? 0 : /^ProjectInputSheet$/i.test(item.name) ? 1 : 2;
+    return rank(a) - rank(b);
   });
 }
 
@@ -111,17 +174,32 @@ function parseCsv(text) {
     else if (character === delimiter && !quoted) { row.push(value); value = ""; }
     else if ((character === "\n" || character === "\r") && !quoted) {
       if (character === "\r" && text[index + 1] === "\n") index += 1;
-      row.push(value); if (row.some((cell) => cell.trim() !== "")) rows.push(row); row = []; value = "";
+      row.push(value); if (row.some(cell => cell.trim() !== "")) rows.push(row); row = []; value = "";
     } else value += character;
   }
-  row.push(value); if (row.some((cell) => cell.trim() !== "")) rows.push(row);
+  row.push(value); if (row.some(cell => cell.trim() !== "")) rows.push(row);
   return rows;
 }
 
-function importedGroupBase({ name, quantity, technology, wattage, ledProducts }) {
+function optionalIndex(mapping, key) {
+  return mapping[key] === "" || mapping[key] == null ? null : Number(mapping[key]);
+}
+
+function importedGroupBase({ name, quantity, technology, wattage, ledProducts, category = "OTHER", replacementRequirement = "UNKNOWN", operatingHours = 0, lumen = 0, description = "", usefulLifetime = 0, kelvin = 0, socket = "", installationHeight = 0 }) {
   const recommendation = recommendLedProduct(wattage, technology, ledProducts);
   return {
     id: uid(), name, quantity, technology, existingWattage: wattage,
+    existingCategory: category,
+    luminaireCategory: category,
+    replacementRequirement,
+    annualOperatingHours: operatingHours,
+    importedOperatingHours: operatingHours,
+    existingLumen: lumen,
+    existingLuminaireDescription: description,
+    existingUsefulLifetime: usefulLifetime,
+    existingKelvin: kelvin,
+    existingSocket: socket,
+    installationHeight,
     upgradeSelected: true,
     proposedProductId: recommendation.product?.id || "",
     projectLedWattage: recommendation.product ? numberValue(recommendation.product.wattage) : recommendation.targetWattage,
@@ -131,42 +209,59 @@ function importedGroupBase({ name, quantity, technology, wattage, ledProducts })
 }
 
 export function buildImportedGroups(rows, mapping, ledProducts, language = "it", mode = "grouped") {
-  const wattageIndex = Number(mapping.wattage);
-  const technologyIndex = mapping.technology === "" ? null : Number(mapping.technology);
-  const quantityIndex = mapping.quantity === "" ? null : Number(mapping.quantity);
-  const nameIndex = mapping.name === "" ? null : Number(mapping.name);
-  const assetIdIndex = mapping.assetId === "" || mapping.assetId == null ? null : Number(mapping.assetId);
+  const wattageIndex = optionalIndex(mapping, "wattage");
+  const technologyIndex = optionalIndex(mapping, "technology");
+  const quantityIndex = optionalIndex(mapping, "quantity");
+  const nameIndex = optionalIndex(mapping, "name");
+  const assetIdIndex = optionalIndex(mapping, "assetId");
+  const categoryIndex = optionalIndex(mapping, "category");
+  const replacementIndex = optionalIndex(mapping, "replacementRequirement");
+  const hoursIndex = optionalIndex(mapping, "operatingHours");
+  const lumenIndex = optionalIndex(mapping, "lumen");
+  const descriptionIndex = optionalIndex(mapping, "description");
+  const lifetimeIndex = optionalIndex(mapping, "usefulLifetime");
+  const kelvinIndex = optionalIndex(mapping, "kelvin");
+  const socketIndex = optionalIndex(mapping, "socket");
+  const heightIndex = optionalIndex(mapping, "installationHeight");
+  if (wattageIndex == null) throw new Error(language === "it" ? "Colonna Wattaggio attuale non trovata." : "Current wattage column not found.");
+
   const grouped = new Map();
   let skipped = 0;
-
   rows.forEach((row, rowIndex) => {
     const wattage = parseWattageValue(row[wattageIndex]);
     const quantity = quantityIndex == null ? 1 : numberValue(row[quantityIndex]);
     if (!(wattage > 0) || !(quantity > 0)) { skipped += 1; return; }
     const technology = technologyIndex == null ? "OTHER" : normalizeTechnology(row[technologyIndex]);
+    const category = categoryIndex == null ? "OTHER" : normalizeLuminaireCategory(row[categoryIndex]);
+    const replacementRequirement = replacementIndex == null ? "UNKNOWN" : normalizeReplacementRequirement(row[replacementIndex]);
+    const operatingHours = hoursIndex == null ? 0 : Math.max(0, numberValue(row[hoursIndex]));
+    const lumen = lumenIndex == null ? 0 : Math.max(0, numberValue(row[lumenIndex]));
+    const description = descriptionIndex == null ? "" : String(row[descriptionIndex] ?? "").trim();
+    const usefulLifetime = lifetimeIndex == null ? 0 : Math.max(0, numberValue(row[lifetimeIndex]));
+    const kelvin = kelvinIndex == null ? 0 : Math.max(0, numberValue(row[kelvinIndex]));
+    const socket = socketIndex == null ? "" : String(row[socketIndex] ?? "").trim();
+    const installationHeight = heightIndex == null ? 0 : Math.max(0, numberValue(row[heightIndex]));
     const suppliedName = nameIndex == null ? "" : String(row[nameIndex] ?? "").trim();
     const assetId = assetIdIndex == null ? "" : String(row[assetIdIndex] ?? "").trim();
+    const baseArgs = { technology, wattage, ledProducts, category, replacementRequirement, operatingHours, lumen, description, usefulLifetime, kelvin, socket, installationHeight };
 
     if (mode === "individual") {
       const count = Math.max(1, Math.round(quantity));
       for (let item = 0; item < count; item += 1) {
         const suffix = count > 1 ? ` #${item + 1}` : "";
-        const fallback = suppliedName ? `${suppliedName}${suffix || ` #${rowIndex + 1}`}` : `${language === "it" ? "Lampada" : "Luminaire"} ${rowIndex + 1}${suffix}`;
-        grouped.set(`individual-${rowIndex}-${item}`, importedGroupBase({
-          name: assetId ? `${assetId}${suffix}` : fallback,
-          quantity: 1, technology, wattage, ledProducts,
-        }));
+        const fallback = suppliedName ? `${suppliedName}${suffix || ` #${rowIndex + 1}`}` : `${language === "it" ? "Apparecchio" : "Luminaire"} ${rowIndex + 1}${suffix}`;
+        grouped.set(`individual-${rowIndex}-${item}`, importedGroupBase({ ...baseArgs, name: assetId ? `${assetId}${suffix}` : fallback, quantity: 1 }));
       }
       return;
     }
 
-    const key = `${technology}|${wattage}`;
+    const key = `${category}|${replacementRequirement}|${technology}|${wattage}|${operatingHours}`;
     const existing = grouped.get(key);
     if (existing) existing.quantity += quantity;
-    else grouped.set(key, importedGroupBase({ name: `${technology} ${wattage} W`, quantity, technology, wattage, ledProducts }));
+    else grouped.set(key, importedGroupBase({ ...baseArgs, name: suppliedName || `${category} · ${technology} ${wattage} W`, quantity }));
   });
 
-  const groups = [...grouped.values()].sort((a, b) => a.technology.localeCompare(b.technology) || a.existingWattage - b.existingWattage);
+  const groups = [...grouped.values()].sort((a, b) => (a.existingCategory || "").localeCompare(b.existingCategory || "") || a.technology.localeCompare(b.technology) || a.existingWattage - b.existingWattage);
   const totalQuantity = groups.reduce((sum, group) => sum + group.quantity, 0);
   return { groups, skipped, totalQuantity, message: language === "it" ? `${groups.length} gruppi, ${totalQuantity} apparecchi` : `${groups.length} groups, ${totalQuantity} luminaires` };
 }
@@ -183,7 +278,6 @@ export function parsePlannerWorkbook(sheets, ledProducts, fileName = "") {
   const inferredRow = rows.find(row => { const label = String(row?.[0] ?? "").trim(); return label && !isTotalLabel(label) && numberValue(row?.[1]) > 0; });
   if (pivot && (codeIndex < 0 || quantityIndex < 0) && inferredRow) { codeIndex = 0; quantityIndex = 1; if (powerSumIndex < 0 && inferredRow.length > 2) powerSumIndex = 2; }
   if (pivot && (codeIndex < 0 || quantityIndex < 0)) throw new Error("PIVOT does not contain readable product rows.");
-
   const centreRows = centre ? [centre.headers, ...centre.rows] : [];
   const centreHeader = centreRows[0] || [];
   const centreCodeIndex = centreHeader.findIndex(value => ["new code", "codifica armature"].includes(clean(value)));
@@ -205,7 +299,7 @@ export function parsePlannerWorkbook(sheets, ledProducts, fileName = "") {
     const proposedWattage = technical?.proposedCount ? technical.proposedTotal / technical.proposedCount : numberValue(row[powerSumIndex]) / quantity;
     const existingWattage = technical?.existingCount ? technical.existingTotal / technical.existingCount : proposedWattage;
     const product = closestProduct(proposedWattage);
-    return { id: uid(), name: code, quantity, technology: "OTHER", existingWattage: Math.round(existingWattage * 10) / 10, proposedProductId: product?.id || "", projectLedPrice: null, projectLedWattage: product?.wattage ?? Math.round(proposedWattage * 10) / 10, upgradeSelected: true, smartAssigned: true, powerAidAssigned: false, importedProductCode: code, importedProposedWattage: Math.round(proposedWattage * 10) / 10 };
+    return { id: uid(), name: code, quantity, technology: "OTHER", existingWattage: Math.round(existingWattage * 10) / 10, existingCategory: "OTHER", replacementRequirement: "UNKNOWN", proposedProductId: product?.id || "", projectLedPrice: null, projectLedWattage: product?.wattage ?? Math.round(proposedWattage * 10) / 10, upgradeSelected: true, smartAssigned: true, powerAidAssigned: false, importedProductCode: code, importedProposedWattage: Math.round(proposedWattage * 10) / 10 };
   }).filter(Boolean);
   if (!groups.length) throw new Error("No valid luminaires were found in the Planner workbook.");
   const totalQuantity = groups.reduce((sum, group) => sum + group.quantity, 0);
@@ -226,7 +320,7 @@ const crmImportNumberFields = new Set([
   "lamps","capex","contract_years","financing_years","saas_years","maintenance_opex_annual","cms_connectivity_annual","saas_poweraid_annual","total_opex_annual","customer_cost_financed_annual","customer_cost_cash_annual","co2_saving_annual_tons","energy_reduction_pct","customer_roi_years",
   "existing_luminaires","upgrade_luminaires","smart_connected_luminaires","upgrade_coverage_pct","annual_contract_revenue","tcv","npv","annual_energy_cost_before","annual_energy_cost_after","annual_energy_saving_eur","energy_saving_kwh","co2_reduction_tons","payback_years"
 ]);
-const rowsWithHeaders = (sheet) => sheet ? [sheet.headers || [], ...(sheet.rows || [])] : [];
+const rowsWithHeaders = sheet => sheet ? [sheet.headers || [], ...(sheet.rows || [])] : [];
 function findLabeledNumber(sheet, labels) {
   const wanted = labels.map(clean);
   for (const row of rowsWithHeaders(sheet)) for (let index = 0; index < row.length; index += 1) {
@@ -255,22 +349,13 @@ export function parseNoleggioWorkbook(sheets) {
   const upgradeLuminaires = Math.max(0, Math.round(values.upgrade_luminaires || values.lamps || existingLuminaires));
   const smartConnectedLuminaires = Math.max(0, Math.round(values.smart_connected_luminaires || 0));
   const standardKpis = {
-    existingLuminaires,
-    upgradeLuminaires,
-    smartConnectedLuminaires,
+    existingLuminaires, upgradeLuminaires, smartConnectedLuminaires,
     upgradeCoveragePct: values.upgrade_coverage_pct ? percentPoints(values.upgrade_coverage_pct) : (existingLuminaires ? upgradeLuminaires / existingLuminaires * 100 : 0),
     contractYears,
-    capex: presentPositive(values, "capex"),
-    annualContractRevenue: presentPositive(values, "annual_contract_revenue"),
-    tcv: presentPositive(values, "tcv"),
-    npv: presentPositive(values, "npv"),
-    annualEnergyCostBefore: presentPositive(values, "annual_energy_cost_before"),
-    annualEnergyCostAfter: presentPositive(values, "annual_energy_cost_after"),
-    annualEnergySavingEUR: presentPositive(values, "annual_energy_saving_eur"),
-    energySavingKwh: presentPositive(values, "energy_saving_kwh"),
+    capex: presentPositive(values, "capex"), annualContractRevenue: presentPositive(values, "annual_contract_revenue"), tcv: presentPositive(values, "tcv"), npv: presentPositive(values, "npv"),
+    annualEnergyCostBefore: presentPositive(values, "annual_energy_cost_before"), annualEnergyCostAfter: presentPositive(values, "annual_energy_cost_after"), annualEnergySavingEUR: presentPositive(values, "annual_energy_saving_eur"), energySavingKwh: presentPositive(values, "energy_saving_kwh"),
     energyReductionPct: values.energy_reduction_pct != null ? percentPoints(values.energy_reduction_pct) : undefined,
-    co2ReductionTons: presentPositive(values, "co2_reduction_tons") || presentPositive(values, "co2_saving_annual_tons"),
-    paybackYears: presentPositive(values, "payback_years") || presentPositive(values, "customer_roi_years"),
+    co2ReductionTons: presentPositive(values, "co2_reduction_tons") || presentPositive(values, "co2_saving_annual_tons"), paybackYears: presentPositive(values, "payback_years") || presentPositive(values, "customer_roi_years"),
   };
   Object.keys(standardKpis).forEach(key => standardKpis[key] == null && delete standardKpis[key]);
   return { source: "CRM_IMPORT + customer offer validation", mappingVersion: 3, projectName: values.project_name, customerName: values.customer_name || values.project_name, quotationId: values.quotation_id || "", lamps: upgradeLuminaires, capex: cents(values.capex || 0), contractYears, financingYears, serviceContractYears: contractYears, interestRate: cents(interestRate), allInclusiveAnnualPayment, totalCustomerPayments: cents(offerTotalPayments || allInclusiveAnnualPayment * financingYears), annualOpex: cents(values.total_opex_annual || 0), cmsAnnual: cents(values.cms_connectivity_annual || 0), maintenanceAnnual: cents(values.maintenance_opex_annual || 0), powerAidAnnual: cents(values.saas_poweraid_annual || 0), co2SavingTons: standardKpis.co2ReductionTons || 0, energyReductionPercent: standardKpis.energyReductionPct || 0, customerRoiYears: standardKpis.paybackYears || 0, pdfFile: values.pdf_file || "", standardKpis, warnings, raw: values };
