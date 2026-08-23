@@ -1,0 +1,83 @@
+const CATEGORY_CODES = new Set(["STREET", "URBAN", "GLOBO", "FLOODLIGHT", "UPLIGHT", "LANTERN", "RETROFIT_KIT", "OTHER"]);
+const STRATEGY_CODES = new Set(["REPLACE", "RETROFIT", "EITHER", "UNKNOWN"]);
+
+const asArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (value == null || value === "") return [];
+  return String(value).split(/[,;|]/).map((item) => item.trim()).filter(Boolean);
+};
+
+const upper = (value) => String(value || "").trim().toUpperCase().replace(/[ -]+/g, "_");
+
+export function normalizeProductCategory(value) {
+  const code = upper(value);
+  if (CATEGORY_CODES.has(code)) return code;
+  if (["ROAD", "STREETLIGHT", "COBRA", "COBRA_HEAD"].includes(code)) return "STREET";
+  if (["DECORATIVE", "URBAN_LIGHT", "ARREDO_URBANO"].includes(code)) return "URBAN";
+  if (["GLOBE"].includes(code)) return "GLOBO";
+  if (["FLOOD", "PROJECTOR", "PROIETTORE"].includes(code)) return "FLOODLIGHT";
+  if (["IN_GROUND", "INGROUND", "INCASSO"].includes(code)) return "UPLIGHT";
+  if (["LANTERNA"].includes(code)) return "LANTERN";
+  if (["RETROFIT", "RETROFITKIT", "RETROFIT_KIT"].includes(code)) return "RETROFIT_KIT";
+  return "OTHER";
+}
+
+export function normalizeReplacementStrategy(value) {
+  const code = upper(value);
+  if (STRATEGY_CODES.has(code)) return code;
+  if (["COMPLETE_REPLACEMENT", "SOSTITUZIONE_COMPLETA"].includes(code)) return "REPLACE";
+  if (["BOTH", "BOTH_OPTIONS", "ENTRAMBE_LE_OPZIONI"].includes(code)) return "EITHER";
+  return "UNKNOWN";
+}
+
+export function normalizeCatalogueProduct(product = {}) {
+  const productCategory = normalizeProductCategory(product.productCategory || product.category || product.type);
+  const compatibleExistingCategories = asArray(product.compatibleExistingCategories || product.compatibleCategories)
+    .map(normalizeProductCategory)
+    .filter((value, index, all) => value && all.indexOf(value) === index);
+  const replacementStrategies = asArray(product.replacementStrategies || product.replacementStrategy)
+    .map(normalizeReplacementStrategy)
+    .filter((value, index, all) => value && value !== "UNKNOWN" && all.indexOf(value) === index);
+  return {
+    ...product,
+    model: product.model || product.name || "",
+    productCategory,
+    compatibleExistingCategories,
+    replacementStrategies,
+    efficiency: Number(product.efficiency || 0) || (Number(product.wattage) > 0 ? Number(product.lumen || 0) / Number(product.wattage) : 0),
+    cct: product.cct ?? "",
+    ip: product.ip ?? "",
+    ik: product.ik ?? "",
+    cri: product.cri ?? "",
+    protectionClass: product.protectionClass ?? "",
+    lifetime: Number(product.lifetime || 0) || 0,
+    zhaga: Boolean(product.zhaga),
+    d4iDriver: Boolean(product.d4iDriver),
+    photometryUrl: product.photometryUrl || "",
+    techSheetUrl: product.techSheetUrl || product.certsTechSheetUrl || "",
+  };
+}
+
+export function isCatalogueProductCompatible(product, existingCategory = "OTHER", replacementRequirement = "UNKNOWN") {
+  const normalized = normalizeCatalogueProduct(product);
+  const existing = normalizeProductCategory(existingCategory);
+  const requirement = normalizeReplacementStrategy(replacementRequirement);
+
+  // Legacy catalogue rows without compatibility metadata remain selectable until the master catalogue is migrated.
+  const categoryOk = normalized.compatibleExistingCategories.length === 0
+    || normalized.compatibleExistingCategories.includes(existing)
+    || normalized.compatibleExistingCategories.includes("OTHER");
+
+  const strategyOk = normalized.replacementStrategies.length === 0
+    || requirement === "UNKNOWN"
+    || requirement === "EITHER"
+    || normalized.replacementStrategies.includes(requirement)
+    || normalized.replacementStrategies.includes("EITHER");
+
+  return categoryOk && strategyOk;
+}
+
+export function compatibleLedProducts(products = [], existingCategory = "OTHER", replacementRequirement = "UNKNOWN") {
+  return products.filter((product) => product?.active !== false)
+    .filter((product) => isCatalogueProductCompatible(product, existingCategory, replacementRequirement));
+}
