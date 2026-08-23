@@ -14,14 +14,24 @@ const products = [
   { id: "led-70", wattage: 70, active: true },
 ];
 
-test("Italian VML input sheet uses B technology, C wattage and D quantity", () => {
+test("Italian VML v2.3 input sheet maps semantic headers independent of position", () => {
   const headers = applyOfficialInputSheetLayout("ProjectInputSheet_ITA", [
-    "Column 1", "Column 2", "Column 3", "Column 4", "Column 5", "Column 6", "Column 7",
+    "Localizzazione / gruppo *",
+    "Categoria apparecchio *",
+    "Wattaggio attuale (W) *",
+    "Tecnologia attuale *",
+    "N. apparecchi *",
+    "Ore funzionamento annue *",
+    "Modalità di sostituzione",
   ]);
   const mapping = guessLightingMapping(headers);
-  assert.equal(mapping.technology, "1");
+  assert.equal(mapping.name, "0");
+  assert.equal(mapping.category, "1");
   assert.equal(mapping.wattage, "2");
-  assert.equal(mapping.quantity, "3");
+  assert.equal(mapping.technology, "3");
+  assert.equal(mapping.quantity, "4");
+  assert.equal(mapping.operatingHours, "5");
+  assert.equal(mapping.replacementRequirement, "6");
 });
 
 test("wattage values with W suffix are parsed", () => {
@@ -30,7 +40,7 @@ test("wattage values with W suffix are parsed", () => {
   assert.equal(parseWattageValue("70,5W"), 70.5);
 });
 
-test("Riccardo-style Italian input rows import 45 luminaires", () => {
+test("legacy Riccardo-style Italian rows still import 45 luminaires with explicit mapping", () => {
   const rows = [
     ["", "SAP", "150W", 35, "", "", "", "", 4200],
     ["", "LED", "100W", 10, "", "", "", "", 4200],
