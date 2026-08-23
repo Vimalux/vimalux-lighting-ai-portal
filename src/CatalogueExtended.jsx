@@ -24,9 +24,9 @@ function TechnicalDetails({ product, index, update, it }) {
     <label><span>CRI</span><input value={product.cri || ""} onChange={(e) => set("cri", e.target.value)} placeholder=">=70" /></label>
     <label><span>{it ? "Classe protezione" : "Protection class"}</span><input value={product.protectionClass || ""} onChange={(e) => set("protectionClass", e.target.value)} placeholder="Class II" /></label>
     <label><span>{it ? "Vita utile (h)" : "Lifetime (h)"}</span><NumericField value={product.lifetime || 0} onChange={(v) => set("lifetime", v)} /></label>
-    <label className="catalogue-checkbox"><span>Zhaga</span><input type="checkbox" checked={yesNo(product.zhaga)} onChange={(e) => set("zhaga", e.target.checked)} /></label>
-    <label className="catalogue-checkbox"><span>D4i Driver</span><input type="checkbox" checked={yesNo(product.d4iDriver)} onChange={(e) => set("d4iDriver", e.target.checked)} /></label>
-    <label className="catalogue-url"><span>Photometry URL</span><input value={product.photometryUrl || ""} onChange={(e) => set("photometryUrl", e.target.value)} /></label>
+    <label className="catalogue-checkbox"><span>{it ? "Compatibile Zhaga" : "Zhaga capable"}</span><input type="checkbox" checked={yesNo(product.zhaga)} onChange={(e) => set("zhaga", e.target.checked)} /></label>
+    <label className="catalogue-checkbox"><span>{it ? "Compatibile D4i" : "D4i capable"}</span><input type="checkbox" checked={yesNo(product.d4iDriver)} onChange={(e) => set("d4iDriver", e.target.checked)} /></label>
+    <label className="catalogue-url"><span>{it ? "Riferimento fotometria / Planner" : "Photometry / Planner reference"}</span><input value={product.photometryUrl || ""} onChange={(e) => set("photometryUrl", e.target.value)} /></label>
     <label className="catalogue-url"><span>{it ? "Scheda tecnica / certificati URL" : "Tech sheet / certs URL"}</span><input value={product.techSheetUrl || ""} onChange={(e) => set("techSheetUrl", e.target.value)} /></label>
   </div>;
 }
@@ -85,8 +85,8 @@ export default function CatalogueExtended({ p, update }) {
         <div>
           <h2>{it ? "Armature LED e Retrofit" : "LED luminaires & Retrofit"}</h2>
           <p className="hint">{it
-            ? "Struttura comune Intelligence + Planner. Categoria, compatibilità e strategia determinano quali prodotti possono essere assegnati a una lampada esistente."
-            : "Shared Intelligence + Planner structure. Category, compatibility and strategy determine which products can be assigned to an existing luminaire."}</p>
+            ? "Master catalogo Intelligence. Categoria, compatibilità, strategia, prestazioni, prezzi e capability Smart vengono usati nel Business Case; CCT, ottiche, interfaccia, colore e codice variante definitivo vengono configurati in Planner."
+            : "Intelligence master catalogue. Category, compatibility, strategy, performance, pricing and Smart capabilities are used in the Business Case; exact CCT, optics, interface, colour and final variant code are configured in Planner."}</p>
         </div>
         <button className="primary" onClick={addLed}>+ {it ? "Nuovo prodotto" : "New product"}</button>
       </div>
