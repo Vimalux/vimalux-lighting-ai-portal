@@ -26,11 +26,23 @@ const numberValue = (value) => {
 const yesNo = (value) => ["YES", "Y", "TRUE", "1", "SI", "SÌ"].includes(upper(value));
 const listValue = (value) => clean(value).split(/[,;|]/).map((item) => item.trim().toUpperCase()).filter(Boolean);
 
-function findHeaderRow(rows = []) {
-  return rows.findIndex((row) => row.some((cell) => clean(cell) === "Product ID *"));
+export function normalizeCatalogueSheetRows(value) {
+  if (Array.isArray(value)) {
+    if (value.every((row) => Array.isArray(row))) return value;
+    if (value.length === 1 && value[0] && Array.isArray(value[0].rows)) return value[0].rows;
+    if (value.length === 1 && value[0] && Array.isArray(value[0].data)) return value[0].data;
+  }
+  if (value && Array.isArray(value.rows)) return value.rows;
+  if (value && Array.isArray(value.data)) return value.data;
+  return [];
 }
 
-export function parseCatalogueRows(rows = []) {
+function findHeaderRow(rows = []) {
+  return rows.findIndex((row) => Array.isArray(row) && row.some((cell) => clean(cell) === "Product ID *"));
+}
+
+export function parseCatalogueRows(input = []) {
+  const rows = normalizeCatalogueSheetRows(input);
   const headerIndex = findHeaderRow(rows);
   if (headerIndex < 0) throw new Error('Header "Product ID *" not found in Catalogo_Prodotti.');
 
@@ -45,7 +57,7 @@ export function parseCatalogueRows(rows = []) {
   const ids = new Set();
 
   rows.slice(headerIndex + 1).forEach((row, offset) => {
-    if (!row?.some((cell) => clean(cell))) return;
+    if (!Array.isArray(row) || !row.some((cell) => clean(cell))) return;
     const excelRow = headerIndex + offset + 2;
     const id = clean(read(row, "Product ID *"));
     if (!id) return;
@@ -122,6 +134,8 @@ export function mergeCatalogueProducts(existing = [], imported = []) {
 
 export async function readProductCatalogueWorkbook(file) {
   if (!/\.xlsx$/i.test(file?.name || "")) throw new Error("Product catalogue import requires an .xlsx file.");
-  const rows = await readExcelFile(file, { sheet: "Catalogo_Prodotti" });
+  const result = await readExcelFile(file, { sheet: "Catalogo_Prodotti" });
+  const rows = normalizeCatalogueSheetRows(result);
+  if (!rows.length) throw new Error("Catalogo_Prodotti could not be read from the workbook.");
   return parseCatalogueRows(rows);
 }
