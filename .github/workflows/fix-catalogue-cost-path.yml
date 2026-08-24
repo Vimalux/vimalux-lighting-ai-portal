@@ -1,0 +1,34 @@
+name: Fix catalogue Smart cost path
+on:
+  push:
+    paths:
+      - '.github/fix-catalogue-cost-path.trigger'
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Fix path and verify CCT CRI UI
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/CatalogueExtended.jsx')
+          s = p.read_text()
+          s = s.replace('update(["catalogue", "smart", i, "costPrice", v])', 'update(["catalogue", "smart", i, "costPrice"], v)')
+          if 'CCT/CRI Code' not in s or 'cctCriCode' not in s:
+              raise SystemExit('CCT/CRI UI fields missing')
+          p.write_text(s)
+          PY
+          npm test
+          npm run build
+      - name: Commit fix
+        run: |
+          git config user.name "VIMALUX Automation"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          git add src/CatalogueExtended.jsx
+          git diff --cached --quiet || git commit -m "Fix Smart catalogue cost editor after CCT CRI update"
+          git push origin HEAD:main
