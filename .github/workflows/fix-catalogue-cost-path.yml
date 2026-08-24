@@ -18,7 +18,7 @@ jobs:
           from pathlib import Path
           p = Path('src/CatalogueExtended.jsx')
           s = p.read_text()
-          s = s.replace('update(["catalogue", "smart", i, "costPrice", v])', 'update(["catalogue", "smart", i, "costPrice"], v)')
+          s = s.replace('update(["catalogue", "smart", i, "costPrice", v)', 'update(["catalogue", "smart", i, "costPrice"], v)')
           if 'CCT/CRI Code' not in s or 'cctCriCode' not in s:
               raise SystemExit('CCT/CRI UI fields missing')
           p.write_text(s)
