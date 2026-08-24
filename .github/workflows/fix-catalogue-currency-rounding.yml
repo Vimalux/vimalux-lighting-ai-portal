@@ -1,0 +1,36 @@
+name: Fix catalogue currency rounding
+on:
+  push:
+    paths:
+      - '.github/fix-catalogue-currency-rounding.trigger'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch catalogue currency import
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/catalogueImport.js')
+          s = p.read_text()
+          old = '''    const costPrice = numberValue(read(row, "Cost Price (€) *"));\n    const salesPrice = numberValue(read(row, "Standard Sales Price (€) *"));'''
+          new = '''    const costPrice = Math.round(numberValue(read(row, "Cost Price (€) *")) * 100) / 100;\n    const salesPrice = Math.round(numberValue(read(row, "Standard Sales Price (€) *")) * 100) / 100;'''
+          if old not in s:
+              raise SystemExit('Target price parsing block not found')
+          s = s.replace(old, new)
+          p.write_text(s)
+          PY
+          npm test
+          npm run build
+      - name: Commit patch
+        run: |
+          git config user.name "VIMALUX Automation"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          git add src/catalogueImport.js
+          git diff --cached --quiet || git commit -m "Round catalogue currency fields on Excel import"
+          git push origin HEAD:main
