@@ -45,6 +45,8 @@ export function normalizeCatalogueProduct(product = {}) {
     compatibleExistingCategories,
     replacementStrategies,
     efficiency: Number(product.efficiency || 0) || (Number(product.wattage) > 0 ? Number(product.lumen || 0) / Number(product.wattage) : 0),
+    cctCriCode: String(product.cctCriCode ?? product.cctCri ?? "").trim(),
+    // Legacy fields are retained for existing catalogue rows, but new performance variants use cctCriCode (730/740/830/840 etc.).
     cct: product.cct ?? "",
     ip: product.ip ?? "",
     ik: product.ik ?? "",
