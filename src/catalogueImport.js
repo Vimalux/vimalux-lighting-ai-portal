@@ -132,10 +132,31 @@ export function mergeCatalogueProducts(existing = [], imported = []) {
   };
 }
 
+export function selectCatalogueSheet(workbook = []) {
+  if (!Array.isArray(workbook)) return null;
+  const sheets = workbook.filter((item) => item && !Array.isArray(item) && typeof item === "object");
+  if (!sheets.length) return null;
+  const target = sheets.find((item) => clean(item.sheet).toLowerCase() === "catalogo_prodotti");
+  return target || null;
+}
+
 export async function readProductCatalogueWorkbook(file) {
   if (!/\.xlsx$/i.test(file?.name || "")) throw new Error("Product catalogue import requires an .xlsx file.");
-  const result = await readExcelFile(file, { sheet: "Catalogo_Prodotti" });
-  const rows = normalizeCatalogueSheetRows(result);
+
+  // read-excel-file v8+ default export returns all workbook sheets as
+  // [{ sheet: 'Name', data: [...] }, ...]. Read the workbook first and then
+  // explicitly select Catalogo_Prodotti instead of passing the old sheet option.
+  const workbook = await readExcelFile(file);
+  const target = selectCatalogueSheet(workbook);
+
+  if (!target) {
+    const available = Array.isArray(workbook)
+      ? workbook.map((item) => clean(item?.sheet)).filter(Boolean).join(", ")
+      : "";
+    throw new Error(`Catalogo_Prodotti not found in workbook.${available ? ` Available sheets: ${available}` : ""}`);
+  }
+
+  const rows = normalizeCatalogueSheetRows(target.data);
   if (!rows.length) throw new Error("Catalogo_Prodotti could not be read from the workbook.");
   return parseCatalogueRows(rows);
 }
