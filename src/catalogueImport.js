@@ -71,8 +71,8 @@ export function parseCatalogueRows(input = []) {
     const wattage = numberValue(read(row, "Wattage (W) *"));
     const lumen = numberValue(read(row, "Lumens"));
     const efficiency = numberValue(read(row, "Efficiency (lm/W)")) || (wattage > 0 && lumen > 0 ? lumen / wattage : 0);
-    const costPrice = numberValue(read(row, "Cost Price (€) *"));
-    const salesPrice = numberValue(read(row, "Standard Sales Price (€) *"));
+    const costPrice = Math.round(numberValue(read(row, "Cost Price (€) *")) * 100) / 100;
+    const salesPrice = Math.round(numberValue(read(row, "Standard Sales Price (€) *")) * 100) / 100;
 
     if (!model) errors.push(`Row ${excelRow}: Product Family / Wattage Version is required`);
     if (!(wattage > 0)) errors.push(`Row ${excelRow}: Wattage must be greater than 0`);
