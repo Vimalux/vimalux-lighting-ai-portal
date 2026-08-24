@@ -19,10 +19,9 @@ function NumericField({ value, onChange }) {
 function TechnicalDetails({ product, index, update, it }) {
   const set = (field, value) => update(["catalogue", "led", index, field], value);
   return <div className="catalogue-tech-grid">
-    <label><span>CCT</span><input value={product.cct || ""} onChange={(e) => set("cct", e.target.value)} placeholder="3000K, 4000K" /></label>
+    <label><span>CCT/CRI Code</span><input value={product.cctCriCode || ""} onChange={(e) => set("cctCriCode", e.target.value.trim())} placeholder="730 / 740 / 830 / 840" /></label>
     <label><span>IP</span><input value={product.ip || ""} onChange={(e) => set("ip", e.target.value)} placeholder="IP66" /></label>
     <label><span>IK</span><input value={product.ik || ""} onChange={(e) => set("ik", e.target.value)} placeholder="IK09" /></label>
-    <label><span>CRI</span><input value={product.cri || ""} onChange={(e) => set("cri", e.target.value)} placeholder=">=70" /></label>
     <label><span>{it ? "Classe protezione" : "Protection class"}</span><input value={product.protectionClass || ""} onChange={(e) => set("protectionClass", e.target.value)} placeholder="Class II" /></label>
     <label><span>{it ? "Vita utile (h)" : "Lifetime (h)"}</span><NumericField value={product.lifetime || 0} onChange={(v) => set("lifetime", v)} /></label>
     <label className="catalogue-checkbox"><span>{it ? "Compatibile Zhaga" : "Zhaga capable"}</span><input type="checkbox" checked={yesNo(product.zhaga)} onChange={(e) => set("zhaga", e.target.checked)} /></label>
@@ -51,10 +50,9 @@ export default function CatalogueExtended({ p, update }) {
       wattage: 0,
       lumen: 0,
       efficiency: 0,
-      cct: "",
+      cctCriCode: "",
       ip: "",
       ik: "",
-      cri: "",
       protectionClass: "",
       lifetime: 0,
       zhaga: false,
@@ -87,8 +85,8 @@ export default function CatalogueExtended({ p, update }) {
         <div>
           <h2>{it ? "Armature LED e Retrofit" : "LED luminaires & Retrofit"}</h2>
           <p className="hint">{it
-            ? "Master catalogo Intelligence. Categoria, compatibilità, strategia, prestazioni, prezzi e capability Smart vengono usati nel Business Case; CCT, ottiche, interfaccia, colore e codice variante definitivo vengono configurati in Planner."
-            : "Intelligence master catalogue. Category, compatibility, strategy, performance, pricing and Smart capabilities are used in the Business Case; exact CCT, optics, interface, colour and final variant code are configured in Planner."}</p>
+            ? "Master catalogo Intelligence. Categoria, compatibilità, strategia, codice CCT/CRI, prestazioni, prezzi e capability Smart vengono usati nel Business Case; ottiche, interfaccia, colore e codice variante definitivo vengono configurati in Planner."
+            : "Intelligence master catalogue. Category, compatibility, strategy, CCT/CRI performance code, performance, pricing and Smart capabilities are used in the Business Case; optics, interface, colour and final variant code are configured in Planner."}</p>
         </div>
         <button className="primary" onClick={addLed}>+ {it ? "Nuovo prodotto" : "New product"}</button>
       </div>
@@ -132,14 +130,14 @@ export default function CatalogueExtended({ p, update }) {
             <td><button className="secondary" onClick={() => setExpanded((current) => ({ ...current, [product.id || index]: !current[product.id || index] }))}>{expanded[product.id || index] ? (it ? "Chiudi" : "Close") : (it ? "Dettagli" : "Details")}</button></td>
             <td><button className="danger" onClick={() => remove("led", index)}>{it ? "Elimina" : "Delete"}</button></td>
           </tr>
-          {expanded[product.id || index] && <tr className="catalogue-tech-row"><td colSpan="13"><TechnicalDetails product={source} index={index} update={update} it={it} /></td></tr>}
+          {expanded[product.id || index] && <tr className="catalogue-tech-row"><td colSpan="13"><TechnicalDetails product={normalizeCatalogueProduct(source)} index={index} update={update} it={it} /></td></tr>}
         </React.Fragment>;
       })}</tbody></table></div>
     </section>
 
     <section className="card">
       <div className="catalogue-title-row"><div><h2>Smart Lighting</h2><p className="hint">LCU, Gateway, Antenna, Energy Meter e relativi costi/OPEX.</p></div><button className="primary" onClick={addSmart}>+ {it ? "Nuovo prodotto Smart" : "New Smart product"}</button></div>
-      <div className="table-scroll"><table><thead><tr>{["Brand", it ? "Prodotto" : "Product", it ? "Tipo" : "Type", it ? "Costo" : "Cost", it ? "Prezzo standard" : "Standard sales", it ? "Costo implementazione" : "Implementation cost", it ? "Prezzo implementazione" : "Implementation sales", it ? "Costo annuo" : "Annual cost", it ? "Prezzo annuo cliente" : "Annual customer sales", it ? "Attivo" : "Active", ""].map((x) => <th key={x}>{x}</th>)}</tr></thead><tbody>{(p.catalogue?.smart || []).map((x, i) => <tr key={x.id}><td><input value={x.brand || ""} onChange={(e) => update(["catalogue", "smart", i, "brand"], e.target.value)} /></td><td><input value={x.name || ""} onChange={(e) => update(["catalogue", "smart", i, "name"], e.target.value)} /></td><td><select value={x.type} onChange={(e) => update(["catalogue", "smart", i, "type"], e.target.value)}>{["LCU", "Gateway", "Antenna", "Energy Meter", "Other"].map((type) => <option key={type} value={type}>{type}</option>)}</select></td><td><NumericField value={x.costPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "costPrice"], v)} /></td><td><NumericField value={x.salesPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "salesPrice"], v)} /></td><td><NumericField value={x.implementationCost || 0} onChange={(v) => update(["catalogue", "smart", i, "implementationCost"], v)} /></td><td><NumericField value={x.implementationSalesPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "implementationSalesPrice"], v)} /></td><td><NumericField value={x.annualCost || 0} onChange={(v) => update(["catalogue", "smart", i, "annualCost"], v)} /></td><td><NumericField value={x.annualSalesPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "annualSalesPrice"], v)} /></td><td><input type="checkbox" checked={x.active !== false} onChange={(e) => update(["catalogue", "smart", i, "active"], e.target.checked)} /></td><td><button className="danger" onClick={() => remove("smart", i)}>{it ? "Elimina" : "Delete"}</button></td></tr>)}</tbody></table></div>
+      <div className="table-scroll"><table><thead><tr>{["Brand", it ? "Prodotto" : "Product", it ? "Tipo" : "Type", it ? "Costo" : "Cost", it ? "Prezzo standard" : "Standard sales", it ? "Costo implementazione" : "Implementation cost", it ? "Prezzo implementazione" : "Implementation sales", it ? "Costo annuo" : "Annual cost", it ? "Prezzo annuo cliente" : "Annual customer sales", it ? "Attivo" : "Active", ""].map((x) => <th key={x}>{x}</th>)}</tr></thead><tbody>{(p.catalogue?.smart || []).map((x, i) => <tr key={x.id}><td><input value={x.brand || ""} onChange={(e) => update(["catalogue", "smart", i, "brand"], e.target.value)} /></td><td><input value={x.name || ""} onChange={(e) => update(["catalogue", "smart", i, "name"], e.target.value)} /></td><td><select value={x.type} onChange={(e) => update(["catalogue", "smart", i, "type"], e.target.value)}>{["LCU", "Gateway", "Antenna", "Energy Meter", "Other"].map((type) => <option key={type} value={type}>{type}</option>)}</select></td><td><NumericField value={x.costPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "costPrice", v)} /></td><td><NumericField value={x.salesPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "salesPrice"], v)} /></td><td><NumericField value={x.implementationCost || 0} onChange={(v) => update(["catalogue", "smart", i, "implementationCost"], v)} /></td><td><NumericField value={x.implementationSalesPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "implementationSalesPrice"], v)} /></td><td><NumericField value={x.annualCost || 0} onChange={(v) => update(["catalogue", "smart", i, "annualCost"], v)} /></td><td><NumericField value={x.annualSalesPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "annualSalesPrice"], v)} /></td><td><input type="checkbox" checked={x.active !== false} onChange={(e) => update(["catalogue", "smart", i, "active"], e.target.checked)} /></td><td><button className="danger" onClick={() => remove("smart", i)}>{it ? "Elimina" : "Delete"}</button></td></tr>)}</tbody></table></div>
     </section>
   </>;
 }
