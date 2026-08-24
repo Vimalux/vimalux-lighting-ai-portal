@@ -17,15 +17,41 @@ patch('src/App.jsx', [[
   '<CatalogueExtended p={project} update={update} projects={projects} />'
 ]]);
 
+const oldRemove = `  const remove = (kind, index) => {\n    if (confirm(it ? "Eliminare questo prodotto dal catalogo?" : "Delete this product from the catalogue?")) {\n      update(["catalogue", kind], p.catalogue[kind].filter((_, i) => i !== index));\n    }\n  };`;
+
+const newRemove = [
+  '  const remove = (kind, index) => {',
+  '    const item = p.catalogue?.[kind]?.[index];',
+  '    if (!item) return;',
+  '    if (kind === "led") {',
+  '      if (item.active !== false) {',
+  '        alert(it ? "Disattivare il prodotto prima di eliminarlo." : "Deactivate the product before deleting it.");',
+  '        return;',
+  '      }',
+  '      const references = (projects || []).filter((project) =>',
+  '        (project.groups || []).some((group) => group.proposedProductId === item.id)',
+  '      );',
+  '      if (references.length) {',
+  '        const names = references.map((project) => project.project?.name || project.name || project.project?.businessCaseId || "Business Case").join(", ");',
+  '        const message = it',
+  '          ? "Impossibile eliminare " + item.id + ": ancora utilizzato in " + references.length + " Business Case (" + names + ")."',
+  '          : "Cannot delete " + item.id + ": still used in " + references.length + " Business Case(s) (" + names + ").";',
+  '        alert(message);',
+  '        return;',
+  '      }',
+  '    }',
+  '    if (confirm(it ? "Eliminare definitivamente questo prodotto dal catalogo?" : "Permanently delete this product from the catalogue?")) {',
+  '      update(["catalogue", kind], p.catalogue[kind].filter((_, i) => i !== index));',
+  '    }',
+  '  };',
+].join('\n');
+
 patch('src/CatalogueExtended.jsx', [
   [
     'export default function CatalogueExtended({ p, update }) {',
     'export default function CatalogueExtended({ p, update, projects = [] }) {'
   ],
-  [
-`  const remove = (kind, index) => {\n    if (confirm(it ? "Eliminare questo prodotto dal catalogo?" : "Delete this product from the catalogue?")) {\n      update(["catalogue", kind], p.catalogue[kind].filter((_, i) => i !== index));\n    }\n  };`,
-`  const remove = (kind, index) => {\n    const item = p.catalogue?.[kind]?.[index];\n    if (!item) return;\n    if (kind === "led") {\n      if (item.active !== false) {\n        alert(it ? "Disattivare il prodotto prima di eliminarlo." : "Deactivate the product before deleting it.");\n        return;\n      }\n      const references = (projects || []).filter((project) =>\n        (project.groups || []).some((group) => group.proposedProductId === item.id)\n      );\n      if (references.length) {\n        const names = references.map((project) => project.project?.name || project.name || project.project?.businessCaseId || "Business Case").join(", ");\n        alert(it\n          ? `Impossibile eliminare ${item.id}: ancora utilizzato in ${references.length} Business Case (${names}).`\n          : `Cannot delete ${item.id}: still used in ${references.length} Business Case(s) (${names}).`);\n        return;\n      }\n    }\n    if (confirm(it ? "Eliminare definitivamente questo prodotto dal catalogo?" : "Permanently delete this product from the catalogue?")) {\n      update(["catalogue", kind], p.catalogue[kind].filter((_, i) => i !== index));\n    }\n  };`
-  ],
+  [oldRemove, newRemove],
   [
     '<td><button className="danger" onClick={() => remove("led", index)}>{it ? "Elimina" : "Delete"}</button></td>',
     '<td>{source.active === false ? <button className="danger" onClick={() => remove("led", index)}>{it ? "Elimina" : "Delete"}</button> : <span className="catalogue-readonly">—</span>}</td>'
