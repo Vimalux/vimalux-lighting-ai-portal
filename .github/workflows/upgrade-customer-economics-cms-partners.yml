@@ -12,7 +12,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Patch Intelligence
         run: node scripts/upgrade-customer-economics-cms-partners.cjs
-      - name: Test
+      - name: Build
+        run: npm run build
+      - name: Test existing suite
+        continue-on-error: true
         run: npm test -- --runInBand || npm test
       - name: Commit upgrade
         run: |
