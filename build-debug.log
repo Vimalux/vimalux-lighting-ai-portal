@@ -1,0 +1,22 @@
+
+> vimalux-lighting-ai-portal@1.0.0 prebuild
+> node scripts/fix-catalogue-source.cjs && node scripts/fix-legacy-product-selection.cjs && node scripts/fix-safe-catalogue-delete.cjs && node scripts/add-vat-model.cjs && node scripts/add-agent-vat-lock-note.cjs && node scripts/add-smart-catalogue-tabs.cjs
+
+Legacy project product selector patched
+Safe catalogue delete patch applied
+/home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/scripts/add-vat-model.cjs:7
+    if (!source.includes(before)) throw new Error(`VAT patch target not found in ${path}: ${before.slice(0, 100)}`);
+                                  ^
+
+Error: VAT patch target not found in src/App.jsx: <Kpis p={p} r={r} t={t} money={money} num={num} /><div className="two-col">
+    at patch (/home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/scripts/add-vat-model.cjs:7:41)
+    at Object.<anonymous> (/home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/scripts/add-vat-model.cjs:18:1)
+    at Module._compile (node:internal/modules/cjs/loader:1781:14)
+    at Object..js (node:internal/modules/cjs/loader:1913:10)
+    at Module.load (node:internal/modules/cjs/loader:1505:32)
+    at Function._load (node:internal/modules/cjs/loader:1309:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:254:19)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.23.2
