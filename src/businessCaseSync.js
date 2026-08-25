@@ -3,6 +3,16 @@ import { applyWarrantyPricing, projectWarranty } from "./warranty.js";
 
 const positive = (value) => Math.max(0, numberValue(value));
 
+function selectedCmsPartner(project) {
+  if (!project?.solution?.smartEnabled || !project?.solution?.cmsEnabled) return "";
+  const selected = (project.catalogue?.smart || []).find((item) => String(item?.id || "") === String(project.solution?.lcuProductId || ""));
+  const explicit = project.solution?.cmsPartner || selected?.cmsPartner || selected?.vendor || selected?.manufacturer;
+  if (String(explicit || "").trim()) return String(explicit).trim();
+  const brand = String(selected?.brand || "").trim();
+  if (brand && brand.toUpperCase() !== "VIMALUX") return brand;
+  return "DATEK";
+}
+
 export function buildBusinessCaseSnapshot(project, calculatedAt = new Date().toISOString()) {
   const result = calculateBusinessCase(applyWarrantyPricing(project));
   const warranty = projectWarranty(project);
@@ -11,6 +21,7 @@ export function buildBusinessCaseSnapshot(project, calculatedAt = new Date().toI
   const smartConnectedLuminaires = positive(result.lcuQuantity);
   const energyPrice = positive(project.assumptions?.energyPrice);
   const projectLineageId = project.crm?.projectLineageId || project.project?.projectLineageId || "";
+  const cmsPartner = selectedCmsPartner(project);
   const legacyKpis = project.importedCommercial?.standardKpis && typeof project.importedCommercial.standardKpis === "object"
     ? project.importedCommercial.standardKpis
     : null;
@@ -51,6 +62,7 @@ export function buildBusinessCaseSnapshot(project, calculatedAt = new Date().toI
     co2ReductionTons: result.co2ReductionKg / 1000,
 
     smartNodeCount: smartConnectedLuminaires,
+    cmsPartner,
     datekArr: result.cmsRevenue,
     datekContractValue: result.cmsRevenue && result.serviceAgreementPeriod
       ? Array.from({ length: result.serviceAgreementPeriod }, (_, index) => result.cmsRevenue * Math.pow(1 + positive(project.assumptions?.opexEscalation) / 100, index)).reduce((sum, value) => sum + value, 0)
