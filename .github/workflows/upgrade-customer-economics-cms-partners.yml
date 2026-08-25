@@ -15,10 +15,12 @@ jobs:
       - name: Patch and validate Intelligence
         run: |
           node scripts/upgrade-customer-economics-cms-partners.cjs
-          if npm run build > build-debug.log 2>&1; then
+          npm run prebuild
+          if npx vite build > build-debug.log 2>&1; then
             echo OK > build-status.txt
           else
             echo FAILED > build-status.txt
+            tail -n 100 build-debug.log > build-error-tail.txt
             git restore src/App.jsx src/partners.js
           fi
       - name: Commit result or diagnostics
@@ -26,11 +28,11 @@ jobs:
           git config user.name "VIMALUX Automation"
           git config user.email "99176508+Vimalux@users.noreply.github.com"
           if grep -q OK build-status.txt; then
-            rm -f build-debug.log build-status.txt
-            git add -A src/App.jsx src/partners.js build-debug.log build-status.txt
+            rm -f build-debug.log build-status.txt build-error-tail.txt
+            git add -A src/App.jsx src/partners.js build-debug.log build-status.txt build-error-tail.txt
             git diff --cached --quiet || git commit -m "Simplify customer economics and generalize CMS partner pipeline"
           else
-            git add build-debug.log build-status.txt
-            git commit -m "Capture Intelligence upgrade build error"
+            git add build-debug.log build-status.txt build-error-tail.txt
+            git commit -m "Capture Intelligence Vite build error"
           fi
           git push origin HEAD:main
