@@ -25,7 +25,7 @@ jobs:
           git config user.email "99176508+Vimalux@users.noreply.github.com"
           if grep -q OK build-status.txt; then
             rm -f build-debug.log build-status.txt
-            git add src/App.jsx src/partners.js
+            git add -A src/App.jsx src/partners.js build-debug.log build-status.txt
             git diff --cached --quiet || git commit -m "Simplify customer economics and generalize CMS partner pipeline"
           else
             git add build-debug.log build-status.txt
