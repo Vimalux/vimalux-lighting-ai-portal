@@ -4,19 +4,754 @@
 
 Legacy project product selector patched
 Safe catalogue delete patch applied
-/home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/scripts/add-vat-model.cjs:7
-    if (!source.includes(before)) throw new Error(`VAT patch target not found in ${path}: ${before.slice(0, 100)}`);
-                                  ^
+VAT municipality cash-flow model integrated
+Agent VAT lock note integrated
+Smart/CMS catalogue tabs patch applied
 
-Error: VAT patch target not found in src/App.jsx: <Kpis p={p} r={r} t={t} money={money} num={num} /><div className="two-col">
-    at patch (/home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/scripts/add-vat-model.cjs:7:41)
-    at Object.<anonymous> (/home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/scripts/add-vat-model.cjs:18:1)
-    at Module._compile (node:internal/modules/cjs/loader:1781:14)
-    at Object..js (node:internal/modules/cjs/loader:1913:10)
-    at Module.load (node:internal/modules/cjs/loader:1505:32)
-    at Function._load (node:internal/modules/cjs/loader:1309:12)
-    at wrapModuleLoad (node:internal/modules/cjs/loader:254:19)
-    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
-    at node:internal/main/run_main_module:36:49
+> vimalux-lighting-ai-portal@1.0.0 build
+> node --test && vite build
 
-Node.js v22.23.2
+TAP version 13
+# Subtest: additional CAPEX increases project CAPEX, financing base and direct cost
+ok 1 - additional CAPEX increases project CAPEX, financing base and direct cost
+  ---
+  duration_ms: 8.682041
+  type: 'test'
+  ...
+# Subtest: annual additional OPEX changes annual customer payment and project direct cost
+ok 2 - annual additional OPEX changes annual customer payment and project direct cost
+  ---
+  duration_ms: 0.826743
+  type: 'test'
+  ...
+# Subtest: splits additional CAPEX and annual OPEX and calculates margins
+ok 3 - splits additional CAPEX and annual OPEX and calculates margins
+  ---
+  duration_ms: 1.051858
+  type: 'test'
+  ...
+# Subtest: normalizes invalid or negative numeric values safely
+ok 4 - normalizes invalid or negative numeric values safely
+  ---
+  duration_ms: 0.270604
+  type: 'test'
+  ...
+# Subtest: agent edits preserve the admin unit cost and discard supplied internal fields
+ok 5 - agent edits preserve the admin unit cost and discard supplied internal fields
+  ---
+  duration_ms: 1.498856
+  type: 'test'
+  ...
+# Subtest: new agent items receive a neutral internal cost while retaining sales data
+ok 6 - new agent items receive a neutral internal cost while retaining sales data
+  ---
+  duration_ms: 0.205767
+  type: 'test'
+  ...
+# Subtest: agent navigation rejects pricing and the full assumptions view
+ok 7 - agent navigation rejects pricing and the full assumptions view
+  ---
+  duration_ms: 0.142002
+  type: 'test'
+  ...
+# Subtest: mixed project costs are separated into CAPEX and annual OPEX
+ok 8 - mixed project costs are separated into CAPEX and annual OPEX
+  ---
+  duration_ms: 1.177186
+  type: 'test'
+  ...
+# Subtest: saved Intelligence groups remain authoritative over stale CRM lamp count
+ok 9 - saved Intelligence groups remain authoritative over stale CRM lamp count
+  ---
+  duration_ms: 3.798596
+  type: 'test'
+  ...
+# Subtest: CRM lamp count seeds a Business Case when no Intelligence state is stored
+ok 10 - CRM lamp count seeds a Business Case when no Intelligence state is stored
+  ---
+  duration_ms: 0.646084
+  type: 'test'
+  ...
+# node:internal/modules/package_json_reader:314
+#   throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+#         ^
+# Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'read-excel-file' imported from /home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/src/catalogueImport.js
+#     at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)
+#     at packageResolve (node:internal/modules/esm/resolve:768:81)
+#     at moduleResolve (node:internal/modules/esm/resolve:855:18)
+#     at defaultResolve (node:internal/modules/esm/resolve:985:11)
+#     at \#cachedDefaultResolve (node:internal/modules/esm/loader:747:20)
+#     at ModuleLoader.resolve (node:internal/modules/esm/loader:724:38)
+#     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:320:38)
+#     at ModuleJob._link (node:internal/modules/esm/module_job:182:49) {
+#   code: 'ERR_MODULE_NOT_FOUND'
+# }
+# Node.js v22.23.2
+# Subtest: src/catalogueImport.test.js
+not ok 6 - src/catalogueImport.test.js
+  ---
+  duration_ms: 50.588027
+  type: 'test'
+  location: '/home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/src/catalogueImport.test.js:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# node:internal/modules/package_json_reader:314
+#   throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+#         ^
+# Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'read-excel-file' imported from /home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/src/lightingImport.js
+#     at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)
+#     at packageResolve (node:internal/modules/esm/resolve:768:81)
+#     at moduleResolve (node:internal/modules/esm/resolve:855:18)
+#     at defaultResolve (node:internal/modules/esm/resolve:985:11)
+#     at \#cachedDefaultResolve (node:internal/modules/esm/loader:747:20)
+#     at ModuleLoader.resolve (node:internal/modules/esm/loader:724:38)
+#     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:320:38)
+#     at ModuleJob._link (node:internal/modules/esm/module_job:182:49) {
+#   code: 'ERR_MODULE_NOT_FOUND'
+# }
+# Node.js v22.23.2
+# Subtest: src/legacyCrmImportKpi.test.js
+not ok 7 - src/legacyCrmImportKpi.test.js
+  ---
+  duration_ms: 47.763835
+  type: 'test'
+  location: '/home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/src/legacyCrmImportKpi.test.js:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: VIMALUX partner report uses actual LCU, ARR and contract value
+ok 13 - VIMALUX partner report uses actual LCU, ARR and contract value
+  ---
+  duration_ms: 7.670372
+  type: 'test'
+  ...
+# Subtest: catalogue keeps CCT/CRI performance code as a distinct product attribute
+ok 14 - catalogue keeps CCT/CRI performance code as a distinct product attribute
+  ---
+  duration_ms: 1.306229
+  type: 'test'
+  ...
+# Subtest: legacy CCT and CRI fields are retained without inventing a CCT/CRI code
+ok 15 - legacy CCT and CRI fields are retained without inventing a CCT/CRI code
+  ---
+  duration_ms: 0.28798
+  type: 'test'
+  ...
+# Subtest: stable CRM identity overrides conflicting Intelligence identity
+ok 16 - stable CRM identity overrides conflicting Intelligence identity
+  ---
+  duration_ms: 3.306382
+  type: 'test'
+  ...
+# Subtest: unlinked Business Case never uses its record id or stale payload as CRM opportunity id
+ok 17 - unlinked Business Case never uses its record id or stale payload as CRM opportunity id
+  ---
+  duration_ms: 0.733725
+  type: 'test'
+  ...
+# Subtest: VML source groups preserve global fixed dimming
+ok 18 - VML source groups preserve global fixed dimming
+  ---
+  duration_ms: 0.87803
+  type: 'test'
+  ...
+# Subtest: stable URL never transports authoritative source fields
+ok 19 - stable URL never transports authoritative source fields
+  ---
+  duration_ms: 0.530762
+  type: 'test'
+  ...
+# Subtest: production rejects legacy querystring payloads as authoritative
+ok 20 - production rejects legacy querystring payloads as authoritative
+  ---
+  duration_ms: 0.87181
+  type: 'test'
+  ...
+# Subtest: decimal parser accepts European and English formats
+ok 21 - decimal parser accepts European and English formats
+  ---
+  duration_ms: 1.795708
+  type: 'test'
+  ...
+# Subtest: Italian formatting always shows four-digit thousands separators
+ok 22 - Italian formatting always shows four-digit thousands separators
+  ---
+  duration_ms: 1856.271937
+  type: 'test'
+  ...
+# Subtest: English display uses European thousands and decimal separators
+ok 23 - English display uses European thousands and decimal separators
+  ---
+  duration_ms: 0.863298
+  type: 'test'
+  ...
+# Subtest: LED only gates all smart savings and costs
+ok 24 - LED only gates all smart savings and costs
+  ---
+  duration_ms: 3.321234
+  type: 'test'
+  ...
+# Subtest: Smart calculates automatic LCU and CLO without PowerAiD
+ok 25 - Smart calculates automatic LCU and CLO without PowerAiD
+  ---
+  duration_ms: 0.991979
+  type: 'test'
+  ...
+# Subtest: PowerAiD applies after CLO and fee only to its saving
+ok 26 - PowerAiD applies after CLO and fee only to its saving
+  ---
+  duration_ms: 1.258327
+  type: 'test'
+  ...
+# Subtest: project configured LED wattage overrides product nominal wattage without changing price
+ok 27 - project configured LED wattage overrides product nominal wattage without changing price
+  ---
+  duration_ms: 0.500667
+  type: 'test'
+  ...
+# Subtest: Smart and PowerAiD automatically cover every upgraded luminaire
+ok 28 - Smart and PowerAiD automatically cover every upgraded luminaire
+  ---
+  duration_ms: 0.655197
+  type: 'test'
+  ...
+# Subtest: optional panel equipment is separate from Mesh gateways included with each LCU
+ok 29 - optional panel equipment is separate from Mesh gateways included with each LCU
+  ---
+  duration_ms: 0.698001
+  type: 'test'
+  ...
+# Subtest: cash and financed payments separate service OPEX from financing
+ok 30 - cash and financed payments separate service OPEX from financing
+  ---
+  duration_ms: 1.991821
+  type: 'test'
+  ...
+# Subtest: Finance solution, LaaS and PPP use financing while Cash Deal does not
+ok 31 - Finance solution, LaaS and PPP use financing while Cash Deal does not
+  ---
+  duration_ms: 0.887834
+  type: 'test'
+  ...
+# Subtest: financing includes monthly compound interest
+ok 32 - financing includes monthly compound interest
+  ---
+  duration_ms: 0.231125
+  type: 'test'
+  ...
+# Subtest: annual customer net benefit deducts the complete customer payment
+ok 33 - annual customer net benefit deducts the complete customer payment
+  ---
+  duration_ms: 0.31503
+  type: 'test'
+  ...
+# Subtest: cash-flow rows deduct OPEX exactly once for every deal type
+ok 34 - cash-flow rows deduct OPEX exactly once for every deal type
+  ---
+  duration_ms: 0.38219
+  type: 'test'
+  ...
+# Subtest: project overrides apply without changing catalogue master values
+ok 35 - project overrides apply without changing catalogue master values
+  ---
+  duration_ms: 0.269081
+  type: 'test'
+  ...
+# Subtest: internal margin deducts all configured direct project costs
+ok 36 - internal margin deducts all configured direct project costs
+  ---
+  duration_ms: 0.362891
+  type: 'test'
+  ...
+# Subtest: GO requires customer viability and the configured minimum net margin
+ok 37 - GO requires customer viability and the configured minimum net margin
+  ---
+  duration_ms: 0.520576
+  type: 'test'
+  ...
+# Subtest: two agent commissions use LED sales net of freight cost and duty
+ok 38 - two agent commissions use LED sales net of freight cost and duty
+  ---
+  duration_ms: 0.252677
+  type: 'test'
+  ...
+# Subtest: legacy commission migrates to agent 1
+ok 39 - legacy commission migrates to agent 1
+  ---
+  duration_ms: 0.936106
+  type: 'test'
+  ...
+# Subtest: old project data safely receives new fields
+ok 40 - old project data safely receives new fields
+  ---
+  duration_ms: 0.339897
+  type: 'test'
+  ...
+# Subtest: cash deal TCV is cash CAPEX plus separate contract OPEX
+ok 41 - cash deal TCV is cash CAPEX plus separate contract OPEX
+  ---
+  duration_ms: 0.24117
+  type: 'test'
+  ...
+# Subtest: Noleggio Operativo uses only the all-inclusive payment and does not double count OPEX
+ok 42 - Noleggio Operativo uses only the all-inclusive payment and does not double count OPEX
+  ---
+  duration_ms: 0.241981
+  type: 'test'
+  ...
+# Subtest: Noleggio default monthly payment includes financing and all annual OPEX
+ok 43 - Noleggio default monthly payment includes financing and all annual OPEX
+  ---
+  duration_ms: 0.277364
+  type: 'test'
+  ...
+# Subtest: finance solution combines financed hardware and separate OPEX
+ok 44 - finance solution combines financed hardware and separate OPEX
+  ---
+  duration_ms: 0.307228
+  type: 'test'
+  ...
+# Subtest: legacy LaaS projects migrate to Noleggio Operativo
+ok 45 - legacy LaaS projects migrate to Noleggio Operativo
+  ---
+  duration_ms: 0.287759
+  type: 'test'
+  ...
+# Subtest: official imported CAPEX and OPEX override catalogue calculations
+ok 46 - official imported CAPEX and OPEX override catalogue calculations
+  ---
+  duration_ms: 0.353678
+  type: 'test'
+  ...
+# Subtest: cash service stops after 10 years while analysis continues to 20
+ok 47 - cash service stops after 10 years while analysis continues to 20
+  ---
+  duration_ms: 0.299346
+  type: 'test'
+  ...
+# Subtest: finance 5 years and service 10 years stay separate
+ok 48 - finance 5 years and service 10 years stay separate
+  ---
+  duration_ms: 0.287079
+  type: 'test'
+  ...
+# Subtest: fixed dimming corrects SAP baseline before LED savings
+ok 49 - fixed dimming corrects SAP baseline before LED savings
+  ---
+  duration_ms: 0.345645
+  type: 'test'
+  ...
+# Subtest: hourly dimming profile calculates the weighted annual reduction
+ok 50 - hourly dimming profile calculates the weighted annual reduction
+  ---
+  duration_ms: 0.454929
+  type: 'test'
+  ...
+# Subtest: custom system factor overrides the technology default
+ok 51 - custom system factor overrides the technology default
+  ---
+  duration_ms: 0.323963
+  type: 'test'
+  ...
+# Subtest: partial upgrade keeps all luminaires in baseline but prices and saves only selected groups
+ok 52 - partial upgrade keeps all luminaires in baseline but prices and saves only selected groups
+  ---
+  duration_ms: 0.437012
+  type: 'test'
+  ...
+# Subtest: projects with no selected upgrades have no upgrade CAPEX or smart quantities
+ok 53 - projects with no selected upgrades have no upgrade CAPEX or smart quantities
+  ---
+  duration_ms: 0.227459
+  type: 'test'
+  ...
+# Subtest: legacy dimming data migrates to annual average mode
+ok 54 - legacy dimming data migrates to annual average mode
+  ---
+  duration_ms: 0.438705
+  type: 'test'
+  ...
+# Subtest: PowerAiD off zeros saving fee cost and margin
+ok 55 - PowerAiD off zeros saving fee cost and margin
+  ---
+  duration_ms: 0.274749
+  type: 'test'
+  ...
+# Subtest: PowerAiD requires both Smart Lighting and CMS
+ok 56 - PowerAiD requires both Smart Lighting and CMS
+  ---
+  duration_ms: 0.293708
+  type: 'test'
+  ...
+# Subtest: PowerAiD fee and supplier cost use only incremental post-CLO saving
+ok 57 - PowerAiD fee and supplier cost use only incremental post-CLO saving
+  ---
+  duration_ms: 0.18771
+  type: 'test'
+  ...
+# Subtest: PowerAiD service fee is separated from fixed OPEX and always leaves a customer benefit
+ok 58 - PowerAiD service fee is separated from fixed OPEX and always leaves a customer benefit
+  ---
+  duration_ms: 0.183764
+  type: 'test'
+  ...
+# Subtest: PowerAiD value escalates with energy price year by year
+ok 59 - PowerAiD value escalates with energy price year by year
+  ---
+  duration_ms: 0.178977
+  type: 'test'
+  ...
+# Subtest: PowerAiD contract values split between VIMALUX and Felicity
+ok 60 - PowerAiD contract values split between VIMALUX and Felicity
+  ---
+  duration_ms: 0.16082
+  type: 'test'
+  ...
+# Subtest: CLO and PowerAiD savings stop after the service agreement
+ok 61 - CLO and PowerAiD savings stop after the service agreement
+  ---
+  duration_ms: 0.237053
+  type: 'test'
+  ...
+# Subtest: customer value chart compares contracted Smart with full analysis-period Smart
+ok 62 - customer value chart compares contracted Smart with full analysis-period Smart
+  ---
+  duration_ms: 0.195803
+  type: 'test'
+  ...
+# Subtest: CLO requires CMS
+ok 63 - CLO requires CMS
+  ---
+  duration_ms: 0.150074
+  type: 'test'
+  ...
+# node:internal/modules/package_json_reader:314
+#   throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+#         ^
+# Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'read-excel-file' imported from /home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/src/lightingImport.js
+#     at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)
+#     at packageResolve (node:internal/modules/esm/resolve:768:81)
+#     at moduleResolve (node:internal/modules/esm/resolve:855:18)
+#     at defaultResolve (node:internal/modules/esm/resolve:985:11)
+#     at \#cachedDefaultResolve (node:internal/modules/esm/loader:747:20)
+#     at ModuleLoader.resolve (node:internal/modules/esm/loader:724:38)
+#     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:320:38)
+#     at ModuleJob._link (node:internal/modules/esm/module_job:182:49) {
+#   code: 'ERR_MODULE_NOT_FOUND'
+# }
+# Node.js v22.23.2
+# Subtest: test/italianInputSheetImport.test.js
+not ok 12 - test/italianInputSheetImport.test.js
+  ---
+  duration_ms: 54.362308
+  type: 'test'
+  location: '/home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/test/italianInputSheetImport.test.js:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# node:internal/modules/package_json_reader:314
+#   throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+#         ^
+# Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'read-excel-file' imported from /home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/src/lightingImport.js
+#     at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)
+#     at packageResolve (node:internal/modules/esm/resolve:768:81)
+#     at moduleResolve (node:internal/modules/esm/resolve:855:18)
+#     at defaultResolve (node:internal/modules/esm/resolve:985:11)
+#     at \#cachedDefaultResolve (node:internal/modules/esm/loader:747:20)
+#     at ModuleLoader.resolve (node:internal/modules/esm/loader:724:38)
+#     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:320:38)
+#     at ModuleJob._link (node:internal/modules/esm/module_job:182:49) {
+#   code: 'ERR_MODULE_NOT_FOUND'
+# }
+# Node.js v22.23.2
+# Subtest: test/lightingImport.test.js
+not ok 13 - test/lightingImport.test.js
+  ---
+  duration_ms: 42.970044
+  type: 'test'
+  location: '/home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/test/lightingImport.test.js:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# node:internal/modules/package_json_reader:314
+#   throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+#         ^
+# Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'read-excel-file' imported from /home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/src/lightingImport.js
+#     at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)
+#     at packageResolve (node:internal/modules/esm/resolve:768:81)
+#     at moduleResolve (node:internal/modules/esm/resolve:855:18)
+#     at defaultResolve (node:internal/modules/esm/resolve:985:11)
+#     at \#cachedDefaultResolve (node:internal/modules/esm/loader:747:20)
+#     at ModuleLoader.resolve (node:internal/modules/esm/loader:724:38)
+#     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:320:38)
+#     at ModuleJob._link (node:internal/modules/esm/module_job:182:49) {
+#   code: 'ERR_MODULE_NOT_FOUND'
+# }
+# Node.js v22.23.2
+# Subtest: test/lightingImportAgentFlow.test.js
+not ok 14 - test/lightingImportAgentFlow.test.js
+  ---
+  duration_ms: 38.283384
+  type: 'test'
+  location: '/home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/test/lightingImportAgentFlow.test.js:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: new projects inherit the richest synced product catalogue
+ok 67 - new projects inherit the richest synced product catalogue
+  ---
+  duration_ms: 1.827806
+  type: 'test'
+  ...
+# node:internal/modules/package_json_reader:314
+#   throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+#         ^
+# Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'read-excel-file' imported from /home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/src/lightingImport.js
+#     at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)
+#     at packageResolve (node:internal/modules/esm/resolve:768:81)
+#     at moduleResolve (node:internal/modules/esm/resolve:855:18)
+#     at defaultResolve (node:internal/modules/esm/resolve:985:11)
+#     at \#cachedDefaultResolve (node:internal/modules/esm/loader:747:20)
+#     at ModuleLoader.resolve (node:internal/modules/esm/loader:724:38)
+#     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:320:38)
+#     at ModuleJob._link (node:internal/modules/esm/module_job:182:49) {
+#   code: 'ERR_MODULE_NOT_FOUND'
+# }
+# Node.js v22.23.2
+# Subtest: test/opportunity.test.js
+not ok 16 - test/opportunity.test.js
+  ---
+  duration_ms: 43.957277
+  type: 'test'
+  location: '/home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/test/opportunity.test.js:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: Planner and Italian category labels normalize to shared codes
+ok 69 - Planner and Italian category labels normalize to shared codes
+  ---
+  duration_ms: 1.102405
+  type: 'test'
+  ...
+# Subtest: catalogue product gets Planner-compatible technical defaults
+ok 70 - catalogue product gets Planner-compatible technical defaults
+  ---
+  duration_ms: 0.856447
+  type: 'test'
+  ...
+# Subtest: lantern retrofit only matches compatible retrofit products
+ok 71 - lantern retrofit only matches compatible retrofit products
+  ---
+  duration_ms: 0.542419
+  type: 'test'
+  ...
+# Subtest: legacy products without new metadata remain available during migration
+ok 72 - legacy products without new metadata remain available during migration
+  ---
+  duration_ms: 1.185608
+  type: 'test'
+  ...
+# Subtest: PowerAiD recurring revenue requires an active CMS connection
+ok 73 - PowerAiD recurring revenue requires an active CMS connection
+  ---
+  duration_ms: 7.188933
+  type: 'test'
+  ...
+# Subtest: ROI uses annual operational benefit over CAPEX
+ok 74 - ROI uses annual operational benefit over CAPEX
+  ---
+  duration_ms: 0.359336
+  type: 'test'
+  ...
+# Subtest: CRM weighted TCV never includes duration or recurring revenue
+ok 75 - CRM weighted TCV never includes duration or recurring revenue
+  ---
+  duration_ms: 0.386146
+  type: 'test'
+  ...
+# Subtest: probability points normalize once and weighted TCV matches production examples
+ok 76 - probability points normalize once and weighted TCV matches production examples
+  ---
+  duration_ms: 1706.293217
+  type: 'test'
+  ...
+# Subtest: stage averages use stored percentage points without multiplying display by 100
+ok 77 - stage averages use stored percentage points without multiplying display by 100
+  ---
+  duration_ms: 1.378617
+  type: 'test'
+  ...
+# Subtest: pipeline keeps recurring totals separate and DATEK only receives CMS
+not ok 78 - pipeline keeps recurring totals separate and DATEK only receives CMS
+  ---
+  duration_ms: 2.485618
+  type: 'test'
+  location: '/home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/test/productionCalculations.test.js:73:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    0 !== 500
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 500
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/runner/work/vimalux-lighting-ai-portal/vimalux-lighting-ai-portal/test/productionCalculations.test.js:81:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: Felicity partner value uses supplier share and supports project-level filtering
+ok 79 - Felicity partner value uses supplier share and supports project-level filtering
+  ---
+  duration_ms: 0.768937
+  type: 'test'
+  ...
+# Subtest: cloud and local project lists are merged without losing local-only projects
+ok 80 - cloud and local project lists are merged without losing local-only projects
+  ---
+  duration_ms: 1.308963
+  type: 'test'
+  ...
+# Subtest: newest project version wins when local and cloud IDs match
+ok 81 - newest project version wins when local and cloud IDs match
+  ---
+  duration_ms: 0.202783
+  type: 'test'
+  ...
+# Subtest: cloud wins a tie to avoid overwriting server data with an ambiguous local copy
+ok 82 - cloud wins a tie to avoid overwriting server data with an ambiguous local copy
+  ---
+  duration_ms: 0.138066
+  type: 'test'
+  ...
+# Subtest: technical reimport reuses Business Case and CRM identity
+ok 83 - technical reimport reuses Business Case and CRM identity
+  ---
+  duration_ms: 1.114462
+  type: 'test'
+  ...
+# Subtest: explicitly selected Business Case wins when duplicate project names exist
+ok 84 - explicitly selected Business Case wins when duplicate project names exist
+  ---
+  duration_ms: 132.454571
+  type: 'test'
+  ...
+# Subtest: different project name remains a new project
+ok 85 - different project name remains a new project
+  ---
+  duration_ms: 0.211195
+  type: 'test'
+  ...
+# Subtest: PDF project type follows the calculated deal type, not the legacy financing field
+ok 86 - PDF project type follows the calculated deal type, not the legacy financing field
+  ---
+  duration_ms: 0.877709
+  type: 'test'
+  ...
+# Subtest: Noleggio report states that OPEX is included in the all-inclusive payment
+ok 87 - Noleggio report states that OPEX is included in the all-inclusive payment
+  ---
+  duration_ms: 0.211025
+  type: 'test'
+  ...
+# Subtest: Cash report remains a Cash Deal with separately deducted OPEX
+ok 88 - Cash report remains a Cash Deal with separately deducted OPEX
+  ---
+  duration_ms: 0.143504
+  type: 'test'
+  ...
+# Subtest: report combines identical replacement lines while retaining different source wattages
+ok 89 - report combines identical replacement lines while retaining different source wattages
+  ---
+  duration_ms: 8.959364
+  type: 'test'
+  ...
+# Subtest: report keeps identical products at different configured wattages separate
+ok 90 - report keeps identical products at different configured wattages separate
+  ---
+  duration_ms: 0.202882
+  type: 'test'
+  ...
+# Subtest: report keeps different proposed products on separate summary lines
+ok 91 - report keeps different proposed products on separate summary lines
+  ---
+  duration_ms: 0.178917
+  type: 'test'
+  ...
+# Subtest: shared KPI dictionary separates existing, upgrade and smart-connected luminaires
+ok 92 - shared KPI dictionary separates existing, upgrade and smart-connected luminaires
+  ---
+  duration_ms: 5.361948
+  type: 'test'
+  ...
+# Subtest: cloud deletion removes the selected project and verifies it is gone
+ok 93 - cloud deletion removes the selected project and verifies it is gone
+  ---
+  duration_ms: 1.458165
+  type: 'test'
+  ...
+# Subtest: cloud deletion fails safely when the project remains visible
+ok 94 - cloud deletion fails safely when the project remains visible
+  ---
+  duration_ms: 0.645172
+  type: 'test'
+  ...
+# Subtest: cloud deletion propagates database errors
+ok 95 - cloud deletion propagates database errors
+  ---
+  duration_ms: 0.191506
+  type: 'test'
+  ...
+# Subtest: non-deductible municipality VAT adds to CAPEX and OPEX cash-out
+ok 96 - non-deductible municipality VAT adds to CAPEX and OPEX cash-out
+  ---
+  duration_ms: 0.991309
+  type: 'test'
+  ...
+# Subtest: qualified civil works use structural rate and partial recovery
+ok 97 - qualified civil works use structural rate and partial recovery
+  ---
+  duration_ms: 0.302841
+  type: 'test'
+  ...
+# Subtest: new Business Cases use the current VIMALUX energy-price default
+ok 98 - new Business Cases use the current VIMALUX energy-price default
+  ---
+  duration_ms: 1.180401
+  type: 'test'
+  ...
+1..98
+# tests 98
+# suites 0
+# pass 91
+# fail 7
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2237.261356
