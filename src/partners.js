@@ -2,7 +2,16 @@ import { calculateBusinessCase } from "./calculations.js";
 import { crmMetrics } from "./crm.js";
 
 export function partnerProjectRows(projects = [], partner) {
-  return projects.map((project) => {
+  const normalizedPartner = String(partner || "").trim().toLowerCase();
+  const isCmsPartner = !["vimalux", "felicity"].includes(normalizedPartner);
+  const sourceProjects = isCmsPartner
+    ? projects.filter((project) => {
+        if (!project.solution?.smartEnabled || !project.solution?.cmsEnabled) return false;
+        const selectedLcu = (project.catalogue?.smart || []).find((item) => item.id === project.solution?.lcuProductId);
+        return String(selectedLcu?.brand || "").trim().toLowerCase() === normalizedPartner;
+      })
+    : projects;
+  return sourceProjects.map((project) => {
     const result = calculateBusinessCase(project);
     const crm = crmMetrics(project);
     const years = Math.max(1, Math.round(Number(project.assumptions.contractYears) || 1));
@@ -15,7 +24,7 @@ export function partnerProjectRows(projects = [], partner) {
       contractYears: years,
     };
 
-    if (partner === "DATEK") {
+    if (isCmsPartner) {
       return {
         ...common,
         probability: crm.probability,
