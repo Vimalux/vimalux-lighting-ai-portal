@@ -70,9 +70,11 @@ test("stage averages use stored percentage points without multiplying display by
   assert.equal(formatProbabilityPoints(won.averageProbability), "100%");
 });
 
-test("pipeline keeps recurring totals separate and DATEK only receives CMS", () => {
+test("pipeline keeps recurring totals separate and selected CMS partner only receives CMS", () => {
   const project = defaultProject();
   project.solution.powerAidEnabled = true;
+  const selectedLcu = project.catalogue.smart.find(item => item.id === project.solution.lcuProductId);
+  selectedLcu.brand = "DATEK";
   const synced = syncBusinessCaseResult(project);
   const pipeline = pipelineTotals([synced]);
   const datek = partnerTotals([synced], "DATEK");
