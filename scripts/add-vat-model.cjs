@@ -4,6 +4,15 @@ function patch(path, replacements) {
   let source = fs.readFileSync(path, 'utf8');
   for (const [before, after] of replacements) {
     if (source.includes(after)) continue;
+    // The agent VAT lock patch may add props to VatSummaryCard after this
+    // script has already inserted it. Treat any existing VatSummaryCard as
+    // satisfying this specific insertion so repeated Vercel prebuilds remain
+    // idempotent.
+    if (
+      path === 'src/App.jsx' &&
+      after.includes('<VatSummaryCard') &&
+      source.includes('<VatSummaryCard')
+    ) continue;
     if (!source.includes(before)) throw new Error(`VAT patch target not found in ${path}: ${before.slice(0, 100)}`);
     source = source.replace(before, after);
   }
