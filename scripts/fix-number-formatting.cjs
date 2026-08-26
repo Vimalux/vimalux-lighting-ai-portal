@@ -31,6 +31,16 @@ if (!catalogue.includes('const numericLanguage = p.language;')) {
   fs.writeFileSync('src/CatalogueExtended.jsx', catalogue);
 }
 
+// Keep customer-facing cashflow money formatting identical to the PDF: whole euros with locale grouping.
+let app = fs.readFileSync('src/App.jsx', 'utf8');
+app = app.replace(
+  'function CashTable({ p, r, money }) { const allInclusive = r.dealType === "noleggio_operativo"; const included = p.language === "it" ? "Incluso" : "Included"; const money2 = (value) => formatMoney(value,p.language,p.project.currency,2);',
+  'function CashTable({ p, r, money }) { const allInclusive = r.dealType === "noleggio_operativo"; const included = p.language === "it" ? "Incluso" : "Included";'
+);
+app = app.replace('allInclusive ? included : money2(x.opex)', 'allInclusive ? included : money(x.opex)');
+app = app.replace('money2(x.payment)', 'money(x.payment)');
+fs.writeFileSync('src/App.jsx', app);
+
 // Make report number helpers explicitly grouped and suppress binary floating-point tails.
 for (const path of ['src/preliminaryProposal.js']) {
   let source = fs.readFileSync(path, 'utf8');
@@ -39,4 +49,4 @@ for (const path of ['src/preliminaryProposal.js']) {
   fs.writeFileSync(path, source);
 }
 
-console.log('Locale-aware number formatting applied across inputs and reports');
+console.log('Locale-aware number formatting applied across inputs, dashboard cashflow and reports');
