@@ -1,14 +1,33 @@
 import { calculateBusinessCase } from "./calculations.js";
 import { crmMetrics } from "./crm.js";
 
+export const CMS_PARTNERS = ["DATEK", "ITRON", "TVILIGHT"];
+
+export function resolveCmsPartner(project) {
+  const explicit = String(project?.solution?.cmsPartner || "").trim().toUpperCase();
+  if (explicit) return explicit;
+  const selectedLcu = (project?.catalogue?.smart || []).find((item) => item.id === project?.solution?.lcuProductId);
+  const candidates = [selectedLcu?.cmsPartner, selectedLcu?.supplier, selectedLcu?.vendor, selectedLcu?.brand, selectedLcu?.name]
+    .map((value) => String(value || "").trim().toUpperCase())
+    .filter(Boolean);
+  for (const candidate of candidates) {
+    const known = CMS_PARTNERS.find((partner) => candidate.includes(partner));
+    if (known) return known;
+  }
+  // Legacy Intelligence projects used VIMALUX as the commercial product brand
+  // while the installed CMS/LCU partner was DATEK. Keep those projects assigned
+  // to DATEK until an explicit solution.cmsPartner is saved.
+  if (project?.solution?.smartEnabled && project?.solution?.cmsEnabled) return "DATEK";
+  return "";
+}
+
 export function partnerProjectRows(projects = [], partner) {
-  const normalizedPartner = String(partner || "").trim().toLowerCase();
-  const isCmsPartner = !["vimalux", "felicity"].includes(normalizedPartner);
+  const normalizedPartner = String(partner || "").trim().toUpperCase();
+  const isCmsPartner = !["VIMALUX", "FELICITY"].includes(normalizedPartner);
   const sourceProjects = isCmsPartner
     ? projects.filter((project) => {
         if (!project.solution?.smartEnabled || !project.solution?.cmsEnabled) return false;
-        const selectedLcu = (project.catalogue?.smart || []).find((item) => item.id === project.solution?.lcuProductId);
-        return String(selectedLcu?.brand || "").trim().toLowerCase() === normalizedPartner;
+        return resolveCmsPartner(project) === normalizedPartner;
       })
     : projects;
   return sourceProjects.map((project) => {
@@ -48,7 +67,7 @@ export function partnerProjectRows(projects = [], partner) {
       };
     }
 
-    if (partner === "FELICITY") {
+    if (normalizedPartner === "FELICITY") {
       return {
         ...common,
         annualRevenue: result.powerAidSupplierCost,
@@ -60,8 +79,6 @@ export function partnerProjectRows(projects = [], partner) {
       };
     }
 
-    // VIMALUX report: show the actual commercial result of the project,
-    // including project-specific CAPEX and annual OPEX additions.
     return {
       ...common,
       annualRevenue: result.annualRecurringRevenue,
