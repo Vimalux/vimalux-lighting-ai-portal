@@ -6,7 +6,6 @@ function replaceOnce(source, before, after, label) {
   return source.replace(before, after);
 }
 
-// 1) Calculation engine: never reuse another CMS partner's product pricing.
 {
   const path = 'src/calculations.js';
   let source = fs.readFileSync(path, 'utf8');
@@ -20,7 +19,6 @@ function replaceOnce(source, before, after, label) {
       .map((value) => String(value || "").trim().toUpperCase())
       .filter(Boolean);
     for (const known of ["DATEK", "ITRON", "TVILIGHT"]) if (values.some((value) => value.includes(known))) return known;
-    // Legacy VIMALUX-branded LCU entries were DATEK commercial products.
     if (values.some((value) => value === "VIMALUX")) return "DATEK";
     return "";
   };
@@ -42,7 +40,6 @@ function replaceOnce(source, before, after, label) {
   fs.writeFileSync(path, source);
 }
 
-// 2) UI: only show LCU products belonging to the chosen CMS partner and warn if pricing is incomplete.
 {
   const path = 'src/App.jsx';
   let source = fs.readFileSync(path, 'utf8');
@@ -50,7 +47,7 @@ function replaceOnce(source, before, after, label) {
     source,
     'function ProductSelect({ label, type, p, value, onChange }) { return <Field label={label} value={value} onChange={onChange}>{p.catalogue.smart.filter((x) => x.type === type && x.active).map((x) => <option key={x.id} value={x.id}>{x.brand} {x.name}</option>)}</Field>; }',
     `function cmsProductPartner(product = {}) { const values = [product.cmsPartner,product.vendor,product.supplier,product.manufacturer,product.brand,product.name].map((value) => String(value || "").trim().toUpperCase()).filter(Boolean); for (const known of CMS_PARTNERS) if (values.some((value) => value.includes(known))) return known; if (values.some((value) => value === "VIMALUX")) return "DATEK"; return ""; }
-function ProductSelect({ label, type, p, value, onChange, cmsPartner }) { const partner = String(cmsPartner || "").trim().toUpperCase(); const products = p.catalogue.smart.filter((x) => x.type === type && x.active && (!partner || cmsProductPartner(x) === partner)); return <Field label={label} value={products.some((x) => x.id === value) ? value : ""} onChange={onChange}><option value="">{partner ? `-- ${partner}: select product --` : "-- select product --"}</option>{products.map((x) => <option key={x.id} value={x.id}>{x.brand} {x.name}</option>)}</Field>; }`,
+function ProductSelect({ label, type, p, value, onChange, cmsPartner }) { const partner = String(cmsPartner || "").trim().toUpperCase(); const products = p.catalogue.smart.filter((x) => x.type === type && x.active && (!partner || cmsProductPartner(x) === partner)); return <Field label={label} value={products.some((x) => x.id === value) ? value : ""} onChange={onChange}><option value="">{partner ? "-- " + partner + ": select product --" : "-- select product --"}</option>{products.map((x) => <option key={x.id} value={x.id}>{x.brand} {x.name}</option>)}</Field>; }`,
     'partner-filtered ProductSelect'
   );
   source = replaceOnce(
@@ -68,14 +65,12 @@ function ProductSelect({ label, type, p, value, onChange, cmsPartner }) { const 
   const setSmartEnabled = (enabled) => { update(["solution","smartEnabled"],enabled); if (!enabled) { update(["solution","cmsEnabled"],false); update(["solution","powerAidEnabled"],false); } };`,
     'CMS pricing state'
   );
-  // Insert visible warning at beginning of Solution return content, using an existing stable marker.
   source = replaceOnce(
     source,
     '  return <><Card title={t("solution")}>',
     '  return <>{p.solution.cmsEnabled && !cmsPricingReady && <div className="status error" style={{marginBottom:12}}>CMS Partner {selectedCmsPartner} selected – no matching LCU/CMS product is configured. CMS hardware and recurring revenue are excluded until a {selectedCmsPartner} product is selected or created in Catalogo Prodotti.</div>}<Card title={t("solution")}>',
     'CMS pricing warning'
   );
-  // Clear the selected LCU when CMS partner changes, so an old vendor product can never remain silently selected.
   source = replaceOnce(
     source,
     '        let next = setPath({ ...p, updatedAt: changedAt }, path, normalized);',
