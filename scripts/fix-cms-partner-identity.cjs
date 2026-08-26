@@ -1,0 +1,28 @@
+const fs = require('fs');
+const path = 'src/App.jsx';
+let source = fs.readFileSync(path, 'utf8');
+
+source = source.replace(
+  'import { growthForecast, partnerTotals } from "./partners.js";',
+  'import { CMS_PARTNERS, growthForecast, partnerTotals, resolveCmsPartner } from "./partners.js";'
+);
+
+source = source.replace(
+  '<header><div><small>{project.project.businessCaseId}</small><h1>{t(view === "admin" ? "priceAdmin" : visibleWorkflow.find((x) => x[0] === view)?.[1] || view)}</h1></div>',
+  '<header><div><small>{project.project.businessCaseId}</small><h1>{view === "datek" ? "CMS Partners" : t(view === "admin" ? "priceAdmin" : visibleWorkflow.find((x) => x[0] === view)?.[1] || view)}</h1></div>'
+);
+
+const solutionNeedle = '<div className="form-grid"><ProductSelect label="LCU" type="LCU" p={p} value={p.solution.lcuProductId} onChange={(v) => update(["solution","lcuProductId"],v)} /></div>';
+const solutionReplacement = '<div className="form-grid"><Field label="CMS Partner" value={p.solution.cmsPartner || resolveCmsPartner(p) || "DATEK"} onChange={(v) => update(["solution","cmsPartner"],v)}>{CMS_PARTNERS.map((name) => <option key={name} value={name}>{name}</option>)}</Field><ProductSelect label="LCU" type="LCU" p={p} value={p.solution.lcuProductId} onChange={(v) => update(["solution","lcuProductId"],v)} /></div>';
+if (source.includes(solutionNeedle)) source = source.replace(solutionNeedle, solutionReplacement);
+
+const oldDashboard = 'function CmsPartnerDashboard({ projects, money }) { const detectedPartners = [...new Set(projects.map((project) => { const product = (project.catalogue?.smart || []).find((item) => item.id === project.solution?.lcuProductId); return String(product?.brand || "").trim(); }).filter(Boolean))].sort(); const [partner,setPartner] = useState(detectedPartners.includes("DATEK") ? "DATEK" : detectedPartners[0] || "DATEK"); const totals = partnerTotals(projects,partner); const forecast = growthForecast(totals.arr); return <><Card title="CMS Partner"><div className="form-grid"><Field label="CMS Partner" value={partner} onChange={setPartner}>{detectedPartners.map((name) => <option key={name} value={name}>{name}</option>)}</Field></div></Card><div className="kpis"><Kpi label="Municipalities" value={totals.municipalities} /><Kpi label="Projects" value={totals.projects} /><Kpi label="Luminaires" value={totals.luminaires} /><Kpi label="LCUs" value={totals.lcus} /><Kpi label="Annual CMS revenue" value={money(totals.annualRevenue)} /><Kpi label="MRR" value={money(totals.mrr)} /><Kpi label="ARR" value={money(totals.arr)} /><Kpi label="Total CMS contract value" value={money(totals.totalContractValue)} /><Kpi label="Pipeline TCV" value={money(totals.pipelineTcv)} /><Kpi label="Weighted TCV" value={money(totals.weightedTcv)} /></div><Card title={partner + " Partner Pipeline"}><PartnerTable rows={totals.rows} money={money} /></Card><Card title="Growth forecast · 10% annual"><div className="breakdown">{forecast.map((x) => <div key={x.year}><span>Year {x.year}</span><span></span><strong>{money(x.arr)}</strong></div>)}</div></Card></>; }';
+const newDashboard = 'function CmsPartnerDashboard({ projects, money }) { const projectPartners = projects.map(resolveCmsPartner).filter(Boolean); const partnerOptions = [...new Set([...CMS_PARTNERS,...projectPartners])]; const [partner,setPartner] = useState(projectPartners.includes("DATEK") ? "DATEK" : projectPartners[0] || "DATEK"); const totals = partnerTotals(projects,partner); const forecast = growthForecast(totals.arr); return <><Card title="CMS Partner"><div className="form-grid"><Field label="CMS Partner" value={partner} onChange={setPartner}>{partnerOptions.map((name) => <option key={name} value={name}>{name}</option>)}</Field></div></Card><div className="kpis"><Kpi label="Municipalities" value={totals.municipalities} /><Kpi label="Projects" value={totals.projects} /><Kpi label="Luminaires" value={totals.luminaires} /><Kpi label="LCUs" value={totals.lcus} /><Kpi label="Annual CMS revenue" value={money(totals.annualRevenue)} /><Kpi label="MRR" value={money(totals.mrr)} /><Kpi label="ARR" value={money(totals.arr)} /><Kpi label="Total CMS contract value" value={money(totals.totalContractValue)} /><Kpi label="Pipeline TCV" value={money(totals.pipelineTcv)} /><Kpi label="Weighted TCV" value={money(totals.weightedTcv)} /></div><Card title={partner + " Partner Pipeline"}><PartnerTable rows={totals.rows} money={money} /></Card><Card title="Growth forecast · 10% annual"><div className="breakdown">{forecast.map((x) => <div key={x.year}><span>Year {x.year}</span><span></span><strong>{money(x.arr)}</strong></div>)}</div></Card></>; }';
+if (source.includes(oldDashboard)) source = source.replace(oldDashboard, newDashboard);
+
+const oldReports = 'function PartnerReports({ projects, p, money }) { const cmsPartnerKeys = [...new Set(projects.map((project) => { const product = (project.catalogue?.smart || []).find((item) => item.id === project.solution?.lcuProductId); return String(product?.brand || "").trim(); }).filter(Boolean))].sort();';
+const newReports = 'function PartnerReports({ projects, p, money }) { const cmsPartnerKeys = [...new Set([...CMS_PARTNERS,...projects.map(resolveCmsPartner).filter(Boolean)])];';
+if (source.includes(oldReports)) source = source.replace(oldReports, newReports);
+
+fs.writeFileSync(path, source);
+console.log('CMS partner identity and dashboard labels updated');
