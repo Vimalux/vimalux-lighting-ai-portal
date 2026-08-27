@@ -12,7 +12,8 @@ function replaceOnce(before, after, label) {
 replaceOnce(
 `  const update = (path, value) =>
     setProjects((all) => {
-      if (isAgent && ["pricing", "assumptions"].includes(path[0])) return all;
+      if (isAgent && path[0] === "pricing") return all;
+      if (isAgent && path[0] === "assumptions" && !["energyPrice", "operatingHours", "dealType"].includes(path[1])) return all;
       if (isAgent && path[0] === "additionalCosts") {
         if (path.length !== 1 || !Array.isArray(value)) return all;
         value = sanitizeAgentAdditionalCosts(project.additionalCosts, value);
@@ -21,7 +22,8 @@ replaceOnce(
       const changedAt = new Date().toISOString();`,
 `  const update = (path, value) =>
     setProjects((all) => {
-      if (isAgent && ["pricing", "assumptions"].includes(path[0])) return all;
+      if (isAgent && path[0] === "pricing") return all;
+      if (isAgent && path[0] === "assumptions" && !["energyPrice", "operatingHours", "dealType"].includes(path[1])) return all;
       if (isAgent && path[0] === "additionalCosts") {
         if (path.length !== 1 || !Array.isArray(value)) return all;
         value = sanitizeAgentAdditionalCosts(project.additionalCosts, value);
