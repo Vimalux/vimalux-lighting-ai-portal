@@ -50,13 +50,22 @@ export async function saveCloudState(projects) {
   if (!projects.length) return [];
   const promotions = [];
   const catalogue = projects[0].catalogue;
-  const profile = await getCurrentProfile("role");
+  const profile = await getCurrentProfile("id,role");
   if (["admin", "vimalux", "sales_manager"].includes(profile?.role)) {
     const { error: catalogueError } = await supabase.rpc("save_intelligence_catalogue", { catalogue_payload: catalogue });
     if (catalogueError) throw catalogueError;
   }
   const canCreateLinkedCase = ["admin", "vimalux", "sales_manager", "agent"].includes(profile?.role);
   for (const project of projects) {
+    // Agents can see the shared agent pipeline, but autosave must never write a
+    // Business Case owned by another agent. New local imports have no stable ID
+    // yet and are therefore still allowed to be created by the current agent.
+    if (
+      profile?.role === "agent" &&
+      stableUuid.test(String(project?.id || "")) &&
+      String(project?.crm?.agentId || "") !== String(profile?.id || "")
+    ) continue;
+
     const result = calculateBusinessCase(project);
     const businessCase = buildBusinessCaseSnapshot(project, project.updatedAt || new Date().toISOString());
     const probability = project.crm?.status === "won" ? 100 : Math.min(100, Math.max(0, Number(project.crm?.closingProbability) || 0));
