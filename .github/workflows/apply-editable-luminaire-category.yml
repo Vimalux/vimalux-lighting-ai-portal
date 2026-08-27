@@ -1,0 +1,34 @@
+name: Apply editable luminaire category
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/apply-editable-luminaire-category.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply canonical patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('.github/workflows/restore-editable-luminaire-category.yml').read_text()
+          start = source.index("          from pathlib import Path\n") + len("          ")
+          end = source.index("          PY\n", start)
+          lines = source[start:end].splitlines()
+          code = "\n".join(line[10:] if line.startswith("          ") else line for line in lines)
+          exec(code, {})
+          PY
+      - name: Verify source and compile
+        run: |
+          node --test
+          npx vite build
+      - name: Commit canonical implementation
+        run: |
+          git config user.name "VIMALUX Automation"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          git add src/App.jsx src/businessCaseTransport.js src/luminaireCategoryAccess.test.js scripts/fix-agent-input-grouping.cjs scripts/fix-official-input-sheet-identity.cjs
+          git diff --cached --quiet || git commit -m "Restore editable luminaire category with owner access"
+          git push origin HEAD:main
