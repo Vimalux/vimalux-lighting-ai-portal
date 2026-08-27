@@ -8,7 +8,10 @@ const key = import.meta.env.VITE_SHARED_SUPABASE_PUBLISHABLE_KEY || "sb_publisha
 
 export const supabaseConfigured = Boolean(url && key);
 export const supabase = supabaseConfigured
-  ? createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } })
+  ? createClient(url, key, {
+      db: { schema: "public" },
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+    })
   : null;
 
 const stableUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
