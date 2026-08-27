@@ -34,6 +34,23 @@ const checks = [
     ok: app.includes('if (isAgent && path[0] === "pricing") return all;'),
   },
   {
+    name: 'Official input sheet applies groups and project identity atomically',
+    ok: app.includes('if (path[0] === "importSheet")')
+      && app.includes('source: "official_input_sheet"')
+      && app.includes('customerName: sheet.customerName')
+      && app.includes('projectName: sheet.projectName')
+      && app.includes('sheetName: sheet.name'),
+  },
+  {
+    name: 'Official identity import is restricted to official VIMALUX sheet names',
+    ok: app.includes('/^ProjectInputSheet(?:_ITA)?$/i.test'),
+  },
+  {
+    name: 'Agent import uses the same atomic official identity path',
+    ok: app.includes('update(["importSheet"], { groups, mode')
+      && !app.includes('update(["groups"], mode === "append" ? [...p.groups, ...groups] : groups); setImporter(null);'),
+  },
+  {
     name: 'Customer-facing warranty label contains term only',
     ok: warranty.includes('`${warranty.selectedYears} anni`')
       && warranty.includes('`${warranty.selectedYears} years`')
