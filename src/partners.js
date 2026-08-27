@@ -1,28 +1,52 @@
 import { calculateBusinessCase } from "./calculations.js";
 import { crmMetrics } from "./crm.js";
 
-export const CMS_PARTNERS = ["DATEK", "ITRON", "TVILIGHT"];
+// Kept for backwards compatibility. New UI must derive partner options from
+// the Smart/CMS master catalogue via cmsPartnerOptions().
+export const CMS_PARTNERS = [];
+
+const partnerName = (value) => String(value || "").trim().toUpperCase();
+
+export function cmsPartnerOptions(source = []) {
+  const projects = Array.isArray(source) ? source : [source];
+  const names = projects.flatMap((project) =>
+    (project?.catalogue?.smart || []).flatMap((item) => [
+      item?.cmsPartner,
+      item?.vendor,
+      item?.supplier,
+    ]),
+  ).map(partnerName).filter(Boolean);
+  return [...new Set(names)].sort();
+}
 
 export function resolveCmsPartner(project) {
-  const explicit = String(project?.solution?.cmsPartner || "").trim().toUpperCase();
+  const selectedLcu = (project?.catalogue?.smart || []).find(
+    (item) => item.id === project?.solution?.lcuProductId,
+  );
+
+  // The selected Smart/CMS product is authoritative. This means changing the
+  // master product vendor immediately changes the partner classification of
+  // every Business Case using that Product ID.
+  const selectedPartner = [
+    selectedLcu?.cmsPartner,
+    selectedLcu?.vendor,
+    selectedLcu?.supplier,
+  ].map(partnerName).find(Boolean);
+  if (selectedPartner) return selectedPartner;
+
+  // Explicit project value remains a fallback for legacy/manual projects that
+  // do not yet reference a catalogue product with partner master data.
+  const explicit = partnerName(project?.solution?.cmsPartner);
   if (explicit) return explicit;
-  const selectedLcu = (project?.catalogue?.smart || []).find((item) => item.id === project?.solution?.lcuProductId);
-  const candidates = [selectedLcu?.cmsPartner, selectedLcu?.supplier, selectedLcu?.vendor, selectedLcu?.brand, selectedLcu?.name]
-    .map((value) => String(value || "").trim().toUpperCase())
-    .filter(Boolean);
-  for (const candidate of candidates) {
-    const known = CMS_PARTNERS.find((partner) => candidate.includes(partner));
-    if (known) return known;
-  }
-  // Legacy Intelligence projects used VIMALUX as the commercial product brand
-  // while the installed CMS/LCU partner was DATEK. Keep those projects assigned
-  // to DATEK until an explicit solution.cmsPartner is saved.
+
+  // Last-resort legacy fallback: old VIMALUX Smart products represented DATEK
+  // before Partner/Vendor became a catalogue master-data field.
   if (project?.solution?.smartEnabled && project?.solution?.cmsEnabled) return "DATEK";
   return "";
 }
 
 export function partnerProjectRows(projects = [], partner) {
-  const normalizedPartner = String(partner || "").trim().toUpperCase();
+  const normalizedPartner = partnerName(partner);
   const isCmsPartner = !["VIMALUX", "FELICITY"].includes(normalizedPartner);
   const sourceProjects = isCmsPartner
     ? projects.filter((project) => {
