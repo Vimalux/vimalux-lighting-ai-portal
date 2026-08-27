@@ -1,0 +1,111 @@
+name: Restore editable luminaire category
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/restore-editable-luminaire-category.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch canonical Intelligence source
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          app = Path('src/App.jsx')
+          s = app.read_text()
+
+          s = s.replace(
+            '  const isAgent = currentProfile?.role === "agent";\n',
+            '  const isAgent = currentProfile?.role === "agent";\n  const isReadOnlyAgentProject = isAgent && project.crm?.agentAccessMode === "read_only";\n'
+          )
+          s = s.replace(
+            '    setProjects((all) => {\n      if (isAgent && ["pricing", "assumptions"].includes(path[0])) return all;',
+            '    setProjects((all) => {\n      if (isReadOnlyAgentProject) return all;\n      if (isAgent && ["pricing", "assumptions"].includes(path[0])) return all;'
+          )
+          s = s.replace(
+            '{view === "existing" && <Existing p={project} update={update} t={t} />}',
+            '{view === "existing" && <Existing p={project} update={update} t={t} readOnly={isReadOnlyAgentProject} />}'
+          )
+          s = s.replace(
+            'function Existing({ p, update, t }) {',
+            'function Existing({ p, update, t, readOnly = false }) {'
+          )
+          s = s.replace(
+            'quantity: 0, technology: "SAP", existingWattage: 0, upgradeSelected: true,',
+            'quantity: 0, technology: "SAP", luminaireCategory: "OTHER", existingCategory: "OTHER", existingWattage: 0, upgradeSelected: true,'
+          )
+          old_products = '  const productsForGroup = (group) => { const active = p.catalogue.led.filter((product) => product.active); const current = p.catalogue.led.find((product) => product.id === group.proposedProductId); return current && !current.active ? [current, ...active] : active; };'
+          new_products = '''  const productsForGroup = (group) => {
+    const category = group.luminaireCategory || group.existingCategory || "OTHER";
+    const active = p.catalogue.led.filter((product) => product.active);
+    const compatible = active.filter((product) => {
+      const categories = Array.isArray(product.compatibleExistingCategories) ? product.compatibleExistingCategories : [];
+      return !categories.length || categories.includes(category);
+    });
+    const candidates = compatible.length ? compatible : active;
+    const current = p.catalogue.led.find((product) => product.id === group.proposedProductId);
+    return current && !candidates.some((product) => product.id === current.id) ? [current, ...candidates] : candidates;
+  };
+  const categoryOptions = p.language === "it"
+    ? [["STREET","Stradale"],["URBAN","Arredo urbano"],["GLOBO","Globo"],["FLOODLIGHT","Proiettore"],["UPLIGHT","Incasso / uplight"],["LANTERN","Lanterna"],["OTHER","Altro"]]
+    : [["STREET","Street"],["URBAN","Urban / decorative"],["GLOBO","Globe"],["FLOODLIGHT","Floodlight"],["UPLIGHT","In-ground / uplight"],["LANTERN","Lantern"],["OTHER","Other"]];'''
+          if old_products not in s:
+            raise SystemExit('productsForGroup marker not found')
+          s = s.replace(old_products, new_products)
+
+          old_header = 'p.language === "it" ? "Tecnologia" : "Technology",p.language === "it" ? "Potenza esistente" : "Existing wattage"'
+          new_header = 'p.language === "it" ? "Tecnologia" : "Technology",p.language === "it" ? "Tipo apparecchio" : "Luminaire type",p.language === "it" ? "Potenza esistente" : "Existing wattage"'
+          if old_header not in s:
+            raise SystemExit('Existing table header marker not found')
+          s = s.replace(old_header, new_header, 1)
+
+          old_cell = '</select></td><td><NumericInput value={g.existingWattage} onChange={(v) => update(["groups", i, "existingWattage"], v)} /></td>'
+          new_cell = '''</select></td><td><select value={g.luminaireCategory || g.existingCategory || "OTHER"} disabled={readOnly} onChange={(e) => { const category = e.target.value; update(["groups", i], { ...g, luminaireCategory: category, existingCategory: category }); }}>{categoryOptions.map(([value,label]) => <option value={value} key={value}>{label}</option>)}</select></td><td><NumericInput value={g.existingWattage} onChange={(v) => update(["groups", i, "existingWattage"], v)} /></td>'''
+          if old_cell not in s:
+            raise SystemExit('Existing table technology/wattage marker not found')
+          s = s.replace(old_cell, new_cell, 1)
+
+          old_labels = 'type:"Tipo lampada",watt:"Potenza (W)"'
+          new_labels = 'type:"Tipo lampada",category:"Tipo apparecchio",watt:"Potenza (W)"'
+          if old_labels not in s:
+            raise SystemExit('Italian import labels marker not found')
+          s = s.replace(old_labels, new_labels, 1)
+          old_labels_en = 'type:"Lamp type",watt:"Wattage (W)"'
+          new_labels_en = 'type:"Lamp type",category:"Luminaire category",watt:"Wattage (W)"'
+          if old_labels_en not in s:
+            raise SystemExit('English import labels marker not found')
+          s = s.replace(old_labels_en, new_labels_en, 1)
+          old_mapping = '{mappingField("technology",labels.type)}{mappingField("wattage",labels.watt,true)}'
+          new_mapping = '{mappingField("technology",labels.type)}{mappingField("category",labels.category)}{mappingField("wattage",labels.watt,true)}'
+          if old_mapping not in s:
+            raise SystemExit('Import mapping marker not found')
+          s = s.replace(old_mapping, new_mapping, 1)
+
+          app.write_text(s)
+
+          transport = Path('src/businessCaseTransport.js')
+          t = transport.read_text()
+          marker = '    agentId: crm.assigned_to_user_id || "",\n'
+          replacement = '    agentId: crm.assigned_to_user_id || "",\n    agentAccessMode: crm.agent_access_mode || project.crm?.agentAccessMode || "",\n'
+          if marker not in t:
+            raise SystemExit('businessCaseTransport agent marker not found')
+          if 'agentAccessMode: crm.agent_access_mode' not in t:
+            t = t.replace(marker, replacement, 1)
+          transport.write_text(t)
+
+          test = Path('src/luminaireCategoryAccess.test.js')
+          test.write_text('''import { describe, expect, it } from "vitest";\nimport fs from "node:fs";\n\ndescribe("luminaire category editor", () => {\n  const app = fs.readFileSync("src/App.jsx", "utf8");\n  const transport = fs.readFileSync("src/businessCaseTransport.js", "utf8");\n  it("renders an editable luminaire category and persists both category fields", () => {\n    expect(app).toContain('Tipo apparecchio');\n    expect(app).toContain('luminaireCategory: category, existingCategory: category');\n    expect(app).toContain('compatibleExistingCategories');\n  });\n  it("keeps shared agent projects read only", () => {\n    expect(app).toContain('disabled={readOnly}');\n    expect(app).toContain('if (isReadOnlyAgentProject) return all;');\n    expect(transport).toContain('agentAccessMode: crm.agent_access_mode');\n  });\n});\n''')
+          PY
+      - name: Test
+        run: npm test -- --runInBand || npm test
+      - name: Commit canonical source
+        run: |
+          git config user.name "VIMALUX Automation"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          git add src/App.jsx src/businessCaseTransport.js src/luminaireCategoryAccess.test.js
+          git diff --cached --quiet || git commit -m "Restore editable luminaire category with owner access"
+          git push origin HEAD:main
