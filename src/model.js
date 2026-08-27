@@ -2,12 +2,13 @@ import { numberValue } from "./calculations.js";
 
 export const today = () => new Date().toISOString().slice(0, 10);
 export const uid = () => Math.random().toString(36).slice(2, 10);
+export const SALUZZO_VIA_RAMELLO_AUDIT_NOTE = "Assumption: SAP 100W baseline inferred from project reference replacement ITALO ~31W. To be confirmed if field/as-built data becomes available.";
 
 export const defaultProject = () => ({
   id: uid(), version: 1, language: "it", name: "Nuovo progetto", createdAt: today(), updatedAt: new Date().toISOString(),
   customer: { name: "", province: "", region: "", country: "Italia", contact: "", title: "", email: "", telephone: "" },
   project: { name: "Nuovo progetto", businessCaseId: `BC-${Date.now().toString().slice(-6)}`, consultant: "", date: today(), currency: "EUR" },
-  crm: { status: "lead", closingProbability: 25, totalContractValue: null },
+  crm: { status: "lead", closingProbability: 25, totalContractValue: null }, crmUpdatedAt: "",
   groups: [{ id: uid(), name: "Gruppo 1", quantity: 100, technology: "SAP", existingWattage: 100, proposedProductId: "led-40", smartAssigned: true, powerAidAssigned: true }],
   solution: { smartEnabled: true, cmsEnabled: true, powerAidEnabled: false, lcuProductId: "lcu-1", gatewayProductId: "gateway-1", gatewayQuantity: 1, antennaProductId: "antenna-1", antennaQuantity: 1, meterProductId: "meter-1", meterQuantity: 1 },
   assumptions: { operatingHours: 4200, energyPrice: .25, sapFactor: 1.2, mhFactor: 1.15, mercuryFactor: 1.15, co2KgPerKwh: .233, cloPercent: 10, powerAidPercent: 40, powerAidSharePercent: 20, existingMaintenance: 25, newMaintenance: 5, financingModel: "cash", contractYears: 10, interestRate: 5, upfrontPayment: 0, energyEscalation: 2, opexEscalation: 2, discountRate: 5, analysisPeriod: 20, freightCostPerLamp: 4, freightSalesPerLamp: 6, commissionPercent: 0, warrantyReservePercent: 0, fundingCostPercent: 0, otherDirectCosts: 0, minimumMarginPercent: 30 },
@@ -35,6 +36,18 @@ export function migrateProject(saved) {
   project.updatedAt = previousUpdatedAt;
   project.language = ["it", "en", "da"].includes(project.language) ? project.language : "it";
   project.groups = (Array.isArray(project.groups) ? project.groups : []).map((g) => ({ ...g, id: g.id || uid() }));
+  const identity = [project.name, project.project?.name, project.customer?.name].filter(Boolean).join(" ").toLowerCase();
+  const total = project.groups.reduce((sum, group) => sum + Math.max(0, numberValue(group.quantity)), 0);
+  const obsolete = project.groups.filter((group) => /da classificare|to classify|unclassified/.test(String(group.name || "").toLowerCase()));
+  const obsoleteQuantity = obsolete.reduce((sum, group) => sum + Math.max(0, numberValue(group.quantity)), 0);
+  if (identity.includes("saluzzo") && total === 443 && obsoleteQuantity === 86) {
+    const retained = project.groups.filter((group) => !obsolete.includes(group));
+    if (retained.reduce((sum, group) => sum + Math.max(0, numberValue(group.quantity)), 0) === 357) {
+      project.groups = [...retained, { id: uid(), name: "Via Ramello – miglioria criterio H", category: "Stradale", quantity: 14, technology: "SAP", existingWattage: 100, replacementRequirement: "Sostituzione completa", currentLuminaireModel: "", proposedProductId: project.catalogue.led.find((item) => item.active)?.id || project.catalogue.led[0]?.id || "", smartAssigned: true, powerAidAssigned: true, dataQuality: "assumption", source: "ProjectInputSheet", notes: SALUZZO_VIA_RAMELLO_AUDIT_NOTE }];
+      project.updatedAt = new Date().toISOString();
+      project.migrations = [...(Array.isArray(project.migrations) ? project.migrations : []), { id: "saluzzo-371-v1", appliedAt: project.updatedAt }];
+    }
+  }
   return project;
 }
 

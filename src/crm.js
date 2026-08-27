@@ -1,4 +1,5 @@
 import { calculateBusinessCase, numberValue } from "./calculations.js";
+import { formatPercent } from "./i18n.js";
 
 const positive = (value) => Math.max(0, numberValue(value));
 
@@ -15,8 +16,7 @@ export function calculateWeightedTcv(totalContractValue, probability) {
 }
 
 export function formatProbabilityPoints(value, language = "en") {
-  const locale = language === "it" ? "it-IT" : language === "da" ? "da-DK" : "en-IE";
-  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(normalizeProbability(value))}%`;
+  return formatPercent(normalizeProbability(value), language);
 }
 
 export function crmMetrics(project) {
@@ -36,6 +36,7 @@ export function crmMetrics(project) {
     monthlyRecurringRevenue: annualRecurringRevenue / 12,
     cmsAnnualRevenue: result.cmsRevenue,
     savingsAsAServiceRevenue: result.savingsAsAServiceRevenue,
+    technicalScopeQuantity: result.totalQuantity,
     contractYears: Math.max(1, Math.round(positive(project.assumptions.contractYears))),
   };
 }

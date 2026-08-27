@@ -32,6 +32,18 @@ Object.assign(translations.it,{roi:"ROI annuo"});
 Object.assign(translations.en,{roi:"Annual ROI"});
 Object.assign(translations.da,{customer:"Kunde og projekt",existing:"Eksisterende belysning",solution:"Løsning",pricing:"Projektpriser",assumptions:"Forudsætninger",business:"Business case",report:"Kunderapport",projects:"Projekter",catalogue:"Produktkatalog",priceAdmin:"Prisadministration",internalReport:"Intern rapport",reset:"Nulstil lokale data",save:"Gemt automatisk",add:"Tilføj gruppe",remove:"Fjern",generate:"Generér PDF",preliminary:"Foreløbig vurdering",capex:"CAPEX",annualOpex:"Årlig OPEX",monthlyPayment:"Månedlig betaling",annualNet:"Årlig nettogevinst",payback:"Tilbagebetalingstid",roi:"Årligt ROI",npv:"NPV",lifecycle:"Livscyklusresultat",energyReduction:"Energireduktion",co2Reduction:"CO₂-reduktion",baseline:"Referenceforbrug",final:"Slutforbrug",ledSaving:"LED-besparelse",cloSaving:"CLO-besparelse",powerSaving:"PowerAiD-besparelse",maintenanceSaving:"Vedligeholdelsesbesparelse",technical:"Teknisk",savings:"Besparelser",financial:"Finansielt",freight:"Fragt",financingModel:"Projekttype",operatingHours:"Årlige driftstimer",energyPrice:"Energipris (EUR/kWh)",cloPercent:"CLO-procent",powerAidPercent:"PowerAiD-procent",powerAidShare:"PowerAiD-andel",contractYears:"Kontraktår",interestRate:"Rente (%)",upfrontPayment:"Udbetaling",energyEscalation:"Energiprisstigning (%)",opexEscalation:"OPEX-stigning (%)",discountRate:"Diskonteringsrente (%)",analysisPeriod:"Analyseperiode",yes:"Ja",no:"Nej",enabled:"Aktiveret",disabled:"Deaktiveret",years:"år",units:"enheder",notAvailable:"Ikke tilgængelig",GO:"Projektet vurderes økonomisk bæredygtigt ud fra de angivne forudsætninger.",REVIEW:"Projektet kræver kommerciel eller teknisk optimering.",NO_GO:"Projektet er ikke økonomisk bæredygtigt med de aktuelle forudsætninger."});
 export const locale = (language) => language === "it" ? "it-IT" : language === "da" ? "da-DK" : "en-IE";
-export const formatMoney = (value, language, currency = "EUR", digits = 0) => new Intl.NumberFormat(locale(language), { style: "currency", currency, useGrouping: "always", minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(value) || 0);
-export const formatNumber = (value, language, digits = 0) => new Intl.NumberFormat(locale(language), { useGrouping: "always", minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(value) || 0);
-export const formatPercent = (value, language) => `${formatNumber(value, language, 1)}%`;
+export function parseLocalizedNumber(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (value == null || String(value).trim() === "") return 0;
+  let text = String(value).trim().replace(/[\s\u00a0]/g, "").replace(/[^\d,.-]/g, "");
+  const comma = text.lastIndexOf(","), dot = text.lastIndexOf(".");
+  if (comma >= 0 && dot >= 0) text = comma > dot ? text.replace(/\./g, "").replace(",", ".") : text.replace(/,/g, "");
+  else if (comma >= 0) text = text.replace(/\./g, "").replace(",", ".");
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+const finite = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+export const formatMoney = (value, language, currency = "EUR", digits = 2) => new Intl.NumberFormat(locale(language), { style: "currency", currency, useGrouping: true, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(finite(value));
+export const formatNumber = (value, language, digits = null) => new Intl.NumberFormat(locale(language), { useGrouping: true, minimumFractionDigits: digits == null ? 0 : digits, maximumFractionDigits: digits == null ? 2 : digits }).format(finite(value));
+export const formatInputNumber = (value, language, { price = false, digits = null } = {}) => formatNumber(value, language, price ? 2 : digits);
+export const formatPercent = (value, language) => `${formatNumber(value, language)}%`;

@@ -20,3 +20,4 @@ test("cloud wins a tie to avoid overwriting server data with an ambiguous local 
   const cloud = [{ id: "same", project: { name: "Cloud" } }];
   assert.equal(mergeProjectStates(local, cloud)[0].project.name, "Cloud");
 });
+test("Intelligence technical data and CRM-specific data keep separate sources of truth",()=>{const intelligence={id:"saluzzo",updatedAt:"2026-08-03T10:00:00Z",groups:[{quantity:371}],crm:{status:"lead"},crmUpdatedAt:"2026-08-01T10:00:00Z"};const crm={id:"saluzzo",updatedAt:"2026-08-02T10:00:00Z",groups:[{quantity:443,name:"86 da classificare"}],crm:{status:"proposal",closingProbability:60},crmUpdatedAt:"2026-08-04T10:00:00Z"};const merged=mergeProjectStates([intelligence],[crm])[0];assert.equal(merged.groups[0].quantity,371);assert.equal(merged.crm.status,"proposal");assert.equal(merged.crm.closingProbability,60)});
