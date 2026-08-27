@@ -63,6 +63,7 @@ export function projectFromBusinessCaseRow(row) {
     closingProbability: number(crm.probability),
     expectedCloseDate: crm.expected_close_date || "",
     agentId: crm.assigned_to_user_id || "",
+    agentAccessMode: crm.agent_access_mode || project.crm?.agentAccessMode || "",
     syncSource: row.sync_source,
     syncVersion: row.sync_version,
     lastSyncedAt: row.last_synced_at,

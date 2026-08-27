@@ -1,6 +1,7 @@
 import readExcelFile from "read-excel-file/browser";
 import { numberValue } from "./calculations.js";
 import { uid } from "./model.js";
+import { compatibleLedProducts } from "./productCatalogue.js";
 
 const aliases = {
   technology: ["technology", "current technology", "tecnologia", "tecnologia attuale", "lamp type", "lampetype", "light source", "tipo lampada", "tipo di tecnologia"],
@@ -86,10 +87,11 @@ function targetLedWattage(existingWattage, technology) {
   return wattage * 0.50;
 }
 
-export function recommendLedProduct(existingWattage, technology, ledProducts = []) {
+export function recommendLedProduct(existingWattage, technology, ledProducts = [], existingCategory = "OTHER", replacementRequirement = "UNKNOWN") {
   const target = targetLedWattage(existingWattage, technology);
+  const compatible = compatibleLedProducts(ledProducts, existingCategory, replacementRequirement).filter(product => numberValue(product.wattage) > 0);
   const active = ledProducts.filter(product => product.active !== false && numberValue(product.wattage) > 0);
-  const candidates = active.length ? active : ledProducts.filter(product => numberValue(product.wattage) > 0);
+  const candidates = compatible.length ? compatible : (active.length ? active : ledProducts.filter(product => numberValue(product.wattage) > 0));
   if (!candidates.length) return { product: null, targetWattage: Math.round(target * 10) / 10 };
   const product = [...candidates].sort((a, b) => {
     const aDelta = Math.abs(numberValue(a.wattage) - target);
@@ -186,7 +188,7 @@ function optionalIndex(mapping, key) {
 }
 
 function importedGroupBase({ name, quantity, technology, wattage, ledProducts, category = "OTHER", replacementRequirement = "UNKNOWN", operatingHours = 0, lumen = 0, description = "", usefulLifetime = 0, kelvin = 0, socket = "", installationHeight = 0 }) {
-  const recommendation = recommendLedProduct(wattage, technology, ledProducts);
+  const recommendation = recommendLedProduct(wattage, technology, ledProducts, category, replacementRequirement);
   return {
     id: uid(), name, quantity, technology, existingWattage: wattage,
     existingCategory: category,
@@ -255,7 +257,8 @@ export function buildImportedGroups(rows, mapping, ledProducts, language = "it",
       return;
     }
 
-    const key = `${category}|${replacementRequirement}|${technology}|${wattage}|${operatingHours}`;
+    const locationKey = clean(suppliedName);
+    const key = `${locationKey}|${category}|${replacementRequirement}|${technology}|${wattage}|${operatingHours}`;
     const existing = grouped.get(key);
     if (existing) existing.quantity += quantity;
     else grouped.set(key, importedGroupBase({ ...baseArgs, name: suppliedName || `${category} · ${technology} ${wattage} W`, quantity }));

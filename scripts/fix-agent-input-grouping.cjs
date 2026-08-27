@@ -4,6 +4,9 @@ function patchFile(path, transforms) {
   let source = fs.readFileSync(path, 'utf8');
   for (const { before, after, label } of transforms) {
     if (source.includes(after)) continue;
+    // Editable luminaire category now lives in canonical App.jsx.
+    if (label === 'category-filter product choices' && source.includes('compatibleExistingCategories')) continue;
+    if (label === 'existing luminaire type cell' && source.includes('luminaireCategory || g.existingCategory || "OTHER"} disabled={readOnly}')) continue;
     if (!source.includes(before)) throw new Error(`Patch target not found (${label}) in ${path}`);
     source = source.replace(before, after);
   }
