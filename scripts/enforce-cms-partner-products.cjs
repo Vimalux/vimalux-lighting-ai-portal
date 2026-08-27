@@ -76,12 +76,21 @@ function ProductSelect({ label, type, p, value, onChange, cmsPartner }) { const 
   const selectedLcuProduct = (p.catalogue.smart || []).find((item) => item.id === p.solution.lcuProductId);
   const cmsPricingReady = !p.solution.cmsEnabled || (selectedLcuProduct && (!selectedCmsPartner || cmsProductPartner(selectedLcuProduct) === selectedCmsPartner));
   const setSmartEnabled = (enabled) => { update(["solution","smartEnabled"],enabled); if (!enabled) { update(["solution","cmsEnabled"],false); update(["solution","powerAidEnabled"],false); } };`;
-  if (source.includes(originalSmart)) source = source.replace(originalSmart, newSmart);
-  else if (source.includes(oldSmart)) source = source.replace(oldSmart, newSmart);
-  else if (!source.includes(newSmart)) throw new Error('CMS pricing state target not found');
+  // Canonical App.jsx may already contain the pricing state while another legacy
+  // patch has altered adjacent text. In that case never replace the standalone
+  // setSmartEnabled line with a second declaration block.
+  const alreadyHasPricingState = source.includes('  const selectedCmsPartner = String(resolveCmsPartner(p) || "").toUpperCase();')
+    && source.includes('  const selectedLcuProduct = (p.catalogue.smart || []).find((item) => item.id === p.solution.lcuProductId);')
+    && source.includes('  const cmsPricingReady = !p.solution.cmsEnabled');
+  if (source.includes(oldSmart)) source = source.replace(oldSmart, newSmart);
+  else if (source.includes(newSmart) || alreadyHasPricingState) {
+    // already canonical / idempotent
+  } else if (source.includes(originalSmart)) source = source.replace(originalSmart, newSmart);
+  else throw new Error('CMS pricing state target not found');
 
   const warningNeedle = '  return <><Card title={t("solution")}>';
-  if (source.includes(warningNeedle)) source = source.replace(warningNeedle,
+  const warningCanonical = '  return <>{p.solution.cmsEnabled && !cmsPricingReady && <div className="status error" style={{marginBottom:12}}>CMS Partner {selectedCmsPartner} selected – no matching LCU/CMS product is configured. CMS hardware and recurring revenue are excluded until a matching product is selected or created in Catalogo Prodotti.</div>}<Card title={t("solution")}> ';
+  if (source.includes(warningNeedle) && !source.includes('CMS Partner {selectedCmsPartner} selected – no matching LCU/CMS product is configured.')) source = source.replace(warningNeedle,
     '  return <>{p.solution.cmsEnabled && !cmsPricingReady && <div className="status error" style={{marginBottom:12}}>CMS Partner {selectedCmsPartner} selected – no matching LCU/CMS product is configured. CMS hardware and recurring revenue are excluded until a matching product is selected or created in Catalogo Prodotti.</div>}<Card title={t("solution")}>');
 
   source = replaceOnce(source,
