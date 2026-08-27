@@ -23,14 +23,14 @@ jobs:
           code = "\n".join(line[10:] if line.startswith("          ") else line for line in lines)
           exec(code, {})
           PY
-      - name: Verify source and compile
+      - name: Verify production patch chain and compile
         run: |
-          node --test
+          npm test
           npx vite build
       - name: Commit canonical implementation
         run: |
           git config user.name "VIMALUX Automation"
           git config user.email "99176508+Vimalux@users.noreply.github.com"
-          git add src/App.jsx src/businessCaseTransport.js src/luminaireCategoryAccess.test.js scripts/fix-agent-input-grouping.cjs scripts/fix-official-input-sheet-identity.cjs
+          git add src/App.jsx src/businessCaseTransport.js src/lightingImport.js src/luminaireCategoryAccess.test.js scripts/fix-agent-input-grouping.cjs scripts/fix-official-input-sheet-identity.cjs
           git diff --cached --quiet || git commit -m "Restore editable luminaire category with owner access"
           git push origin HEAD:main
