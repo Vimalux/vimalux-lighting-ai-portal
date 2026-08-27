@@ -23,6 +23,14 @@ jobs:
               raise SystemExit('legacy patch loop marker not found')
           legacy.write_text(ls.replace(old_loop, new_loop, 1))
 
+          identity = Path('scripts/fix-official-input-sheet-identity.cjs')
+          ids = identity.read_text()
+          old_guard = '    setProjects((all) => {\n      if (isAgent && path[0] === "pricing") return all;'
+          new_guard = '    setProjects((all) => {\n      if (isReadOnlyAgentProject) return all;\n      if (isAgent && path[0] === "pricing") return all;'
+          if old_guard in ids:
+              ids = ids.replace(old_guard, new_guard)
+          identity.write_text(ids)
+
           app = Path('src/App.jsx')
           s = app.read_text()
           s = s.replace('  const isAgent = currentProfile?.role === "agent";\n', '  const isAgent = currentProfile?.role === "agent";\n  const isReadOnlyAgentProject = isAgent && project.crm?.agentAccessMode === "read_only";\n')
@@ -70,6 +78,6 @@ jobs:
         run: |
           git config user.name "VIMALUX Automation"
           git config user.email "99176508+Vimalux@users.noreply.github.com"
-          git add src/App.jsx src/businessCaseTransport.js src/luminaireCategoryAccess.test.js scripts/fix-agent-input-grouping.cjs
+          git add src/App.jsx src/businessCaseTransport.js src/luminaireCategoryAccess.test.js scripts/fix-agent-input-grouping.cjs scripts/fix-official-input-sheet-identity.cjs
           git diff --cached --quiet || git commit -m "Restore editable luminaire category with owner access"
           git push origin HEAD:main
