@@ -18,8 +18,10 @@ const checks = [
     ok: app.includes('function AgentAssumptions') && app.includes('Assunzioni progetto'),
   },
   {
-    name: 'Existing lighting shows luminaire type',
-    ok: app.includes('Tipo apparecchio') && app.includes('categoryLabel(g.existingCategory || g.luminaireCategory)'),
+    name: 'Existing lighting has persisted editable luminaire type',
+    ok: app.includes('Tipo apparecchio')
+      && app.includes('luminaireCategory: category, existingCategory: category')
+      && app.includes('disabled={readOnly}'),
   },
   {
     name: 'Replacement choices use catalogue compatibility logic',
@@ -32,6 +34,11 @@ const checks = [
   {
     name: 'Agent pricing remains protected',
     ok: app.includes('if (isAgent && path[0] === "pricing") return all;'),
+  },
+  {
+    name: 'Shared agent projects are read only',
+    ok: app.includes('if (isReadOnlyAgentProject) return all;')
+      && app.includes('agentAccessMode'),
   },
   {
     name: 'Official input sheet applies groups and project identity atomically',
