@@ -66,4 +66,60 @@ patchFile('src/agentProjectInputs.js', [
   },
 ]);
 
-console.log('Agent input grouping, compatibility and finance selector patched');
+patchFile('src/App.jsx', [
+  {
+    label: 'catalogue compatibility import for existing lighting',
+    before: 'import CatalogueExtended from "./CatalogueExtended.jsx";',
+    after: 'import CatalogueExtended from "./CatalogueExtended.jsx";\nimport { compatibleLedProducts } from "./productCatalogue.js";',
+  },
+  {
+    label: 'restore assumptions to agent workflow',
+    before: 'const agentWorkflow = [\n  ...workflow.slice(0, 3),\n  ["additionalCosts", "additionalCosts"],\n  ...workflow.slice(5),\n];',
+    after: 'const agentWorkflow = [\n  ...workflow.slice(0, 3),\n  ["additionalCosts", "additionalCosts"],\n  ["assumptions", "assumptions"],\n  ...workflow.slice(5),\n];',
+  },
+  {
+    label: 'allow safe agent assumptions only',
+    before: '      if (isAgent && ["pricing", "assumptions"].includes(path[0])) return all;',
+    after: '      if (isAgent && path[0] === "pricing") return all;\n      if (isAgent && path[0] === "assumptions" && !["energyPrice", "operatingHours", "dealType"].includes(path[1])) return all;',
+  },
+  {
+    label: 'render safe agent assumptions',
+    before: '          {!isAgent && view === "assumptions" && <Assumptions p={project} r={result} update={update} />}',
+    after: '          {view === "assumptions" && (isAgent ? <AgentAssumptions p={project} update={update} /> : <Assumptions p={project} r={result} update={update} />)}',
+  },
+  {
+    label: 'agent assumptions component',
+    before: 'const Card = ({ title, children, className = "" }) => <section className={`card ${className}`.trim()}><h2>{title}</h2>{children}</section>;\n\nfunction Customer({ p, update }) {',
+    after: 'const Card = ({ title, children, className = "" }) => <section className={`card ${className}`.trim()}><h2>{title}</h2>{children}</section>;\n\nfunction AgentAssumptions({ p, update }) {\n  const it = p.language === "it";\n  return <Card title={it ? "Assunzioni progetto" : "Project assumptions"}><div className="form-grid"><Field label={it ? "Prezzo energia (EUR/kWh)" : "Energy price (EUR/kWh)"} value={p.assumptions.energyPrice} onChange={(v) => update(["assumptions","energyPrice"],v)} /><Field label={it ? "Ore operative annue" : "Annual operating hours"} value={p.assumptions.operatingHours} onChange={(v) => update(["assumptions","operatingHours"],v)} /><Field label={it ? "Soluzione commerciale" : "Commercial solution"} value={p.assumptions.dealType || "cash"} onChange={(v) => update(["assumptions","dealType"],v)}><option value="cash">{it ? "Acquisto diretto" : "Direct purchase"}</option><option value="finance">{it ? "Finanziamento ESCO" : "ESCO financing"}</option><option value="noleggio_operativo">Noleggio Operativo / LaaS</option></Field></div><p className="muted">{it ? "L’agente può modificare solo i parametri specifici del progetto. Prezzi, margini, aliquote IVA e parametri finanziari interni restano gestiti da VIMALUX." : "The agent can only change project-specific inputs. Prices, margins, VAT rates and internal financing assumptions remain controlled by VIMALUX."}</p></Card>;\n}\n\nfunction Customer({ p, update }) {',
+  },
+  {
+    label: 'existing category label helper',
+    before: '  const [bulkProduct, setBulkProduct] = useState("");',
+    after: '  const [bulkProduct, setBulkProduct] = useState("");\n  const categoryLabel = (value) => ({ STREET: p.language === "it" ? "Stradale" : "Street", URBAN: p.language === "it" ? "Urbano" : "Urban", GLOBO: "Globo", FLOODLIGHT: p.language === "it" ? "Proiettore" : "Floodlight", UPLIGHT: "Uplight", LANTERN: p.language === "it" ? "Lanterna" : "Lantern", RETROFIT_KIT: "Retrofit kit", OTHER: p.language === "it" ? "Altro" : "Other" }[String(value || "OTHER").toUpperCase()] || value || "—");',
+  },
+  {
+    label: 'category-filter product choices',
+    before: '  const productsForGroup = (group) => { const active = p.catalogue.led.filter((product) => product.active); const current = p.catalogue.led.find((product) => product.id === group.proposedProductId); return current && !current.active ? [current, ...active] : active; };',
+    after: '  const productsForGroup = (group) => { const compatible = compatibleLedProducts(p.catalogue.led, group.existingCategory || group.luminaireCategory || "OTHER", group.replacementRequirement || "UNKNOWN"); const current = p.catalogue.led.find((product) => product.id === group.proposedProductId); return current && !compatible.some((product) => product.id === current.id) ? [current, ...compatible] : compatible; };',
+  },
+  {
+    label: 'existing luminaire type header',
+    before: 'p.language === "it" ? "Tecnologia" : "Technology",p.language === "it" ? "Potenza esistente" : "Existing wattage"',
+    after: 'p.language === "it" ? "Tecnologia" : "Technology",p.language === "it" ? "Tipo apparecchio" : "Luminaire type",p.language === "it" ? "Potenza esistente" : "Existing wattage"',
+  },
+  {
+    label: 'existing luminaire type cell',
+    before: '</select></td><td><NumericInput value={g.existingWattage}',
+    after: '</select></td><td>{categoryLabel(g.existingCategory || g.luminaireCategory)}</td><td><NumericInput value={g.existingWattage}',
+  },
+]);
+
+patchFile('src/main.jsx', [
+  {
+    label: 'remove legacy agent parameter injection',
+    before: 'import "./agentProjectInputs.js";\n',
+    after: '',
+  },
+]);
+
+console.log('Agent grouping, luminaire compatibility, type summary and safe assumptions patched');
