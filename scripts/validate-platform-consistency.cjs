@@ -4,6 +4,9 @@ const read = (path) => fs.readFileSync(path, 'utf8');
 const app = read('src/App.jsx');
 const main = read('src/main.jsx');
 const catalogue = read('src/productCatalogue.js');
+const warranty = read('src/warranty.js');
+const report = read('src/report.js');
+const preliminaryProposal = read('src/preliminaryProposal.js');
 
 const checks = [
   {
@@ -29,6 +32,18 @@ const checks = [
   {
     name: 'Agent pricing remains protected',
     ok: app.includes('if (isAgent && path[0] === "pricing") return all;'),
+  },
+  {
+    name: 'Customer-facing warranty label contains term only',
+    ok: warranty.includes('`${warranty.selectedYears} anni`')
+      && warranty.includes('`${warranty.selectedYears} years`')
+      && !warranty.includes('return warranty.isExtended ? `${warranty.selectedYears} anni · +')
+      && !warranty.includes('`${warranty.selectedYears} anni · standard`'),
+  },
+  {
+    name: 'All customer PDFs use the shared warranty label',
+    ok: report.includes('[it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)]')
+      && preliminaryProposal.includes('[it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)]'),
   },
 ];
 

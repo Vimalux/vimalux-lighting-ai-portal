@@ -56,9 +56,11 @@ export function applyWarrantyPricing(project = {}) {
   };
 }
 
+// Customer-facing warranty text intentionally shows only the included term.
+// Commercial uplift remains internal to pricing and must not leak into reports/proposals.
 export function warrantyLabel(project = {}, language = "it") {
   const warranty = projectWarranty(project);
-  const pct = warranty.upliftPercentSnapshot.toLocaleString(language === "it" ? "it-IT" : "en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (language === "it") return warranty.isExtended ? `${warranty.selectedYears} anni · +${pct}%` : `${warranty.selectedYears} anni · standard`;
-  return warranty.isExtended ? `${warranty.selectedYears} years · +${pct}%` : `${warranty.selectedYears} years · standard`;
+  return language === "it"
+    ? `${warranty.selectedYears} anni`
+    : `${warranty.selectedYears} years`;
 }
