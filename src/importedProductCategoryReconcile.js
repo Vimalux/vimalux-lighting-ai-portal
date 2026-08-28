@@ -1,5 +1,4 @@
 import { compatibleLedProducts, isCatalogueProductCompatible, normalizeProductCategory } from "./productCatalogue.js";
-import { saveCloudState } from "./supabase.js";
 
 const STORAGE_KEY = "vimalux-intelligence-projects";
 const numberValue = (value) => {
@@ -62,32 +61,36 @@ export function reconcileImportedProjectProductCategories(project) {
   return changed ? { ...project, groups, updatedAt: new Date().toISOString() } : project;
 }
 
-function readProjects() {
+function readStoredContainer() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.projects) ? parsed.projects : []);
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(parsed)) return { parsed, projects: parsed, wrapped: false };
+    if (Array.isArray(parsed?.projects)) return { parsed, projects: parsed.projects, wrapped: true };
+    return { parsed: [], projects: [], wrapped: false };
   } catch {
-    return [];
+    return { parsed: [], projects: [], wrapped: false };
   }
 }
 
-async function reconcileStoredProjects() {
-  const projects = readProjects();
-  if (!projects.length) return;
-  const changed = [];
-  const next = projects.map((project) => {
+function reconcileStoredProjects() {
+  const container = readStoredContainer();
+  if (!container.projects.length) return;
+  let changed = false;
+  const projects = container.projects.map((project) => {
     const reconciled = reconcileImportedProjectProductCategories(project);
-    if (reconciled !== project) changed.push(reconciled);
+    if (reconciled !== project) changed = true;
     return reconciled;
   });
-  if (!changed.length) return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  try { await saveCloudState(changed); } catch { /* local correction remains; normal sync can retry */ }
+  if (!changed) return;
+  const nextValue = container.wrapped ? { ...container.parsed, projects } : projects;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextValue));
   window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
 }
 
 if (typeof window !== "undefined") {
-  // Repair already-imported projects once the current cloud/local state has loaded.
+  // Repair already-imported projects after the current project state has loaded.
+  // The app's existing persistence/sync layer will then persist the corrected state.
   window.setTimeout(reconcileStoredProjects, 1200);
 
   // Re-run after an import/re-import. The existing confirmation guard decides whether
