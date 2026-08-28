@@ -2,6 +2,7 @@ import { numberValue } from "./calculations.js";
 
 export const today = () => new Date().toISOString().slice(0, 10);
 export const uid = () => Math.random().toString(36).slice(2, 10);
+export const SALUZZO_VIA_RAMELLO_AUDIT_NOTE = "Assumption: SAP 100W baseline inferred from project reference replacement ITALO ~31W. To be confirmed if field/as-built data becomes available.";
 
 const FALLBACK_CATALOGUE = {
   led: [
@@ -47,7 +48,7 @@ export function storedMasterCatalogue() {
 }
 
 export const defaultProject = () => ({
-  id: uid(), version: 1, language: "it", name: "Nuovo progetto", createdAt: today(), updatedAt: new Date().toISOString(),
+  id: uid(), version: 1, language: "it", name: "Nuovo progetto", createdAt: today(), updatedAt: new Date().toISOString(), crmUpdatedAt: "",
   customer: { name: "", province: "", region: "", country: "Italia", contact: "", title: "", email: "", telephone: "" },
   project: { name: "Nuovo progetto", businessCaseId: `BC-${Date.now().toString().slice(-6)}`, consultant: "", date: today(), currency: "EUR" },
   crm: { customerId: "", contactId: "", agentId: "", agentName: "", source: "", opportunityId: "", uniqueProjectId: "", status: "lead", closingProbability: 25, totalContractValue: null, expectedCloseDate: "", goStatus: "", notes: "", businessCaseUrl: "", plannerProjectUrl: "", businessCase: null, importHistory: [] },
@@ -154,6 +155,28 @@ export function migrateProject(saved) {
   project.groups = (Array.isArray(project.groups) ? project.groups : [])
     .filter((group) => !isImportedTotalGroup(group))
     .map((g) => ({ existingSystemFactor: 0, existingDimmingProfile: "none", existingDimmingMethod: "average", existingDimmingPercent: 0, existingFullPowerHours: 0, existingReducedHours: 0, existingReducedLoadPercent: 100, existingDimmingNote: "", existingDriverType: "non_dimmable", upgradeSelected: true, ...g, projectLedWattage: g.projectLedWattage ?? g.importedProposedWattage ?? null, id: g.id || uid() }));
+  const identity = [project.name, project.project?.name, project.customer?.name].filter(Boolean).join(" ").toLowerCase();
+  const total = project.groups.reduce((sum, group) => sum + Math.max(0, numberValue(group.quantity)), 0);
+  const obsolete = project.groups.filter((group) => /da classificare|to classify|unclassified/.test(String(group.name || "").toLowerCase()));
+  const obsoleteQuantity = obsolete.reduce((sum, group) => sum + Math.max(0, numberValue(group.quantity)), 0);
+  if (identity.includes("saluzzo") && total === 443 && obsoleteQuantity === 86) {
+    const retained = project.groups.filter((group) => !obsolete.includes(group));
+    const retainedQuantity = retained.reduce((sum, group) => sum + Math.max(0, numberValue(group.quantity)), 0);
+    if (retainedQuantity === 357) {
+      const proposed = project.catalogue.led.find((item) => item.active) || project.catalogue.led[0] || {};
+      project.groups = [...retained, {
+        id: uid(), name: "Via Ramello – miglioria criterio H", quantity: 14,
+        technology: "SAP", existingWattage: 100, category: "Stradale",
+        luminaireCategory: "STREET", existingCategory: "STREET",
+        replacementRequirement: "Sostituzione completa", currentLuminaireModel: "",
+        upgradeSelected: true, proposedProductId: proposed.id || "", projectLedWattage: proposed.wattage ?? null,
+        smartAssigned: true, powerAidAssigned: true, dataQuality: "assumption",
+        source: "ProjectInputSheet", notes: SALUZZO_VIA_RAMELLO_AUDIT_NOTE,
+      }];
+      project.updatedAt = new Date().toISOString();
+      project.migrations = [...(Array.isArray(project.migrations) ? project.migrations : []), { id: "saluzzo-371-v1", appliedAt: project.updatedAt }];
+    }
+  }
   project.additionalCosts = (Array.isArray(project.additionalCosts) ? project.additionalCosts : []).map((item) => ({
     id: item?.id || uid(),
     description: String(item?.description || ""),

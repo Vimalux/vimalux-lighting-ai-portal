@@ -1,15 +1,7 @@
 import { calculateAdditionalCosts } from "./additionalCosts.js";
+import { parseLocalizedNumber } from "./i18n.js";
 
-export const numberValue = (value) => {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (value == null || value === "") return 0;
-  let text = String(value).trim().replace(/\s/g, "");
-  const comma = text.lastIndexOf(",");
-  const dot = text.lastIndexOf(".");
-  if (comma >= 0 && dot >= 0) text = comma > dot ? text.replace(/\./g, "").replace(",", ".") : text.replace(/,/g, "");
-  else if (comma >= 0) text = text.replace(/\./g, "").replace(",", ".");
-  return Number.isFinite(Number(text)) ? Number(text) : 0;
-};
+export const numberValue = parseLocalizedNumber;
 
 const n = numberValue;
 const positive = (v) => Math.max(0, n(v));

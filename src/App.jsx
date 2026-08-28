@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { calculateBusinessCase, numberValue } from "./calculations.js";
 import { defaultProject, loadProjects, migrateProject, uid } from "./model.js";
-import { formatMoney, formatNumber, formatPercent, useT } from "./i18n.js";
+import { formatInputNumber, formatMoney, formatNumber, formatPercent, useT } from "./i18n.js";
 import { generateCustomerPdf } from "./report.js";
 import {
   crmMetrics,
@@ -162,6 +162,7 @@ export default function App() {
   const result = useMemo(() => calculateBusinessCase(applyWarrantyPricing(project)), [project]);
   const syncedProjects = useMemo(() => projects.map((item) => syncBusinessCaseResult(item, item.updatedAt || item.createdAt)), [projects]);
   const syncedProject = syncedProjects.find((item) => item.id === project.id) || syncBusinessCaseResult(project, project.updatedAt || project.createdAt);
+  useEffect(() => { document.documentElement.lang = project.language; }, [project.language]);
   useEffect(
     () =>
       localStorage.setItem(
@@ -356,7 +357,7 @@ export default function App() {
       }
       return all.map((p) => {
         if (p.id !== project.id) return p;
-        let next = setPath({ ...p, updatedAt: changedAt }, path, normalized);
+        let next = setPath({ ...p, updatedAt: changedAt, ...(path[0] === "crm" ? { crmUpdatedAt: changedAt } : {}) }, path, normalized);
         if (path[0] === "solution" && path[1] === "cmsPartner") next = setPath(next, ["solution", "lcuProductId"], "");
         if (path[0] === "crm" && path[1] === "status" && normalized === "won")
           next = setPath(next, ["crm", "closingProbability"], 100);
@@ -516,7 +517,7 @@ export default function App() {
       const sheet = sheets[0];
       const mapping = guessLightingMapping(sheet.headers);
       if (mapping.wattage === "") throw new Error("Could not identify a wattage column. Use the import mapping under Existing Lighting.");
-      const imported = buildImportedGroups(sheet.rows, mapping, p.catalogue.led, p.language);
+      const imported = buildImportedGroups(sheet.rows, mapping, p.catalogue.led, p.language, "grouped", { fileName: file.name, sheetName: sheet.name, projectName: p.project.name, customerName: p.customer.name });
       if (!imported.groups.length) throw new Error("No valid luminaires were found.");
       if (!confirm(`${file.name}\nGeneric lighting file\n${imported.message}\n\nImport as a new project?`)) return;
       const importedProjectName = String(sheet.projectIdCellC6 || "").trim() || file.name.replace(/\.(xlsx?|csv)$/i, "");
@@ -590,11 +591,9 @@ function AuthScreen() {
   return <div className="auth-screen"><form className="auth-card" onSubmit={submit}><div className="auth-logo">V</div><h1>VIMALUX Intelligence</h1><p>Accedi con l’account Supabase autorizzato.<br />Sign in with your authorised Supabase account.</p><Field label="Email" type="email" value={email} onChange={setEmail} /><Field label="Password" type="password" value={password} onChange={setPassword} />{message && <div className="sync-error">{message}</div>}<button className="primary" disabled={busy}>{busy ? "Accesso…" : "Accedi / Sign in"}</button></form></div>;
 }
 function setPath(object, path, value) { const copy = structuredClone(object); let cursor = copy; path.slice(0, -1).forEach((k) => (cursor = cursor[k])); cursor[path.at(-1)] = value; return migrateProject(copy); }
-function activeUiLanguage() { return document.querySelector('select[aria-label="Language"]')?.value || "it"; }
-function inputLocale(language) { return language === "da" ? "da-DK" : language === "en" ? "en-IE" : "it-IT"; }
+function activeUiLanguage() { return document.documentElement.lang || document.querySelector('select[aria-label="Language"]')?.value || "it"; }
 function cleanInputNumber(value) { const n = Number(value); return Number.isFinite(n) ? Number(n.toFixed(6)) : 0; }
-function formatInputNumber(value, language = activeUiLanguage()) { const n = Number(value); if (!Number.isFinite(n)) return ""; return new Intl.NumberFormat(inputLocale(language), { useGrouping: true, minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n); }
-function NumericInput({ value, onChange, placeholder, disabled = false }) { const [draft, setDraft] = useState(value == null ? "" : String(cleanInputNumber(value))); const [focused, setFocused] = useState(false); useEffect(() => { if (!focused) setDraft(value == null ? "" : String(cleanInputNumber(value))); }, [value, focused]); const display = focused ? draft : (value == null || value === "" ? "" : formatInputNumber(value)); return <input inputMode="decimal" value={display} placeholder={placeholder} disabled={disabled} onFocus={() => { setDraft(value == null ? "" : String(cleanInputNumber(value))); setFocused(true); }} onChange={(e) => setDraft(e.target.value)} onBlur={() => { onChange(draft); setFocused(false); }} />; }
+function NumericInput({ value, onChange, placeholder, disabled = false, price = false }) { const language = activeUiLanguage(); const [draft, setDraft] = useState(value == null ? "" : String(cleanInputNumber(value))); const [focused, setFocused] = useState(false); useEffect(() => { if (!focused) setDraft(value == null || value === "" ? "" : formatInputNumber(value, language, { price })); }, [value, focused, language, price]); const display = focused ? draft : (value == null || value === "" ? "" : formatInputNumber(value, language, { price })); return <input inputMode="decimal" value={display} placeholder={placeholder} disabled={disabled} onFocus={() => { setDraft(value == null || value === "" ? "" : String(value)); setFocused(true); }} onChange={(e) => setDraft(e.target.value)} onBlur={() => { onChange(draft); setFocused(false); }} />; }
 const Field = ({ label, value, onChange, type = "text", children, disabled = false }) => <label className={disabled ? "field-disabled" : ""}><span>{label}</span>{children ? <select disabled={disabled} value={value} onChange={(e) => onChange(e.target.value)}>{children}</select> : typeof value === "number" ? <NumericInput disabled={disabled} value={value} onChange={onChange} /> : <input type={type} disabled={disabled} value={value ?? ""} onChange={(e) => onChange(e.target.value)} />}</label>;
 const Toggle = ({ label, value, onChange, disabled = false, title = "" }) => <label className={`toggle ${disabled ? "field-disabled" : ""}`} title={title}><input type="checkbox" checked={Boolean(value)} disabled={disabled} onChange={(e) => onChange(e.target.checked)} /><span>{label}</span></label>;
 const Card = ({ title, children, className = "" }) => <section className={`card ${className}`.trim()}><h2>{title}</h2>{children}</section>;
@@ -645,7 +644,7 @@ function Existing({ p, update, t, readOnly = false }) {
 function LightingImportModal({ p, state, setState, close, apply }) {
   const sheet = state.sheets[state.sheetIndex];
   const setMapping = (field, value) => setState({ ...state, mapping: { ...state.mapping, [field]: value } });
-  const preview = state.mapping.wattage === "" ? null : buildImportedGroups(sheet.rows, state.mapping, p.catalogue.led, p.language, state.mode);
+  const preview = state.mapping.wattage === "" ? null : buildImportedGroups(sheet.rows, state.mapping, p.catalogue.led, p.language, state.mode, { fileName: state.fileName, sheetName: sheet.name, projectName: p.project.name, customerName: p.customer.name });
   const labels = p.language === "it" ? { title:"Importa illuminazione esistente",sheet:"Foglio",type:"Tipo lampada",category:"Tipo apparecchio",watt:"Potenza (W)",qty:"Quantità (opzionale)",name:"Via / posizione (opzionale)",asset:"ID lampada / palo (opzionale)",skip:"- Ignora -",replace:"Sostituisci righe",append:"Aggiungi righe",cancel:"Annulla",individual:"Una riga per lampada",grouped:"Raggruppa tipo e potenza" } : { title:"Import existing lighting",sheet:"Sheet",type:"Lamp type",category:"Luminaire category",watt:"Wattage (W)",qty:"Quantity (optional)",name:"Street / location (optional)",asset:"Luminaire / pole ID (optional)",skip:"- Skip -",replace:"Replace rows",append:"Append rows",cancel:"Cancel",individual:"One row per luminaire",grouped:"Group by type and wattage" };
   const mappingField = (field,label,required=false) => <label><span>{label}{required ? " *" : ""}</span><select value={state.mapping[field]} onChange={(e) => setMapping(field, e.target.value)}><option value="">{labels.skip}</option>{sheet.headers.map((header,index) => <option key={`${header}-${index}`} value={index}>{header}</option>)}</select></label>;
   return <div className="modal-backdrop" role="dialog" aria-modal="true"><section className="import-modal"><div className="modal-head"><div><h2>{labels.title}</h2><p>{state.fileName} · {sheet.rows.length} {p.language === "it" ? "righe" : "rows"} · {sheet.headers.length} {p.language === "it" ? "colonne" : "columns"}</p></div><button onClick={close} aria-label="Close">×</button></div>{state.sheets.length > 1 && <Field label={labels.sheet} value={state.sheetIndex} onChange={(value) => { const index = Number(value); setState({ ...state, sheetIndex: index, mapping: guessLightingMapping(state.sheets[index].headers) }); }}>{state.sheets.map((item,index) => <option key={item.name} value={index}>{item.name}</option>)}</Field>}<div className="import-mode"><label><input type="radio" checked={state.mode === "individual"} onChange={() => setState({ ...state, mode: "individual" })} /><span>{labels.individual}</span></label><label><input type="radio" checked={state.mode === "grouped"} onChange={() => setState({ ...state, mode: "grouped" })} /><span>{labels.grouped}</span></label></div><div className="mapping-grid">{mappingField("assetId",labels.asset)}{mappingField("name",labels.name)}{mappingField("technology",labels.type)}{mappingField("category",labels.category)}{mappingField("wattage",labels.watt,true)}{mappingField("quantity",labels.qty)}</div><div className="import-preview"><strong>{preview ? preview.message : p.language === "it" ? "Seleziona la colonna potenza." : "Select the wattage column."}</strong>{preview && <span>{preview.skipped} {p.language === "it" ? "righe ignorate" : "rows skipped"}</span>}</div><div className="preview-table"><table><thead><tr><th>{state.mode === "individual" ? p.language === "it" ? "Lampada" : "Luminaire" : p.language === "it" ? "Gruppo" : "Group"}</th><th>{p.language === "it" ? "Tipo" : "Type"}</th><th>W</th><th>{p.language === "it" ? "Quantità" : "Quantity"}</th></tr></thead><tbody>{preview?.groups.slice(0,8).map((group) => <tr key={group.id}><td>{group.name}</td><td>{group.technology}</td><td>{group.existingWattage}</td><td>{group.quantity}</td></tr>)}</tbody></table>{preview?.groups.length > 8 && <p className="hint">+ {preview.groups.length - 8} {p.language === "it" ? "altre righe" : "more rows"}</p>}</div><div className="modal-actions"><button onClick={close}>{labels.cancel}</button><button className="secondary" disabled={!preview?.groups.length} onClick={() => apply(preview.groups,"append")}>{labels.append}</button><button className="primary" disabled={!preview?.groups.length} onClick={() => { if (confirm(p.language === "it" ? "Sostituire le righe esistenti con i dati importati?" : "Replace existing rows with the imported data?")) apply(preview.groups,"replace"); }}>{labels.replace}</button></div></section></div>;

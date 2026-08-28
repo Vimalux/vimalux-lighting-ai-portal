@@ -3,12 +3,16 @@ import assert from "node:assert/strict";
 import { buildImportedGroups, detectWorkbookType, guessLightingMapping, normalizeLuminaireCategory, normalizeReplacementRequirement, normalizeTechnology, parseNoleggioWorkbook, parsePlannerWorkbook } from "../src/lightingImport.js";
 
 const emptyExtended = {
-  category: "", replacementRequirement: "", operatingHours: "", lumen: "", description: "", usefulLifetime: "", kelvin: "", socket: "", installationHeight: "",
+  category: "", replacementRequirement: "", operatingHours: "", lumen: "", description: "", usefulLifetime: "", kelvin: "", socket: "", installationHeight: "", notes: "",
 };
 
 test("column mapping recognises common lighting headers", () => {
   assert.deepEqual(guessLightingMapping(["Asset_ID", "Street", "Lamp Type", "Wattage", "Quantity"]), { technology: "2", wattage: "3", quantity: "4", name: "1", assetId: "0", ...emptyExtended });
 });
+
+test("grouping preserves distinct current models and replacement characteristics",()=>{const rows=[["Via A","SAP",70,"Retrofit","AEC IBOX SMART"],["Via A","SAP",70,"Sostituzione completa","AEC IBOX SMART"],["Via A","SAP",70,"Retrofit","AEC IBOX OTHER"]];const mapping={name:"0",technology:"1",wattage:"2",replacementRequirement:"3",description:"4",quantity:"",assetId:"",category:"",notes:""};const result=buildImportedGroups(rows,mapping,[{id:"led-1",wattage:25,active:true}],"it","grouped");assert.equal(result.groups.length,3)});
+
+test("Saluzzo Via Ramello missing wattage receives audited 14 x SAP 100W",()=>{const rows=[["Via Ramello","SAP","",14,"Stradale"]];const mapping={name:"0",technology:"1",wattage:"2",quantity:"3",category:"4",assetId:"",replacementRequirement:"",description:"",notes:""};const result=buildImportedGroups(rows,mapping,[{id:"led-vimalux",active:true,wattage:31}],"it","grouped",{projectName:"Saluzzo"});const group=result.groups[0];assert.equal(result.totalQuantity,14);assert.equal(group.name,"Via Ramello – miglioria criterio H");assert.equal(group.technology,"SAP");assert.equal(group.existingWattage,100);assert.equal(group.replacementRequirement,"REPLACE");assert.match(group.notes,/Assumption: SAP 100W baseline/)});
 
 test("official VML Input Sheet semantic headers map automatically", () => {
   assert.deepEqual(
