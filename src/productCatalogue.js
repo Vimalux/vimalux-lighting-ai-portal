@@ -22,6 +22,23 @@ export function normalizeProductCategory(value) {
   return "OTHER";
 }
 
+export function inferProductCategory(product = {}) {
+  const explicit = normalizeProductCategory(product.productCategory || product.category || product.type);
+  if (explicit !== "OTHER") return explicit;
+
+  // Older catalogue rows pre-date structured compatibility metadata. Infer only
+  // VIMALUX families we know, so category-aware imports do not fall back to an
+  // unrelated family merely because its wattage is numerically closer.
+  const identity = upper([product.model, product.name, product.sku, product.code, product.id].filter(Boolean).join(" "));
+  if (/\b(OPERA|RETRO)\b/.test(identity)) return "URBAN";
+  if (/\b(MANTA|MAKO|ZETA)\b/.test(identity)) return "STREET";
+  if (/\b(FL01|FLOOD|PROJECTOR|PROIETTORE)\b/.test(identity)) return "FLOODLIGHT";
+  if (/\b(GLOBO|GLOBE)\b/.test(identity)) return "GLOBO";
+  if (/\b(LANTERN|LANTERNA)\b/.test(identity)) return "LANTERN";
+  if (/\b(UPLIGHT|INGROUND|IN_GROUND|INCASSO)\b/.test(identity)) return "UPLIGHT";
+  return "OTHER";
+}
+
 export function normalizeReplacementStrategy(value) {
   const code = upper(value);
   if (STRATEGY_CODES.has(code)) return code;
@@ -31,7 +48,7 @@ export function normalizeReplacementStrategy(value) {
 }
 
 export function normalizeCatalogueProduct(product = {}) {
-  const productCategory = normalizeProductCategory(product.productCategory || product.category || product.type);
+  const productCategory = inferProductCategory(product);
   const compatibleExistingCategories = asArray(product.compatibleExistingCategories || product.compatibleCategories)
     .map(normalizeProductCategory)
     .filter((value, index, all) => value && all.indexOf(value) === index);
@@ -65,10 +82,14 @@ export function isCatalogueProductCompatible(product, existingCategory = "OTHER"
   const existing = normalizeProductCategory(existingCategory);
   const requirement = normalizeReplacementStrategy(replacementRequirement);
 
-  // Legacy catalogue rows without compatibility metadata remain selectable until the master catalogue is migrated.
-  const categoryOk = normalized.compatibleExistingCategories.length === 0
-    || normalized.compatibleExistingCategories.includes(existing)
-    || normalized.compatibleExistingCategories.includes("OTHER");
+  // Structured compatibility metadata is authoritative. For legacy VIMALUX
+  // rows, the inferred product family becomes the category guard. Truly
+  // unknown legacy rows remain selectable until the master catalogue is fully
+  // migrated, preserving backwards compatibility without allowing MANTA to
+  // masquerade as an urban luminaire (or OPERA as a street luminaire).
+  const categoryOk = normalized.compatibleExistingCategories.length > 0
+    ? normalized.compatibleExistingCategories.includes(existing) || normalized.compatibleExistingCategories.includes("OTHER")
+    : existing === "OTHER" || normalized.productCategory === "OTHER" || normalized.productCategory === existing;
 
   const strategyOk = normalized.replacementStrategies.length === 0
     || requirement === "UNKNOWN"
