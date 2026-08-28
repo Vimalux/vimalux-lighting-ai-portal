@@ -13,7 +13,7 @@ const hasToken = (identity, token) => identity === token || identity.startsWith(
 export function normalizeProductCategory(value) {
   const code = upper(value);
   if (CATEGORY_CODES.has(code)) return code;
-  if (["ROAD", "STREETLIGHT", "COBRA", "COBRA_HEAD"].includes(code)) return "STREET";
+  if (["ROAD", "STREETLIGHT", "COBRA", "COBRA_HEAD", "STRADALE"].includes(code)) return "STREET";
   if (["DECORATIVE", "URBAN_LIGHT", "ARREDO_URBANO"].includes(code)) return "URBAN";
   if (["GLOBE"].includes(code)) return "GLOBO";
   if (["FLOOD", "PROJECTOR", "PROIETTORE"].includes(code)) return "FLOODLIGHT";
@@ -83,14 +83,15 @@ export function isCatalogueProductCompatible(product, existingCategory = "OTHER"
   const existing = normalizeProductCategory(existingCategory);
   const requirement = normalizeReplacementStrategy(replacementRequirement);
 
-  // Structured compatibility metadata is authoritative. For legacy VIMALUX
-  // rows, the inferred product family becomes the category guard. Truly
-  // unknown legacy rows remain selectable until the master catalogue is fully
-  // migrated, preserving backwards compatibility without allowing MANTA to
-  // masquerade as an urban luminaire (or OPERA as a street luminaire).
-  const categoryOk = normalized.compatibleExistingCategories.length > 0
-    ? normalized.compatibleExistingCategories.includes(existing) || normalized.compatibleExistingCategories.includes("OTHER")
-    : existing === "OTHER" || normalized.productCategory === "OTHER" || normalized.productCategory === existing;
+  // A known VIMALUX family is authoritative for family/category compatibility.
+  // Legacy metadata value OTHER must never act as a wildcard that lets a known
+  // STREET family (e.g. MANTA) masquerade as URBAN, or vice versa.
+  const knownFamily = normalized.productCategory !== "OTHER";
+  const familyOk = existing === "OTHER" || !knownFamily || normalized.productCategory === existing;
+  const metadataOk = normalized.compatibleExistingCategories.length === 0
+    || normalized.compatibleExistingCategories.includes(existing)
+    || (!knownFamily && normalized.compatibleExistingCategories.includes("OTHER"));
+  const categoryOk = familyOk && metadataOk;
 
   const strategyOk = normalized.replacementStrategies.length === 0
     || requirement === "UNKNOWN"
