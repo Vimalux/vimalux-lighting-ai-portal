@@ -27,9 +27,6 @@ export function inferProductCategory(product = {}) {
   const explicit = normalizeProductCategory(product.productCategory || product.category || product.type);
   if (explicit !== "OTHER") return explicit;
 
-  // Older catalogue rows pre-date structured compatibility metadata. Infer only
-  // VIMALUX families we know, so category-aware imports do not fall back to an
-  // unrelated family merely because its wattage is numerically closer.
   const identity = upper([product.model, product.name, product.sku, product.code, product.id].filter(Boolean).join(" "));
   if (hasToken(identity, "OPERA") || hasToken(identity, "RETRO")) return "URBAN";
   if (hasToken(identity, "MANTA") || hasToken(identity, "MAKO") || hasToken(identity, "ZETA")) return "STREET";
@@ -64,7 +61,6 @@ export function normalizeCatalogueProduct(product = {}) {
     replacementStrategies,
     efficiency: Number(product.efficiency || 0) || (Number(product.wattage) > 0 ? Number(product.lumen || 0) / Number(product.wattage) : 0),
     cctCriCode: String(product.cctCriCode ?? product.cctCri ?? "").trim(),
-    // Legacy fields are retained for existing catalogue rows, but new performance variants use cctCriCode (730/740/830/840 etc.).
     cct: product.cct ?? "",
     ip: product.ip ?? "",
     ik: product.ik ?? "",
@@ -82,16 +78,20 @@ export function isCatalogueProductCompatible(product, existingCategory = "OTHER"
   const normalized = normalizeCatalogueProduct(product);
   const existing = normalizeProductCategory(existingCategory);
   const requirement = normalizeReplacementStrategy(replacementRequirement);
-
-  // A known VIMALUX family is authoritative for family/category compatibility.
-  // Legacy metadata value OTHER must never act as a wildcard that lets a known
-  // STREET family (e.g. MANTA) masquerade as URBAN, or vice versa.
   const knownFamily = normalized.productCategory !== "OTHER";
-  const familyOk = existing === "OTHER" || !knownFamily || normalized.productCategory === existing;
-  const metadataOk = normalized.compatibleExistingCategories.length === 0
-    || normalized.compatibleExistingCategories.includes(existing)
-    || (!knownFamily && normalized.compatibleExistingCategories.includes("OTHER"));
-  const categoryOk = familyOk && metadataOk;
+
+  let categoryOk;
+  if (normalized.compatibleExistingCategories.length > 0) {
+    if (normalized.compatibleExistingCategories.includes(existing)) {
+      categoryOk = true;
+    } else if (normalized.compatibleExistingCategories.includes("OTHER")) {
+      categoryOk = existing === "OTHER" || !knownFamily || normalized.productCategory === existing;
+    } else {
+      categoryOk = false;
+    }
+  } else {
+    categoryOk = existing === "OTHER" || !knownFamily || normalized.productCategory === existing;
+  }
 
   const strategyOk = normalized.replacementStrategies.length === 0
     || requirement === "UNKNOWN"
