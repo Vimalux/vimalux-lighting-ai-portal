@@ -8,6 +8,7 @@ const asArray = (value) => {
 };
 
 const upper = (value) => String(value || "").trim().toUpperCase().replace(/[ -]+/g, "_");
+const hasToken = (identity, token) => identity === token || identity.startsWith(`${token}_`) || identity.endsWith(`_${token}`) || identity.includes(`_${token}_`);
 
 export function normalizeProductCategory(value) {
   const code = upper(value);
@@ -30,12 +31,12 @@ export function inferProductCategory(product = {}) {
   // VIMALUX families we know, so category-aware imports do not fall back to an
   // unrelated family merely because its wattage is numerically closer.
   const identity = upper([product.model, product.name, product.sku, product.code, product.id].filter(Boolean).join(" "));
-  if (/\b(OPERA|RETRO)\b/.test(identity)) return "URBAN";
-  if (/\b(MANTA|MAKO|ZETA)\b/.test(identity)) return "STREET";
-  if (/\b(FL01|FLOOD|PROJECTOR|PROIETTORE)\b/.test(identity)) return "FLOODLIGHT";
-  if (/\b(GLOBO|GLOBE)\b/.test(identity)) return "GLOBO";
-  if (/\b(LANTERN|LANTERNA)\b/.test(identity)) return "LANTERN";
-  if (/\b(UPLIGHT|INGROUND|IN_GROUND|INCASSO)\b/.test(identity)) return "UPLIGHT";
+  if (hasToken(identity, "OPERA") || hasToken(identity, "RETRO")) return "URBAN";
+  if (hasToken(identity, "MANTA") || hasToken(identity, "MAKO") || hasToken(identity, "ZETA")) return "STREET";
+  if (hasToken(identity, "FL01") || hasToken(identity, "FLOOD") || hasToken(identity, "PROJECTOR") || hasToken(identity, "PROIETTORE")) return "FLOODLIGHT";
+  if (hasToken(identity, "GLOBO") || hasToken(identity, "GLOBE")) return "GLOBO";
+  if (hasToken(identity, "LANTERN") || hasToken(identity, "LANTERNA")) return "LANTERN";
+  if (hasToken(identity, "UPLIGHT") || hasToken(identity, "INGROUND") || hasToken(identity, "INCASSO")) return "UPLIGHT";
   return "OTHER";
 }
 
