@@ -52,8 +52,16 @@ const groups = [
 
 const style = `
   position:fixed; inset:0; z-index:100000; background:rgba(7,18,34,.62);
-  display:flex; align-items:flex-start; justify-content:center; overflow:auto; padding:28px;
+  align-items:flex-start; justify-content:center; overflow:auto; padding:28px;
 `;
+
+function hideModal(overlay) {
+  overlay.style.display = "none";
+}
+
+function showModal(overlay) {
+  overlay.style.display = "flex";
+}
 
 function modal() {
   const existing = document.getElementById("vimalux-default-assumptions-modal");
@@ -61,7 +69,7 @@ function modal() {
   const overlay = document.createElement("div");
   overlay.id = "vimalux-default-assumptions-modal";
   overlay.style.cssText = style;
-  overlay.hidden = true;
+  hideModal(overlay);
   overlay.innerHTML = `
     <div style="width:min(1080px,96vw);background:#fff;border-radius:16px;padding:24px;box-shadow:0 24px 60px rgba(0,0,0,.28);font-family:inherit;color:#10223a">
       <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px">
@@ -96,7 +104,7 @@ function modal() {
   });
 
   overlay.addEventListener("click", (event) => {
-    if (event.target === overlay || event.target.closest("[data-default-close]")) overlay.hidden = true;
+    if (event.target === overlay || event.target.closest("[data-default-close]")) hideModal(overlay);
   });
   overlay.querySelector("[data-default-reset]").addEventListener("click", () => fill(overlay, BASE_ASSUMPTIONS));
   overlay.querySelector("[data-default-save]").addEventListener("click", () => {
@@ -111,7 +119,7 @@ function modal() {
     values.rateProfileId = "custom";
     values.interestRateSnapshot = { profileId: "custom", annualRate: values.interestRate, capturedAt: null };
     localStorage.setItem(DEFAULT_ASSUMPTIONS_STORAGE_KEY, JSON.stringify({ version: 1, updatedAt: new Date().toISOString(), values }));
-    overlay.hidden = true;
+    hideModal(overlay);
   });
   return overlay;
 }
@@ -126,7 +134,7 @@ function fill(overlay, values) {
 function openDefaults() {
   const overlay = modal();
   fill(overlay, readStoredDefaultAssumptions());
-  overlay.hidden = false;
+  showModal(overlay);
 }
 
 function installMenu() {
