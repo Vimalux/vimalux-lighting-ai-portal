@@ -7,6 +7,7 @@ Production-ready preliminary business-case platform for municipal street-lightin
 - React and Vite frontend
 - A single calculation engine in `src/calculations.js`
 - Supabase authentication and persistent catalogue/project storage
+- CRM RC1 opportunity import, authoritative Business Case snapshots and Planner-ready handoff
 - Safe local/cloud project reconciliation using update timestamps
 - PDF generation with jsPDF
 - Italian and English user interface
@@ -22,4 +23,5 @@ The Supabase project must contain the `intelligence_catalogue` and `intelligence
 ## Verification
 
 - `npm test` runs the calculation, import, project-sync, and report tests.
+- See `VIMALUX_DATA_FLOW.md` for Agent Excel, legacy CRM import, Business Case sync and Planner field mapping.
 - `npm run build` creates the production bundle in `dist`.

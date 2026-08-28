@@ -1,0 +1,42 @@
+name: Fix legacy product selection
+on:
+  push:
+    paths:
+      - '.github/fix-legacy-product-selection.trigger'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch Existing Lighting legacy product selector
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/App.jsx')
+          s = p.read_text()
+          anchor = '  const setUpgradeForVisible = (upgradeSelected) => { if (!visibleGroups.length) return; update(["groups"], p.groups.map((group) => matchesFilter(group) ? { ...group, upgradeSelected } : group)); };\n'
+          helper = anchor + '  const productsForGroup = (group) => { const active = p.catalogue.led.filter((product) => product.active); const current = p.catalogue.led.find((product) => product.id === group.proposedProductId); return current && !current.active ? [current, ...active] : active; };\n'
+          if 'const productsForGroup = (group)' not in s:
+              if anchor not in s:
+                  raise SystemExit('Existing helper anchor not found')
+              s = s.replace(anchor, helper, 1)
+          old = '>{p.catalogue.led.filter((x) => x.active).map((x) => <option value={x.id} key={x.id}>{x.brand} {x.name} · {x.wattage} W</option>)}</select></td><td><div className="wattage-input">'
+          new = '>{productsForGroup(g).map((x) => <option value={x.id} key={x.id}>{x.brand} {x.name} · {x.wattage} W{x.active ? "" : (p.language === "it" ? " · Legacy / inattivo" : " · Legacy / inactive")}</option>)}</select></td><td><div className="wattage-input">'
+          if old not in s:
+              raise SystemExit('Target group product selector not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+          npm test
+          npm run build
+      - name: Commit patch
+        run: |
+          git config user.name "VIMALUX Automation"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          git add src/App.jsx
+          git diff --cached --quiet || git commit -m "Preserve inactive legacy products in existing project selectors"
+          git push origin HEAD:main

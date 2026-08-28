@@ -9,10 +9,11 @@ export function generatePartnerPdf(partner, projects, language = "it", currency 
   const label = partner === "FELICITY" ? "Felicity / PowerAiD" : partner;
   const rows = partnerProjectRows(projects, partner);
   const totals = partnerTotals(projects, partner);
+  const projectLevel = projects.length === 1;
   const money = value => formatMoney(value, language, currency);
   doc.setFillColor(15, 23, 42); doc.rect(0, 0, 210, 38, "F");
   doc.setTextColor(255); doc.setFontSize(18); doc.text(`${label} Partner Report`, 14, 18);
-  doc.setFontSize(10); doc.text(`VIMALUX Intelligence · ${new Date().toISOString().slice(0,10)}`, 14, 28);
+  doc.setFontSize(10); doc.text(projectLevel ? `${projects[0].customer.name || projects[0].project.name} · ${projects[0].project.businessCaseId}` : `VIMALUX Intelligence · ${new Date().toISOString().slice(0,10)}`, 14, 28);
   doc.setTextColor(15,23,42);
   const datek = partner === "DATEK";
   const summaryHead = datek ? ["Projects","Luminaires","LCUs","Pipeline TCV","Weighted TCV","ARR","CMS contract value"] : ["Projects","Luminaires","LCUs","ARR","Contract value"];
@@ -21,5 +22,5 @@ export function generatePartnerPdf(partner, projects, language = "it", currency 
   const detailHead = datek ? ["Municipality","Project","Probability","Pipeline TCV","Weighted TCV","Annual CMS","Years","CMS contract value"] : ["Municipality","Project","Luminaires","LCUs","Annual revenue","Years","Contract value"];
   const detailBody = datek ? rows.map(row=>[row.municipality,row.project,formatProbabilityPoints(row.probability,language),money(row.pipelineTcv),money(row.weightedTcv),money(row.annualRevenue),row.contractYears,money(row.totalContractValue)]) : rows.map(row=>[row.municipality,row.project,formatNumber(row.luminaires,language),formatNumber(row.lcus||0,language),money(row.annualRevenue),row.contractYears,money(row.totalContractValue)]);
   autoTable(doc,{startY:doc.lastAutoTable.finalY+10,head:[detailHead],body:detailBody,theme:"striped",headStyles:{fillColor:[15,23,42]},styles:{fontSize:7}});
-  doc.save(`${label.replace(/[^a-z0-9]+/gi,"_")}_Partner_Report.pdf`);
+  doc.save(`${label.replace(/[^a-z0-9]+/gi,"_")}_${projectLevel ? projects[0].project.businessCaseId : "Portfolio"}_Partner_Report.pdf`);
 }

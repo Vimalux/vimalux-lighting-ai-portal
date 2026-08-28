@@ -4,8 +4,9 @@ import { calculateBusinessCase } from "../src/calculations.js";
 import { calculateWeightedTcv, crmMetrics, formatProbabilityPoints, pipelineStageTotals, pipelineTotals, probabilityFactor } from "../src/crm.js";
 import { defaultProject } from "../src/model.js";
 import { partnerTotals } from "../src/partners.js";
+import { syncBusinessCaseResult } from "../src/businessCaseSync.js";
 
-test("recurring revenue categories are independently gated", () => {
+test("PowerAiD recurring revenue requires an active CMS connection", () => {
   const project = defaultProject();
   project.solution.powerAidEnabled = true;
   let result = calculateBusinessCase(project);
@@ -14,7 +15,8 @@ test("recurring revenue categories are independently gated", () => {
   project.solution.cmsEnabled = false;
   result = calculateBusinessCase(project);
   assert.equal(result.cmsRevenue, 0);
-  assert.ok(result.savingsAsAServiceRevenue > 0);
+  assert.equal(result.savingsAsAServiceRevenue, 0);
+  assert.equal(result.powerAidSavingKwh, 0);
   project.solution.powerAidEnabled = false;
   result = calculateBusinessCase(project);
   assert.equal(result.savingsAsAServiceRevenue, 0);
@@ -68,13 +70,35 @@ test("stage averages use stored percentage points without multiplying display by
   assert.equal(formatProbabilityPoints(won.averageProbability), "100%");
 });
 
-test("pipeline keeps recurring totals separate and DATEK only receives CMS", () => {
+test("pipeline keeps recurring totals separate and selected CMS partner only receives CMS", () => {
   const project = defaultProject();
   project.solution.powerAidEnabled = true;
-  const pipeline = pipelineTotals([project]);
-  const datek = partnerTotals([project], "DATEK");
+  const selectedLcu = project.catalogue.smart.find(item => item.id === project.solution.lcuProductId);
+  selectedLcu.brand = "DATEK";
+  const synced = syncBusinessCaseResult(project);
+  const pipeline = pipelineTotals([synced]);
+  const datek = partnerTotals([synced], "DATEK");
   const result = calculateBusinessCase(project);
   assert.equal(pipeline.annualRecurringRevenue, result.annualRecurringRevenue);
   assert.equal(datek.arr, result.cmsRevenue);
   assert.notEqual(datek.arr, result.annualRecurringRevenue);
+});
+
+test("Felicity partner value uses supplier share and supports project-level filtering", () => {
+  const first = defaultProject();
+  first.id = "first";
+  first.solution.powerAidEnabled = true;
+  first.assumptions.powerAidCustomerFeePercent = 50;
+  first.assumptions.powerAidSupplierSharePercent = 70;
+  const second = defaultProject();
+  second.id = "second";
+  second.solution.powerAidEnabled = false;
+  const result = calculateBusinessCase(first);
+  const projectOnly = partnerTotals([first], "FELICITY");
+  const portfolio = partnerTotals([first, second], "FELICITY");
+  assert.equal(projectOnly.projects, 1);
+  assert.equal(projectOnly.arr, result.powerAidSupplierCost);
+  assert.equal(projectOnly.totalContractValue, result.powerAidSupplierContractCost);
+  assert.equal(portfolio.projects, 2);
+  assert.equal(portfolio.arr, projectOnly.arr);
 });

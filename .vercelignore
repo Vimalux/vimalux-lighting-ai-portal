@@ -1,0 +1,4 @@
+.playwright-browsers/
+node_modules/
+dist/
+.git/

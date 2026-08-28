@@ -1,0 +1,39 @@
+name: Upgrade customer economics and CMS partners
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/upgrade-customer-economics-cms-partners.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: npm ci
+      - name: Patch and validate Intelligence
+        run: |
+          node scripts/upgrade-customer-economics-cms-partners.cjs
+          npm run prebuild
+          if npx vite build > build-debug.log 2>&1; then
+            echo OK > build-status.txt
+          else
+            echo FAILED > build-status.txt
+            tail -n 100 build-debug.log > build-error-tail.txt
+            git restore src/App.jsx src/partners.js
+          fi
+      - name: Commit result or diagnostics
+        run: |
+          git config user.name "VIMALUX Automation"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          if grep -q OK build-status.txt; then
+            rm -f build-debug.log build-status.txt build-error-tail.txt
+            git add src/App.jsx src/partners.js
+            git add -u build-debug.log build-status.txt 2>/dev/null || true
+            git diff --cached --quiet || git commit -m "Simplify customer economics and generalize CMS partner pipeline"
+          else
+            git add build-debug.log build-status.txt build-error-tail.txt
+            git commit -m "Capture Intelligence Vite build error"
+          fi
+          git push origin HEAD:main
