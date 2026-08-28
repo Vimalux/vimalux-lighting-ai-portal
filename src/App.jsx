@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { calculateBusinessCase, numberValue } from "./calculations.js";
 import { defaultProject, loadProjects, migrateProject, uid } from "./model.js";
 import { formatMoney, formatNumber, formatPercent, useT } from "./i18n.js";
@@ -32,6 +32,8 @@ import {
 } from "./lightingImport.js";
 import {
   deleteCloudProject,
+  createOrOpenBusinessCase,
+  getLinkedBusinessCaseId,
   loadBusinessCase,
   loadCloudState,
   loadCurrentProfile,
@@ -424,6 +426,15 @@ export default function App() {
     setView("crm");
     alert(`Import complete\nCreated: ${created}\nUpdated: ${updated}\nSkipped: ${skipped}\nErrors: ${errors}`);
   };
+  const rememberBusinessCaseLink = useCallback(({ opportunityId, caseId }) => {
+    setProjects((current) => current.map((item) =>
+      item.crm?.opportunityId === opportunityId || item.crm?.uniqueProjectId === opportunityId || item.id === opportunityId
+        ? item.crm?.businessCaseRecordId === caseId
+          ? item
+          : { ...item, crm: { ...(item.crm || {}), opportunityId, uniqueProjectId: opportunityId, businessCaseRecordId: caseId } }
+        : item,
+    ));
+  }, []);
   const removeProject = async (id) => {
     const target = projects.find((item) => item.id === id);
     if (!target) return;
@@ -569,7 +580,7 @@ export default function App() {
           {view === "business" && <Business p={project} r={result} t={t} money={money} num={num} isAgent={isAgent} />}
           {view === "report" && <Report p={project} r={result} t={t} money={money} num={num} />}
           {!isAgent && view === "internalReport" && <InternalReport p={project} r={result} update={update} money={money} />}
-          {!isAgent && view === "crm" && <CrmOpportunity projects={syncedProjects} active={syncedProject} update={update} money={money} onImport={importOpportunities} onManual={createManualOpportunity} setView={setView} currentUser={session?.user?.email || "Local user"} />}
+          {!isAgent && view === "crm" && <CrmOpportunity projects={syncedProjects} active={syncedProject} update={update} money={money} onImport={importOpportunities} onManual={createManualOpportunity} setView={setView} currentUser={session?.user?.email || "Local user"} getLinkedBusinessCaseId={getLinkedBusinessCaseId} createOrOpenBusinessCase={createOrOpenBusinessCase} onBusinessCaseLinked={rememberBusinessCaseLink} />}
           {!isAgent && view === "datek" && <CmsPartnerDashboard projects={syncedProjects} money={money} />}
           {!isAgent && view === "partnerReports" && <PartnerReports projects={syncedProjects} p={syncedProject} money={money} />}
           {view === "projects" && <Projects list={projects} activeId={activeId} select={(id) => { setActiveId(id); setView("customer"); }} remove={isAgent ? undefined : removeProject} create={isAgent ? undefined : create} importProjectFile={importProjectFile} t={t} />}

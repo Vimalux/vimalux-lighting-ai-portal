@@ -28,6 +28,17 @@ The current application stores each opportunity as an `intelligence_projects.dat
 4. If the municipality already exists, its customer/contact identity is reused; non-empty imported contact values may safely supplement it.
 5. Legacy files without a unique ID retain their existing Business Case/quotation and legacy matching path.
 
+### CRM ↔ Intelligence ownership boundary
+
+- `projects.id` is the CRM Opportunity ID; `business_cases.id` is the Intelligence Business Case record ID.
+- `business_cases.crm_opportunity_id` is the authoritative, unique relationship. Names and municipality text are never link keys.
+- CRM creates or reopens a Business Case through the idempotent `create_or_get_business_case` RPC. Repeated calls return the existing record.
+- Intelligence creates a CRM Opportunity only for a genuinely new, unlinked Intelligence project. Later saves update the linked Opportunity.
+- Intelligence owns technical groups, calculations, CAPEX/OPEX/TCV, savings, recommendations and technical assumptions.
+- CRM owns pipeline stage, probability, assignment, comments, manual notes, CMS Partner selection where CRM-maintained, and offer/history records.
+- Intelligence synchronization updates only calculated CRM columns and its namespaced Business Case snapshot. It does not delete or replace comments, proposal snapshots, assignment, pipeline state or unrelated CRM metadata.
+- Missing/null Intelligence values do not clear populated CRM-owned values.
+
 ## Periods
 
 The following fields remain independent throughout import, CRM and Business Case:
