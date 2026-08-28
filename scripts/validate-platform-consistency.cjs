@@ -11,7 +11,7 @@ const preliminaryProposal = read('src/preliminaryProposal.js');
 const checks = [
   {
     name: 'Agent workflow includes Assunzioni after Additional Costs',
-    ok: app.includes('["additionalCosts", "additionalCosts"],\n  ["assumptions", "assumptions"]'),
+    ok: /\["additionalCosts", "additionalCosts"\],\r?\n\s*\["assumptions", "assumptions"\]/.test(app),
   },
   {
     name: 'Agent Assunzioni component is rendered',

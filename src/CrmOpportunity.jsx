@@ -1,8 +1,13 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { crmMetrics, formatProbabilityPoints, pipelineStageTotals, pipelineTotals } from "./crm.js";
 import { buildPlannerHandoff, canCreatePlannerProject, canonicalOpportunityFromProject } from "./opportunity.js";
 import { parseOpportunityWorkbook, validateOpportunity } from "./opportunityImport.js";
 import { readLightingWorkbook } from "./lightingImport.js";
+import {
+  businessCaseActionLabel,
+  existingBusinessCaseRecordId,
+  linkedBusinessCaseUrl,
+} from "./crmBusinessCase.js";
 
 const Field = ({ label, value, onChange, children, type = "text", disabled = false }) => (
   <label className="field"><span>{label}</span>{children ? <select value={value ?? ""} onChange={(event) => onChange(event.target.value)} disabled={disabled}>{children}</select> : <input type={type} value={value ?? ""} onChange={(event) => onChange(event.target.value)} disabled={disabled} />}</label>
@@ -44,18 +49,56 @@ function ImportModal({ close, apply, currentUser }) {
   </section></div>;
 }
 
-export default function CrmOpportunity({ projects, active, update, money, onImport, onManual, setView, currentUser }) {
+export default function CrmOpportunity({ projects, active, update, money, onImport, onManual, setView, currentUser, getLinkedBusinessCaseId, createOrOpenBusinessCase, onBusinessCaseLinked }) {
   const [importOpen, setImportOpen] = useState(false);
+  const [linkedCaseId, setLinkedCaseId] = useState(() => existingBusinessCaseRecordId(active));
+  const [businessCaseBusy, setBusinessCaseBusy] = useState(false);
+  const [businessCaseError, setBusinessCaseError] = useState("");
   const totals = pipelineTotals(projects);
   const stages = pipelineStageTotals(projects);
   const row = crmMetrics(active);
   const canonical = useMemo(() => canonicalOpportunityFromProject(active), [active]);
   const bc = active.crm?.businessCase || {};
   const probability = (value) => formatProbabilityPoints(value, active.language);
-  const query = new URLSearchParams({ opportunity_id: canonical.opportunity.opportunityId || active.id, customer_id: canonical.customer.customerId || "", business_case_id: canonical.opportunity.businessCaseId || "" });
-  const businessCaseUrl = `${window.location.origin}/?${query.toString()}`;
+  const opportunityId = canonical.opportunity.opportunityId || active.id;
   const plannerReady = canCreatePlannerProject(active);
   const history = [...new Map(projects.flatMap((project) => project.crm?.importHistory || []).map((item) => [item.id, item])).values()].sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
+  useEffect(() => {
+    let current = true;
+    const storedId = existingBusinessCaseRecordId(active);
+    setLinkedCaseId(storedId);
+    setBusinessCaseError("");
+    if (!getLinkedBusinessCaseId) return () => { current = false; };
+    setBusinessCaseBusy(true);
+    getLinkedBusinessCaseId(opportunityId)
+      .then((caseId) => {
+        if (!current) return;
+        setLinkedCaseId(caseId || "");
+        if (caseId) onBusinessCaseLinked?.({ opportunityId, caseId });
+      })
+      .catch((error) => {
+        if (current) setBusinessCaseError(error.message);
+      })
+      .finally(() => {
+        if (current) setBusinessCaseBusy(false);
+      });
+    return () => { current = false; };
+  }, [active.id, opportunityId, getLinkedBusinessCaseId, onBusinessCaseLinked]);
+  const openBusinessCase = async () => {
+    if (!createOrOpenBusinessCase || businessCaseBusy) return;
+    setBusinessCaseBusy(true);
+    setBusinessCaseError("");
+    try {
+      const caseId = await createOrOpenBusinessCase(opportunityId);
+      setLinkedCaseId(caseId);
+      onBusinessCaseLinked?.({ opportunityId, caseId });
+      window.open(linkedBusinessCaseUrl(caseId, window.location.origin), "_blank", "noopener,noreferrer");
+    } catch (error) {
+      setBusinessCaseError(error.message);
+    } finally {
+      setBusinessCaseBusy(false);
+    }
+  };
   return <>
     <div className="crm-toolbar"><button className="primary" onClick={() => setImportOpen(true)}>New Opportunity · Import Data</button><button onClick={onManual}>Enter manually</button></div>
     <div className="kpis"><Kpi label="Total TCV" value={money(totals.totalContractValue)} /><Kpi label="Weighted TCV" value={money(totals.weightedTcv)} /><Kpi label="ARR" value={money(totals.annualRecurringRevenue)} /><Kpi label="Weighted ARR" value={money(totals.weightedArr)} /></div>
@@ -66,7 +109,7 @@ export default function CrmOpportunity({ projects, active, update, money, onImpo
       <div className="opportunity-section"><h3>C. Preliminary Project Data</h3><div className="detail-grid"><span>Luminaires<strong>{canonical.assumptions.totalLuminaires}</strong></span><span>Existing technology<strong>{canonical.assumptions.existingTechnology || "—"}</strong></span><span>Average watt<strong>{canonical.assumptions.averageExistingWatt.toFixed(1)} W</strong></span><span>Annual hours<strong>{canonical.assumptions.annualOperatingHours}</strong></span><span>Energy price<strong>{canonical.assumptions.energyPrice}</strong></span><span>Dimming<strong>{canonical.assumptions.existingDimmingProfile} · {canonical.assumptions.existingDimmingPct}%</strong></span><span>Smart / CMS / PowerAiD<strong>{canonical.assumptions.smartLightingEnabled ? "Yes" : "No"} / {canonical.assumptions.cmsEnabled ? "Yes" : "No"} / {canonical.assumptions.powerAidEnabled ? "Yes" : "No"}</strong></span></div></div>
       <div className="opportunity-section"><h3>D. Commercial Structure</h3><div className="detail-grid"><span>Model<strong>{canonical.commercial.financingModel}</strong></span><span>Financing Period<strong>{canonical.commercial.financingPeriodYears} years</strong></span><span>Service Agreement Period<strong>{canonical.commercial.serviceAgreementPeriodYears} years</strong></span><span>Analysis Period<strong>{canonical.commercial.analysisPeriodYears} years</strong></span></div></div>
       <div className="opportunity-section"><h3>E. Preliminary Business Case</h3><p className="muted">{bc.calculatedAt ? `Business Case updated: ${new Date(bc.calculatedAt).toLocaleString()}` : "Business Case has not yet been calculated."}</p><div className="detail-grid"><span>CAPEX<strong>{money(bc.capex || 0)}</strong></span><span>Annual OPEX<strong>{money(bc.annualOpex || 0)}</strong></span><span>Customer payment annual / monthly<strong>{money(bc.annualCustomerPayment || 0)} / {money(bc.monthlyCustomerPayment || 0)}</strong></span><span>TCV<strong>{money(bc.tcv || 0)}</strong></span><span>ARR / MRR<strong>{money(bc.arr || 0)} / {money(bc.mrr || 0)}</strong></span><span>Annual net benefit<strong>{money(bc.annualCustomerNetBenefit || 0)}</strong></span><span>Payback<strong>{bc.paybackYears == null ? "—" : `${Number(bc.paybackYears).toFixed(1)} years`}</strong></span><span>NPV / lifecycle<strong>{money(bc.npv || 0)} / {money(bc.lifecycleResult || 0)}</strong></span><span>Energy / CO₂<strong>{Number(bc.energyReductionPct || 0).toFixed(1)}% / {Number(bc.co2ReductionTons || 0).toFixed(1)} t</strong></span><span>Smart nodes<strong>{bc.smartNodeCount || 0}</strong></span><span>DATEK ARR / contract value<strong>{money(bc.datekArr || 0)} / {money(bc.datekContractValue || 0)}</strong></span><span>PowerAiD fee / supplier / margin<strong>{money(bc.powerAidCustomerFee || 0)} / {money(bc.powerAidSupplierCost || 0)} / {money(bc.powerAidVimaluxMargin || 0)}</strong></span></div></div>
-      <div className="opportunity-section"><h3>F. Actions</h3><div className="crm-toolbar"><button onClick={() => setView("customer")}>Edit Opportunity</button><button className="primary" onClick={() => window.open(businessCaseUrl, "_blank")}>Create/Open Preliminary Business Case</button><button onClick={() => setView("report")} disabled={!bc.calculatedAt}>Generate Report</button><button disabled={!plannerReady} title={!plannerReady ? "Requires GO and a calculated Preliminary Business Case" : "Ready for Planner handoff"} onClick={() => update(["crm", "plannerHandoff"], buildPlannerHandoff(active))}>Create Planner Project</button></div></div>
+      <div className="opportunity-section"><h3>F. Actions</h3>{businessCaseError && <div className="sync-error" role="alert">{businessCaseError}</div>}<div className="crm-toolbar"><button onClick={() => setView("customer")}>Edit Opportunity</button><button className="primary" onClick={openBusinessCase} disabled={businessCaseBusy}>{businessCaseBusy ? "…" : businessCaseActionLabel(Boolean(linkedCaseId), active.language)}</button><button onClick={() => setView("report")} disabled={!bc.calculatedAt}>Generate Report</button><button disabled={!plannerReady} title={!plannerReady ? "Requires GO and a calculated Preliminary Business Case" : "Ready for Planner handoff"} onClick={() => update(["crm", "plannerHandoff"], buildPlannerHandoff(active))}>Create Planner Project</button></div></div>
     </Card>
     <Card title="Import History / Audit"><div className="preview-table"><table><thead><tr><th>Timestamp</th><th>File</th><th>Source</th><th>Imported by</th><th>Created</th><th>Updated</th><th>Skipped</th><th>Errors</th></tr></thead><tbody>{history.length ? history.map((item) => <tr key={item.id}><td>{new Date(item.timestamp).toLocaleString()}</td><td>{item.fileName}</td><td>{item.sourceFormat} · {item.templateVersion}</td><td>{item.importedBy || "—"}</td><td>{item.created}</td><td>{item.updated}</td><td>{item.skipped}</td><td>{item.errors}</td></tr>) : <tr><td colSpan="8">No imports recorded yet.</td></tr>}</tbody></table></div></Card>
     {importOpen && <ImportModal close={() => setImportOpen(false)} currentUser={currentUser} apply={(parsed, meta) => { onImport(parsed, meta); setImportOpen(false); }} />}

@@ -72,6 +72,11 @@ export function projectFromBusinessCaseRow(row) {
   project.customer.province = crm.province || project.customer.province || "";
   project.customer.region = crm.region || project.customer.region || "";
   project.customer.country = crm.country || project.customer.country || "";
+  const crmContact = crm.contact && typeof crm.contact === "object" ? crm.contact : {};
+  project.customer.contact = crmContact.name || (typeof crm.contact === "string" ? crm.contact : "") || project.customer.contact || "";
+  project.customer.title = crmContact.title || project.customer.title || "";
+  project.customer.email = crm.email || crmContact.email || project.customer.email || "";
+  project.customer.telephone = crm.phone || crmContact.phone || project.customer.telephone || "";
 
   // CRM owns the preliminary lamp count only until Intelligence has persisted a
   // technical installation. Once saved Intelligence groups exist, those groups

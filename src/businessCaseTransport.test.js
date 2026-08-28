@@ -55,3 +55,21 @@ test("CRM lamp count seeds a Business Case when no Intelligence state is stored"
   const project = projectFromBusinessCaseRow(row);
   assert.equal(project.groups.reduce((sum, group) => sum + Number(group.quantity || 0), 0), 495);
 });
+
+test("CRM-created Business Case receives available municipality and contact metadata", () => {
+  const row = baseRow();
+  row.intelligence_data = {};
+  row.crm_fields = {
+    ...row.crm_fields,
+    province: "Matera",
+    region: "Basilicata",
+    country: "Italia",
+    contact: { name: "Comune Contact", title: "Responsabile", email: "contact@example.test", phone: "+39 000" },
+  };
+  const project = projectFromBusinessCaseRow(row);
+  assert.equal(project.customer.province, "Matera");
+  assert.equal(project.customer.region, "Basilicata");
+  assert.equal(project.customer.contact, "Comune Contact");
+  assert.equal(project.customer.email, "contact@example.test");
+  assert.equal(project.customer.telephone, "+39 000");
+});
