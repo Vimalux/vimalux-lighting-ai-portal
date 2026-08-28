@@ -8,4 +8,5 @@ import "./warranty.css";
 import "./solutionAdditionalCosts.js";
 import "./preliminaryProposal.js";
 import "./reimportConfirmGuard.js";
+import "./importedProductCategoryReconcile.js";
 ReactDOM.createRoot(document.getElementById("root")).render(<React.StrictMode><App/></React.StrictMode>);
