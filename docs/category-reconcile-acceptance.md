@@ -1,0 +1,1 @@
+Acceptance case: after loading or re-importing an imported technical Business Case, every proposed product must be compatible with the stored luminaire category. Example: Montalbano Jonico rows marked Arredo urbano may use OPERA/RETRO-compatible products but must not retain MANTA/MAKO/ZETA IDs. Existing compatible product selections remain unchanged.
