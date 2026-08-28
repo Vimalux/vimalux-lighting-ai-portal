@@ -3,6 +3,85 @@ import { numberValue } from "./calculations.js";
 export const today = () => new Date().toISOString().slice(0, 10);
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
+export const DEFAULT_ASSUMPTIONS_STORAGE_KEY = "vimalux-intelligence-default-assumptions";
+
+export const BASE_ASSUMPTIONS = {
+  operatingHours: 4200,
+  energyPrice: .29,
+  sapFactor: 1.2,
+  mhFactor: 1.15,
+  mercuryFactor: 1.15,
+  co2KgPerKwh: .233,
+  cloPercent: 10,
+  powerAidPercent: 40,
+  powerAidCustomerFeePercent: 30,
+  powerAidSupplierSharePercent: 70,
+  existingMaintenance: 25,
+  newMaintenance: 5,
+  financingModel: "cash",
+  dealType: "cash",
+  financingPeriod: 5,
+  serviceAgreementPeriod: 10,
+  analysisPeriod: 20,
+  contractYears: 10,
+  financingYears: 5,
+  rateProfileId: "custom",
+  interestRate: 5,
+  interestRateSnapshot: { profileId: "custom", annualRate: 5, capturedAt: null },
+  allInclusiveAnnualPayment: 0,
+  officialOfferCapex: 0,
+  officialAnnualOpex: 0,
+  upfrontPayment: 0,
+  energyEscalation: 2,
+  opexEscalation: 2,
+  discountRate: 5,
+  freightCostPerLamp: 4,
+  freightSalesPerLamp: 6,
+  dutyCost: 0,
+  commissionPercent: 0,
+  agent1Name: "",
+  agent1CommissionPercent: 0,
+  agent2Name: "",
+  agent2CommissionPercent: 0,
+  warrantyReservePercent: 0,
+  fundingCostPercent: 0,
+  otherDirectCosts: 0,
+  minimumMarginPercent: 30,
+};
+
+const DEFAULT_ASSUMPTION_KEYS = new Set(Object.keys(BASE_ASSUMPTIONS));
+
+export function readStoredDefaultAssumptions() {
+  if (typeof localStorage === "undefined") return { ...BASE_ASSUMPTIONS };
+  try {
+    const raw = localStorage.getItem(DEFAULT_ASSUMPTIONS_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    const values = parsed?.values && typeof parsed.values === "object" ? parsed.values : parsed;
+    const safe = {};
+    Object.entries(values || {}).forEach(([key, value]) => {
+      if (!DEFAULT_ASSUMPTION_KEYS.has(key)) return;
+      if (key === "interestRateSnapshot") return;
+      if (["financingModel", "dealType", "rateProfileId", "agent1Name", "agent2Name"].includes(key)) {
+        safe[key] = String(value ?? "");
+      } else {
+        const numeric = Number(value);
+        if (Number.isFinite(numeric)) safe[key] = numeric;
+      }
+    });
+    const merged = { ...BASE_ASSUMPTIONS, ...safe };
+    merged.financingYears = merged.financingPeriod;
+    merged.contractYears = merged.serviceAgreementPeriod;
+    merged.interestRateSnapshot = {
+      profileId: merged.rateProfileId || "custom",
+      annualRate: numberValue(merged.interestRate),
+      capturedAt: null,
+    };
+    return merged;
+  } catch {
+    return { ...BASE_ASSUMPTIONS };
+  }
+}
+
 const FALLBACK_CATALOGUE = {
   led: [
     { id: "led-40", brand: "VIMALUX", name: "VIMA LED 40", wattage: 40, lumen: 6000, costPrice: 90, salesPrice: 150, active: true },
@@ -46,14 +125,14 @@ export function storedMasterCatalogue() {
   }
 }
 
-export const defaultProject = () => ({
+export const defaultProject = ({ applyStoredDefaults = true } = {}) => ({
   id: uid(), version: 1, language: "it", name: "Nuovo progetto", createdAt: today(), updatedAt: new Date().toISOString(),
   customer: { name: "", province: "", region: "", country: "Italia", contact: "", title: "", email: "", telephone: "" },
   project: { name: "Nuovo progetto", businessCaseId: `BC-${Date.now().toString().slice(-6)}`, consultant: "", date: today(), currency: "EUR" },
   crm: { customerId: "", contactId: "", agentId: "", agentName: "", source: "", opportunityId: "", uniqueProjectId: "", status: "lead", closingProbability: 25, totalContractValue: null, expectedCloseDate: "", goStatus: "", notes: "", businessCaseUrl: "", plannerProjectUrl: "", businessCase: null, importHistory: [] },
   groups: [{ id: uid(), name: "Gruppo 1", quantity: 100, technology: "SAP", existingWattage: 100, existingSystemFactor: 0, existingDimmingProfile: "none", existingDimmingMethod: "average", existingDimmingPercent: 0, existingFullPowerHours: 0, existingReducedHours: 0, existingReducedLoadPercent: 100, existingDimmingNote: "", existingDriverType: "non_dimmable", upgradeSelected: true, proposedProductId: "led-40", projectLedWattage: null, smartAssigned: true, powerAidAssigned: true }],
   solution: { warrantyYears: 5, warrantyUpliftPercentSnapshot: 18.19, smartEnabled: true, cmsEnabled: true, powerAidEnabled: false, lcuProductId: "lcu-1", panelEquipmentEnabled: false, gatewayProductId: "gateway-1", gatewayQuantity: 0, antennaProductId: "antenna-1", antennaQuantity: 0, meterProductId: "meter-1", meterQuantity: 0 },
-  assumptions: { operatingHours: 4200, energyPrice: .29, sapFactor: 1.2, mhFactor: 1.15, mercuryFactor: 1.15, co2KgPerKwh: .233, cloPercent: 10, powerAidPercent: 40, powerAidCustomerFeePercent: 30, powerAidSupplierSharePercent: 70, existingMaintenance: 25, newMaintenance: 5, financingModel: "cash", dealType: "cash", financingPeriod: 5, serviceAgreementPeriod: 10, analysisPeriod: 20, contractYears: 10, financingYears: 5, rateProfileId: "custom", interestRate: 5, interestRateSnapshot: { profileId: "custom", annualRate: 5, capturedAt: null }, allInclusiveAnnualPayment: 0, officialOfferCapex: 0, officialAnnualOpex: 0, upfrontPayment: 0, energyEscalation: 2, opexEscalation: 2, discountRate: 5, freightCostPerLamp: 4, freightSalesPerLamp: 6, dutyCost: 0, commissionPercent: 0, agent1Name: "", agent1CommissionPercent: 0, agent2Name: "", agent2CommissionPercent: 0, warrantyReservePercent: 0, fundingCostPercent: 0, otherDirectCosts: 0, minimumMarginPercent: 30 },
+  assumptions: applyStoredDefaults ? readStoredDefaultAssumptions() : { ...BASE_ASSUMPTIONS, interestRateSnapshot: { ...BASE_ASSUMPTIONS.interestRateSnapshot } },
   additionalCosts: [],
   pricing: { overrides: {} },
   catalogue: storedMasterCatalogue() || cloneCatalogue(FALLBACK_CATALOGUE),
@@ -148,7 +227,7 @@ export function migrateProject(saved) {
   const reconciled = reconcileReimportIdentity(saved, storedProjectsForReimport());
   saved = reconciled;
   const previousUpdatedAt = saved?.updatedAt || saved?.createdAt || "";
-  const project = merge(defaultProject(), saved && typeof saved === "object" ? saved : {});
+  const project = merge(defaultProject({ applyStoredDefaults: false }), saved && typeof saved === "object" ? saved : {});
   project.updatedAt = previousUpdatedAt;
   project.language = ["it", "en", "da"].includes(project.language) ? project.language : "it";
   project.groups = (Array.isArray(project.groups) ? project.groups : [])
