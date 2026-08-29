@@ -16,11 +16,23 @@ function currentProject() {
   }
 }
 
-const originalSave = jsPDF.API.save;
+function downloadPdf(doc, filename) {
+  const blob = doc.output("blob");
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename || "VIMALUX_Preliminary_Proposal.pdf";
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return doc;
+}
 
 if (!jsPDF.API.__vimaluxPreliminaryVisualsInstalled) {
   jsPDF.API.__vimaluxPreliminaryVisualsInstalled = true;
-  jsPDF.API.save = function patchedSave(filename, ...args) {
+  jsPDF.API.save = function patchedSave(filename) {
     const isPreliminary = /^VIMALUX_PRE_/i.test(String(filename || ""));
     if (isPreliminary && !this.__vimaluxVisualPagesAdded) {
       const project = currentProject();
@@ -35,6 +47,6 @@ if (!jsPDF.API.__vimaluxPreliminaryVisualsInstalled) {
         });
       }
     }
-    return originalSave.call(this, filename, ...args);
+    return downloadPdf(this, filename);
   };
 }
