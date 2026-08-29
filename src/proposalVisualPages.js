@@ -15,40 +15,21 @@ const number = (value, digits = 0, lang = "en") => new Intl.NumberFormat(lang ==
   maximumFractionDigits: digits,
 }).format(safe(value));
 
-function card(doc, x, y, w, h, label, value, teal, navy, light) {
+function metricCard(doc, x, y, w, h, label, value, teal, navy, light) {
   doc.setFillColor(...light);
   doc.setDrawColor(226, 232, 240);
   doc.roundedRect(x, y, w, h, 2, 2, "FD");
-  doc.setTextColor(71, 85, 105);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.1);
+  doc.setFontSize(7);
+  doc.setTextColor(71, 85, 105);
   doc.text(label, x + 4, y + 6, { maxWidth: w - 8 });
-  doc.setTextColor(...navy);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
+  doc.setFontSize(12);
+  doc.setTextColor(...navy);
   doc.text(value, x + 4, y + h - 5);
   doc.setDrawColor(...teal);
-  doc.setLineWidth(0.7);
+  doc.setLineWidth(0.6);
   doc.line(x + 4, y + h - 2.5, x + w - 4, y + h - 2.5);
-}
-
-function horizontalBars(doc, x, y, w, labels, values, lang, teal, navy, muted) {
-  const max = Math.max(1, ...values.map((value) => Math.max(0, safe(value))));
-  labels.forEach((label, index) => {
-    const yy = y + index * 19;
-    const value = Math.max(0, safe(values[index]));
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.6);
-    doc.setTextColor(...navy);
-    doc.text(label, x, yy + 4);
-    doc.setFillColor(226, 232, 240);
-    doc.roundedRect(x, yy + 7, w, 5, 1, 1, "F");
-    doc.setFillColor(...teal);
-    doc.roundedRect(x, yy + 7, w * value / max, 5, 1, 1, "F");
-    doc.setFontSize(7.2);
-    doc.setTextColor(...muted);
-    doc.text(money(value, lang), x + w, yy + 4, { align: "right" });
-  });
 }
 
 function lineChart(doc, x, y, w, h, rows, teal, navy, muted) {
@@ -98,6 +79,124 @@ function lineChart(doc, x, y, w, h, rows, teal, navy, muted) {
   });
 }
 
+function costEvolutionChart(doc, calculated, project, x, y, w, h, lang, colors) {
+  const it = lang === "it";
+  const { teal, navy, muted } = colors;
+  const rows = Array.isArray(calculated.customerValueRows) ? calculated.customerValueRows : [];
+  const first = rows[0] || {};
+  const currentCost = safe(first.currentOperatingCost);
+  const futureOperating = safe(first.futureOperatingCost);
+  const servicePayment = safe(first.servicePayment);
+  const investmentPayment = safe(first.investmentPayment);
+  const customerSaving = Math.max(0, safe(first.customerSaving));
+  const analysisPeriod = Math.max(1, safe(calculated.analysisPeriod));
+  const serviceYears = Math.max(0, Math.min(analysisPeriod, safe(calculated.serviceAgreementPeriod)));
+  const financeYears = Math.max(0, Math.min(analysisPeriod, safe(calculated.financingYears)));
+
+  const baselineY = y + 12;
+  const chartBottom = y + h - 28;
+  const chartHeight = chartBottom - baselineY;
+  const currentW = 35;
+  const gap = 7;
+  const timelineX = x + currentW + gap;
+  const timelineW = w - currentW - gap;
+  const maxCost = Math.max(1, currentCost, futureOperating + servicePayment + investmentPayment + customerSaving);
+  const heightFor = (value) => chartHeight * Math.max(0, value) / maxCost;
+
+  doc.setDrawColor(100, 116, 139);
+  doc.setLineDashPattern([1.2, 1.2], 0);
+  doc.setLineWidth(0.35);
+  doc.line(timelineX, baselineY, x + w, baselineY);
+  doc.setLineDashPattern([], 0);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.2);
+  doc.setTextColor(...navy);
+  doc.text(`100% · ${money(currentCost, lang)} / ${it ? "anno" : "year"}`, x + w, baselineY - 3, { align: "right" });
+
+  const currentH = heightFor(currentCost);
+  doc.setFillColor(31, 119, 180);
+  doc.rect(x, chartBottom - currentH, currentW, currentH, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(7.4);
+  doc.text("100%", x + currentW / 2, chartBottom - currentH / 2 - 1, { align: "center" });
+  doc.setFontSize(6.3);
+  doc.text(money(currentCost, lang), x + currentW / 2, chartBottom - currentH / 2 + 4, { align: "center" });
+  doc.setTextColor(...navy);
+  doc.setFontSize(8.2);
+  doc.text(it ? "Situazione attuale" : "Current situation", x + currentW / 2, chartBottom + 6, { align: "center" });
+
+  const stack = [
+    { value: futureOperating, color: [77, 182, 172], label: it ? "Costo operativo post-upgrade" : "Post-upgrade operating cost" },
+    { value: servicePayment, color: [245, 158, 11], label: it ? "OPEX servizi" : "Service OPEX" },
+    { value: investmentPayment, color: [148, 163, 184], label: it ? "Pagamento contratto / investimento" : "Contract / investment payment" },
+    { value: customerSaving, color: [22, 163, 74], label: it ? "Risparmio netto cliente" : "Customer net saving" },
+  ];
+
+  let cursor = chartBottom;
+  stack.forEach((segment) => {
+    if (segment.value <= 0) return;
+    const segmentH = heightFor(segment.value);
+    cursor -= segmentH;
+    doc.setFillColor(...segment.color);
+    doc.rect(timelineX, cursor, timelineW, segmentH, "F");
+    if (segmentH >= 8) {
+      const pct = currentCost ? segment.value / currentCost * 100 : 0;
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(6.6);
+      doc.text(`${number(pct, 0, lang)}%`, timelineX + timelineW / 2, cursor + segmentH / 2 - 0.5, { align: "center" });
+      doc.setFontSize(5.8);
+      doc.text(money(segment.value, lang), timelineX + timelineW / 2, cursor + segmentH / 2 + 4, { align: "center" });
+    }
+  });
+
+  doc.setTextColor(...navy);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.2);
+  doc.text(`${it ? "Anni" : "Years"} 1–${analysisPeriod}`, timelineX + timelineW / 2, chartBottom + 6, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.5);
+  const modelLabel = calculated.dealType === "cash"
+    ? (it ? "Smart senza finanziamento" : "Smart without financing")
+    : calculated.dealType === "finance"
+      ? (it ? `Finanziamento ${financeYears} anni` : `${financeYears}-year financing`)
+      : (it ? "Pagamento all-inclusive" : "All-inclusive payment");
+  doc.setTextColor(...muted);
+  doc.text(modelLabel, timelineX + timelineW / 2, chartBottom + 11, { align: "center" });
+  doc.setTextColor(...navy);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.2);
+  doc.text(`${money(customerSaving, lang)} / ${it ? "anno" : "year"}`, timelineX + timelineW / 2, chartBottom + 16, { align: "center" });
+
+  const legendY = chartBottom + 24;
+  let legendX = x;
+  stack.forEach((segment) => {
+    doc.setFillColor(...segment.color);
+    doc.roundedRect(legendX, legendY - 3, 3, 3, 0.5, 0.5, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(5.9);
+    doc.setTextColor(...muted);
+    doc.text(segment.label, legendX + 4.5, legendY);
+    legendX += Math.min(48, 8 + segment.label.length * 1.2);
+  });
+
+  const smartActiveYears = Math.min(analysisPeriod, serviceYears || analysisPeriod);
+  doc.setFillColor(236, 253, 245);
+  doc.setDrawColor(110, 231, 183);
+  doc.roundedRect(x, legendY + 5, w, 11, 2, 2, "FD");
+  doc.setTextColor(4, 120, 87);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.2);
+  doc.text(
+    smartActiveYears >= analysisPeriod
+      ? (it ? `Smart attivo per l'intero periodo di analisi - ${analysisPeriod} anni` : `Smart active for the full analysis period - ${analysisPeriod} years`)
+      : (it ? `Smart attivo per ${smartActiveYears} anni su ${analysisPeriod}` : `Smart active for ${smartActiveYears} of ${analysisPeriod} years`),
+    x + w / 2,
+    legendY + 12,
+    { align: "center" },
+  );
+}
+
 export function appendProposalVisualPages(doc, project, options = {}) {
   const lang = options.lang === "it" ? "it" : "en";
   const it = lang === "it";
@@ -105,21 +204,15 @@ export function appendProposalVisualPages(doc, project, options = {}) {
   const navy = options.navy || [15, 23, 42];
   const muted = options.muted || [71, 85, 105];
   const light = options.light || [248, 250, 252];
-  const sectionAt = (title, x, y) => {
+  const section = (title, y) => {
     doc.setTextColor(...teal);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
-    doc.text(title, x, y);
+    doc.text(title, 14, y);
     doc.setTextColor(...navy);
   };
-  const section = (title, y) => sectionAt(title, 14, y);
 
   const calculated = calculateBusinessCase(applyWarrantyPricing(project));
-  const energyBefore = safe(calculated.baselineKwh) * safe(project.assumptions?.energyPrice);
-  const energyAfter = safe(calculated.finalKwh) * safe(project.assumptions?.energyPrice);
-  const maintenanceSaving = safe(calculated.maintenanceSaving);
-  const annualFee = safe(calculated.customerAnnualPayment);
-  const netBenefit = safe(calculated.customerAnnualNetBenefit);
   const cashRows = Array.isArray(calculated.cashFlowRows) ? calculated.cashFlowRows : [];
   const openingCash = cashRows.length ? safe(cashRows[0].cumulative) - safe(cashRows[0].netCashFlow) : 0;
   const initialOutlay = Math.max(0, -openingCash);
@@ -136,54 +229,44 @@ export function appendProposalVisualPages(doc, project, options = {}) {
   ];
 
   doc.addPage();
-  section(it ? "Dashboard economico ed energetico" : "Economic & Energy Dashboard", 20);
+  section(it ? `Evoluzione dei costi e dei risparmi - ${calculated.analysisPeriod} anni` : `Cost & Savings Evolution - ${calculated.analysisPeriod} years`, 20);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.3);
+  doc.setFontSize(8.2);
   doc.setTextColor(...muted);
   doc.text(it
-    ? "Vista sintetica generata dallo stesso motore di calcolo utilizzato nel dashboard VIMALUX Intelligence."
-    : "Summary view generated by the same calculation engine used by the VIMALUX Intelligence dashboard.", 14, 28);
+    ? "La larghezza della fase rappresenta la durata. La linea superiore rappresenta il costo annuo attuale."
+    : "Phase width represents duration. The upper line represents the current annual cost.", 14, 28, { maxWidth: 182 });
 
+  costEvolutionChart(doc, calculated, project, 14, 34, 182, 126, lang, { teal, navy, muted });
+
+  section(it ? "Indicatori chiave" : "Key Indicators", 177);
   const cardW = 42.5;
-  card(doc, 14, 35, cardW, 27, it ? "Costo energia attuale" : "Current energy cost", money(energyBefore, lang), teal, navy, light);
-  card(doc, 60.5, 35, cardW, 27, it ? "Costo energia futuro" : "Future energy cost", money(energyAfter, lang), teal, navy, light);
-  card(doc, 107, 35, cardW, 27, it ? "Beneficio netto annuo" : "Annual net benefit", money(netBenefit, lang), teal, navy, light);
-  card(doc, 153.5, 35, cardW, 27, "Payback", calculated.payback == null ? "-" : `${number(calculated.payback, 1, lang)} ${it ? "anni" : "yrs"}`, teal, navy, light);
+  metricCard(doc, 14, 184, cardW, 25, it ? "Riduzione energia" : "Energy reduction", `${number(calculated.energyReductionPercent, 1, lang)}%`, teal, navy, light);
+  metricCard(doc, 60.5, 184, cardW, 25, it ? "Energia risparmiata" : "Energy saved", `${number(Math.max(0, safe(calculated.baselineKwh) - safe(calculated.finalKwh)), 0, lang)} kWh`, teal, navy, light);
+  metricCard(doc, 107, 184, cardW, 25, it ? "Riduzione CO2" : "CO2 reduction", `${number(safe(calculated.co2ReductionKg) / 1000, 1, lang)} t/${it ? "anno" : "yr"}`, teal, navy, light);
+  metricCard(doc, 153.5, 184, cardW, 25, it ? "Punti Smart" : "Smart points", number(calculated.lcuQuantity, 0, lang), teal, navy, light);
 
-  sectionAt(it ? "Costo energetico annuo" : "Annual Energy Cost", 14, 76);
-  horizontalBars(doc, 14, 83, 80,
-    [it ? "Situazione attuale" : "Current", it ? "Dopo LED + Smart" : "After LED + Smart"],
-    [energyBefore, energyAfter], lang, teal, navy, muted);
-
-  sectionAt(it ? "Composizione beneficio annuo" : "Annual Benefit Composition", 108, 76);
-  horizontalBars(doc, 108, 83, 88,
-    [it ? "Risparmio energia" : "Energy saving", it ? "Risparmio manutenzione" : "Maintenance saving", it ? "Canone Smart / CMS" : "Smart / CMS fee"],
-    [safe(calculated.energySaving), maintenanceSaving, annualFee], lang, teal, navy, muted);
-
-  section(it ? "Indicatori ambientali e operativi" : "Environmental & Operational Indicators", 158);
   autoTable(doc, {
-    startY: 164,
+    startY: 218,
     theme: "grid",
-    head: [[it ? "Indicatore" : "Indicator", it ? "Valore" : "Value", it ? "Interpretazione" : "Interpretation"]],
+    head: [[it ? "Indicatore economico" : "Economic indicator", it ? "Valore" : "Value"]],
     body: [
-      [it ? "Riduzione energia" : "Energy reduction", `${number(calculated.energyReductionPercent, 1, lang)}%`, it ? "Riduzione rispetto alla baseline" : "Reduction versus baseline"],
-      [it ? "Energia risparmiata" : "Energy saved", `${number(Math.max(0, safe(calculated.baselineKwh) - safe(calculated.finalKwh)), 0, lang)} kWh/anno`, it ? "Effetto LED + Smart" : "LED + Smart effect"],
-      [it ? "Riduzione CO2" : "CO2 reduction", `${number(safe(calculated.co2ReductionKg) / 1000, 1, lang)} t/anno`, it ? "Sulla base del fattore CO2 impostato" : "Based on configured CO2 factor"],
-      [it ? "Punti luce aggiornati" : "Upgraded lighting points", number(calculated.upgradedQuantity, 0, lang), it ? "Copertura del progetto" : "Project coverage"],
-      [it ? "Punti Smart connessi" : "Smart connected points", number(calculated.lcuQuantity, 0, lang), it ? "Monitoraggio e controllo remoto" : "Remote monitoring and control"],
+      [it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit", money(calculated.customerAnnualNetBenefit, lang)],
+      ["Payback", calculated.payback == null ? "-" : `${number(calculated.payback, 1, lang)} ${it ? "anni" : "yrs"}`],
+      [it ? "Investimento iniziale" : "Initial investment", money(calculated.totalCapex, lang)],
     ],
     headStyles: { fillColor: teal },
     alternateRowStyles: { fillColor: light },
-    styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.7 },
-    columnStyles: { 1: { halign: "right", cellWidth: 42 } },
+    styles: { font: "helvetica", fontSize: 7.4, cellPadding: 1.6 },
+    columnStyles: { 1: { halign: "right", cellWidth: 50 } },
   });
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.2);
+  doc.setFontSize(7.1);
   doc.setTextColor(...muted);
   doc.text(it
-    ? "I grafici sono preliminari e seguono le ipotesi economiche del Business Case. La validazione illuminotecnica definitiva avviene in VIMALUX Planner."
-    : "Charts are preliminary and follow the Business Case assumptions. Final lighting-design validation is completed in VIMALUX Planner.", 14, 262, { maxWidth: 182 });
+    ? "Visualizzazione preliminare basata sullo stesso motore di calcolo del dashboard Intelligence. La validazione illuminotecnica definitiva avviene in VIMALUX Planner."
+    : "Preliminary visualization based on the same calculation engine as the Intelligence dashboard. Final lighting-design validation is completed in VIMALUX Planner.", 14, 262, { maxWidth: 182 });
 
   doc.addPage();
   section(it ? `Cash flow cliente - ${calculated.analysisPeriod} anni` : `Customer Cash Flow - ${calculated.analysisPeriod} years`, 20);
