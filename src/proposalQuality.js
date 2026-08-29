@@ -16,12 +16,12 @@ export function validateProposalQuality(project) {
     const productId = String(group?.proposedProductId || "").trim();
     const category = normalizeCategory(group?.existingCategory || group?.luminaireCategory);
     if (!productId) {
-      issues.push({ type: "missing_product", group: group?.name || "-", category, productId: "" });
+      issues.push({ type: "missing_product", severity: "blocker", group: group?.name || "-", category, productId: "" });
       continue;
     }
     const product = products.get(productId);
     if (!product) {
-      issues.push({ type: "unknown_product", group: group?.name || "-", category, productId });
+      issues.push({ type: "unknown_product", severity: "blocker", group: group?.name || "-", category, productId });
       continue;
     }
     const compatible = (product.compatibleExistingCategories || []).map(normalizeCategory).filter(Boolean);
@@ -30,6 +30,7 @@ export function validateProposalQuality(project) {
     if (category && !allowed) {
       issues.push({
         type: "incompatible_product",
+        severity: "warning",
         group: group?.name || "-",
         category,
         productId,
@@ -39,18 +40,32 @@ export function validateProposalQuality(project) {
     }
   }
 
-  return { ok: issues.length === 0, issues };
+  const blockers = issues.filter((issue) => issue.severity === "blocker");
+  const warnings = issues.filter((issue) => issue.severity === "warning");
+  return { ok: blockers.length === 0, issues, blockers, warnings };
 }
 
 export function qualityGateMessage(validation, language = "it") {
-  if (validation?.ok) return "";
+  const blockers = validation?.blockers || (validation?.issues || []).filter((issue) => issue.severity !== "warning");
+  if (!blockers.length) return "";
   const it = language === "it";
-  const first = (validation?.issues || []).slice(0, 3).map((issue) => {
+  const first = blockers.slice(0, 3).map((issue) => {
     const product = issue.productId || (it ? "nessun prodotto" : "no product");
     return `${issue.group}: ${issue.category || "?"} → ${product}`;
   });
-  const suffix = (validation?.issues?.length || 0) > 3 ? ` (+${validation.issues.length - 3})` : "";
+  const suffix = blockers.length > 3 ? ` (+${blockers.length - 3})` : "";
   return it
-    ? `Proposta bloccata: ${validation.issues.length} assegnazioni tecniche non valide. Correggere prima di generare il PDF. ${first.join("; ")}${suffix}`
-    : `Proposal blocked: ${validation.issues.length} invalid technical assignments. Correct them before generating the PDF. ${first.join("; ")}${suffix}`;
+    ? `Proposta bloccata: ${blockers.length} assegnazioni tecniche incomplete. Assegnare un prodotto valido prima di generare il PDF. ${first.join("; ")}${suffix}`
+    : `Proposal blocked: ${blockers.length} technical assignments are incomplete. Assign a valid product before generating the PDF. ${first.join("; ")}${suffix}`;
+}
+
+export function qualityWarningMessage(validation, language = "it") {
+  const warnings = validation?.warnings || (validation?.issues || []).filter((issue) => issue.severity === "warning");
+  if (!warnings.length) return "";
+  const it = language === "it";
+  const first = warnings.slice(0, 3).map((issue) => `${issue.group}: ${issue.category || "?"} → ${issue.productId || "?"}`);
+  const suffix = warnings.length > 3 ? ` (+${warnings.length - 3})` : "";
+  return it
+    ? `Avviso tecnico: ${warnings.length} assegnazioni non corrispondono alla compatibilità catalogo. Il PDF può essere generato; verificare la selezione in Planner. ${first.join("; ")}${suffix}`
+    : `Technical warning: ${warnings.length} assignments do not match catalogue compatibility. The PDF can still be generated; verify the selection in Planner. ${first.join("; ")}${suffix}`;
 }
