@@ -15,22 +15,46 @@ const base = {
 
 test("accepts explicit cross-category compatibility", () => {
   const project = { ...base, groups: [{ name: "Urban retrofit", quantity: 10, existingCategory: "URBAN", proposedProductId: "RETRO" }] };
-  assert.equal(validateProposalQuality(project).ok, true);
+  const result = validateProposalQuality(project);
+  assert.equal(result.ok, true);
+  assert.equal(result.warnings.length, 0);
 });
 
-test("blocks STREET product on URBAN group", () => {
+test("warns but does not block STREET product on URBAN group", () => {
   const project = { ...base, groups: [{ name: "Urban", quantity: 10, existingCategory: "URBAN", proposedProductId: "MANTA" }] };
   const result = validateProposalQuality(project);
-  assert.equal(result.ok, false);
-  assert.equal(result.issues[0].type, "incompatible_product");
+  assert.equal(result.ok, true);
+  assert.equal(result.blockers.length, 0);
+  assert.equal(result.warnings.length, 1);
+  assert.equal(result.warnings[0].type, "incompatible_product");
 });
 
-test("blocks URBAN product on FLOODLIGHT group", () => {
+test("warns but does not block URBAN product on FLOODLIGHT group", () => {
   const project = { ...base, groups: [{ name: "Projector", quantity: 4, existingCategory: "FLOODLIGHT", proposedProductId: "OPERA" }] };
-  assert.equal(validateProposalQuality(project).ok, false);
+  const result = validateProposalQuality(project);
+  assert.equal(result.ok, true);
+  assert.equal(result.warnings.length, 1);
 });
 
 test("accepts FLOODLIGHT product on FLOODLIGHT group", () => {
   const project = { ...base, groups: [{ name: "Projector", quantity: 4, existingCategory: "Proiettore", proposedProductId: "FLOLY" }] };
-  assert.equal(validateProposalQuality(project).ok, true);
+  const result = validateProposalQuality(project);
+  assert.equal(result.ok, true);
+  assert.equal(result.warnings.length, 0);
+});
+
+test("still blocks an upgraded group with no proposed product", () => {
+  const project = { ...base, groups: [{ name: "Missing", quantity: 4, existingCategory: "STREET", proposedProductId: "" }] };
+  const result = validateProposalQuality(project);
+  assert.equal(result.ok, false);
+  assert.equal(result.blockers.length, 1);
+  assert.equal(result.blockers[0].type, "missing_product");
+});
+
+test("still blocks an unknown catalogue product id", () => {
+  const project = { ...base, groups: [{ name: "Unknown", quantity: 4, existingCategory: "STREET", proposedProductId: "DOES_NOT_EXIST" }] };
+  const result = validateProposalQuality(project);
+  assert.equal(result.ok, false);
+  assert.equal(result.blockers.length, 1);
+  assert.equal(result.blockers[0].type, "unknown_product");
 });
