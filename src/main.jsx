@@ -6,7 +6,7 @@ import "./solution-additional-costs.css";
 import "./catalogueExtended.css";
 import "./warranty.css";
 import "./solutionAdditionalCosts.js";
-import "./preliminaryProposal.js";
+import "./preliminaryProposalV2.js";
 import "./reimportConfirmGuard.js";
 import "./importedProductCategoryReconcile.js";
 import "./catalogueTabsRuntime.js";
