@@ -16,6 +16,7 @@ test("four-page proposal footer is redrawn after visual pages are appended", () 
   assert.match(autoSource, /appendProposalVisualPages\(this, project/);
   assert.match(autoSource, /redrawFourPageFooters\(this, project, filename\)/);
   assert.match(autoSource, /\$\{page\}\/\$\{pages\}/);
+  assert.match(autoSource, /doc\.rect\(0, 278, 210, 19, "F"\)/);
 });
 
 test("cashflow table explicitly includes year zero initial outlay", () => {
@@ -25,8 +26,15 @@ test("cashflow table explicitly includes year zero initial outlay", () => {
   assert.match(pageSource, /cumulative:\s*openingCash/);
 });
 
-test("dashboard headings are positioned independently and PDF-safe CO2 text is used", () => {
-  assert.match(pageSource, /sectionAt\(it \? "Costo energetico annuo"/);
-  assert.match(pageSource, /sectionAt\(it \? "Composizione beneficio annuo"/);
+test("page three mirrors dashboard cost evolution and keeps PDF-safe CO2 text", () => {
+  assert.match(pageSource, /Evoluzione dei costi e dei risparmi/);
+  assert.match(pageSource, /function costEvolutionChart/);
+  assert.match(pageSource, /currentOperatingCost/);
+  assert.match(pageSource, /futureOperatingCost/);
+  assert.match(pageSource, /servicePayment/);
+  assert.match(pageSource, /investmentPayment/);
+  assert.match(pageSource, /customerSaving/);
+  assert.doesNotMatch(pageSource, /Costo energetico annuo/);
+  assert.doesNotMatch(pageSource, /Composizione beneficio annuo/);
   assert.doesNotMatch(pageSource, /CO₂/);
 });
