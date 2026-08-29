@@ -1,6 +1,7 @@
 import { compatibleLedProducts, isCatalogueProductCompatible, normalizeProductCategory } from "./productCatalogue.js";
 
 const STORAGE_KEY = "vimalux-intelligence-projects";
+const DISMISS_KEY = "vimalux-catalogue-reconcile-dismissed";
 const numberValue = (value) => {
   const parsed = Number(String(value ?? "").trim().replace(",", "."));
   return Number.isFinite(parsed) ? parsed : 0;
@@ -45,20 +46,37 @@ export function reconcileImportedGroupProduct(group, ledProducts = []) {
   };
 }
 
-export function reconcileImportedProjectProductCategories(project) {
-  if (!project?.importedTechnical || !Array.isArray(project.groups)) return project;
+export function reconciliationChanges(project) {
+  if (!project?.importedTechnical || !Array.isArray(project.groups)) return [];
   const ledProducts = Array.isArray(project.catalogue?.led) ? project.catalogue.led : [];
-  if (!ledProducts.length) return project;
-  let changed = false;
-  const groups = project.groups.map((group) => {
+  if (!ledProducts.length) return [];
+
+  return project.groups.flatMap((group, index) => {
     const next = reconcileImportedGroupProduct(group, ledProducts);
-    if (next !== group && (
-      next.proposedProductId !== group.proposedProductId ||
-      next.projectLedWattage !== group.projectLedWattage
-    )) changed = true;
-    return next;
+    if (next === group || (
+      next.proposedProductId === group.proposedProductId &&
+      next.projectLedWattage === group.projectLedWattage
+    )) return [];
+
+    const oldProduct = ledProducts.find((p) => String(p?.id) === String(group.proposedProductId || ""));
+    const newProduct = ledProducts.find((p) => String(p?.id) === String(next.proposedProductId || ""));
+    return [{
+      index,
+      group,
+      next,
+      category: normalizeProductCategory(group.luminaireCategory || group.existingCategory),
+      oldProductId: oldProduct?.id || group.proposedProductId || "-",
+      newProductId: newProduct?.id || next.proposedProductId || "-",
+    }];
   });
-  return changed ? { ...project, groups, updatedAt: new Date().toISOString() } : project;
+}
+
+export function reconcileImportedProjectProductCategories(project) {
+  const changes = reconciliationChanges(project);
+  if (!changes.length) return project;
+  const byIndex = new Map(changes.map((change) => [change.index, change.next]));
+  const groups = project.groups.map((group, index) => byIndex.get(index) || group);
+  return { ...project, groups, updatedAt: new Date().toISOString() };
 }
 
 function readStoredContainer() {
@@ -73,33 +91,77 @@ function readStoredContainer() {
   }
 }
 
-function reconcileStoredProjects() {
+function currentBusinessCaseId() {
+  try {
+    return new URLSearchParams(window.location.search).get("business_case_id") || "";
+  } catch {
+    return "";
+  }
+}
+
+function matchesCurrentProject(project, businessCaseId) {
+  if (!businessCaseId) return false;
+  return [
+    project?.id,
+    project?.crm?.businessCaseRecordId,
+    project?.project?.businessCaseId,
+  ].some((value) => String(value || "") === String(businessCaseId));
+}
+
+function confirmationText(project, changes) {
+  const it = project?.language === "it";
+  const preview = changes.slice(0, 5).map((change) =>
+    `${change.category}: ${change.oldProductId} → ${change.newProductId}`
+  ).join("\n");
+  const extra = changes.length > 5 ? `\n+ ${changes.length - 5} ${it ? "altre assegnazioni" : "more assignments"}` : "";
+  return it
+    ? `${changes.length} assegnazioni prodotto non sono più compatibili con il catalogo attuale. Vuoi aggiornarle automaticamente?\n\n${preview}${extra}\n\nVerranno modificati solo i prodotti non compatibili. Quantità, potenze esistenti, prezzi, CRM e altre impostazioni del Business Case restano invariati.`
+    : `${changes.length} product assignments are no longer compatible with the current catalogue. Update them automatically?\n\n${preview}${extra}\n\nOnly incompatible product assignments will be changed. Quantities, existing wattages, prices, CRM and all other Business Case settings remain unchanged.`;
+}
+
+function reconcileCurrentStoredProjectWithConfirmation() {
+  const businessCaseId = currentBusinessCaseId();
+  if (!businessCaseId) return;
   const container = readStoredContainer();
-  if (!container.projects.length) return;
-  let changed = false;
-  const projects = container.projects.map((project) => {
-    const reconciled = reconcileImportedProjectProductCategories(project);
-    if (reconciled !== project) changed = true;
-    return reconciled;
-  });
-  if (!changed) return;
+  const index = container.projects.findIndex((project) => matchesCurrentProject(project, businessCaseId));
+  if (index < 0) return;
+
+  const project = container.projects[index];
+  const changes = reconciliationChanges(project);
+  if (!changes.length) {
+    sessionStorage.removeItem(`${DISMISS_KEY}:${businessCaseId}`);
+    return;
+  }
+
+  const signature = changes.map((change) => `${change.index}:${change.oldProductId}:${change.newProductId}`).join("|");
+  const dismissKey = `${DISMISS_KEY}:${businessCaseId}`;
+  if (sessionStorage.getItem(dismissKey) === signature) return;
+
+  if (!window.confirm(confirmationText(project, changes))) {
+    sessionStorage.setItem(dismissKey, signature);
+    return;
+  }
+
+  const projects = [...container.projects];
+  projects[index] = reconcileImportedProjectProductCategories(project);
   const nextValue = container.wrapped ? { ...container.parsed, projects } : projects;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(nextValue));
-  window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+  sessionStorage.removeItem(dismissKey);
+  window.location.reload();
 }
 
 if (typeof window !== "undefined") {
-  // Repair already-imported projects after the current project state has loaded.
-  // The app's existing persistence/sync layer will then persist the corrected state.
-  window.setTimeout(reconcileStoredProjects, 1200);
+  // Existing Business Cases are never silently rewritten. Once the current project is
+  // loaded, incompatible product assignments are detected and the user is asked before
+  // only those assignments are reconciled against the current catalogue.
+  window.setTimeout(reconcileCurrentStoredProjectWithConfirmation, 1400);
 
-  // Re-run after an import/re-import. The existing confirmation guard decides whether
-  // overwrite is allowed; this module only ensures the resulting product IDs obey the
-  // selected luminaire category.
+  // After import/re-import, run the same controlled check. The existing import overwrite
+  // confirmation still decides whether imported technical data may replace the project.
   document.addEventListener("change", (event) => {
     const input = event.target;
     if (!(input instanceof HTMLInputElement) || input.type !== "file" || !input.files?.length) return;
-    window.setTimeout(reconcileStoredProjects, 800);
-    window.setTimeout(reconcileStoredProjects, 1800);
+    window.setTimeout(reconcileCurrentStoredProjectWithConfirmation, 1000);
+    window.setTimeout(reconcileCurrentStoredProjectWithConfirmation, 2200);
   });
 }
