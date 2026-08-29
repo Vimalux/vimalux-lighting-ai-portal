@@ -105,13 +105,14 @@ export function appendProposalVisualPages(doc, project, options = {}) {
   const navy = options.navy || [15, 23, 42];
   const muted = options.muted || [71, 85, 105];
   const light = options.light || [248, 250, 252];
-  const section = (title, y) => {
+  const sectionAt = (title, x, y) => {
     doc.setTextColor(...teal);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
-    doc.text(title, 14, y);
+    doc.text(title, x, y);
     doc.setTextColor(...navy);
   };
+  const section = (title, y) => sectionAt(title, 14, y);
 
   const calculated = calculateBusinessCase(applyWarrantyPricing(project));
   const energyBefore = safe(calculated.baselineKwh) * safe(project.assumptions?.energyPrice);
@@ -120,6 +121,19 @@ export function appendProposalVisualPages(doc, project, options = {}) {
   const annualFee = safe(calculated.customerAnnualPayment);
   const netBenefit = safe(calculated.customerAnnualNetBenefit);
   const cashRows = Array.isArray(calculated.cashFlowRows) ? calculated.cashFlowRows : [];
+  const openingCash = cashRows.length ? safe(cashRows[0].cumulative) - safe(cashRows[0].netCashFlow) : 0;
+  const initialOutlay = Math.max(0, -openingCash);
+  const cashTableRows = [
+    {
+      year: 0,
+      grossBenefit: 0,
+      serviceOpex: 0,
+      payment: initialOutlay,
+      netCashFlow: -initialOutlay,
+      cumulative: openingCash,
+    },
+    ...cashRows,
+  ];
 
   doc.addPage();
   section(it ? "Dashboard economico ed energetico" : "Economic & Energy Dashboard", 20);
@@ -134,14 +148,14 @@ export function appendProposalVisualPages(doc, project, options = {}) {
   card(doc, 14, 35, cardW, 27, it ? "Costo energia attuale" : "Current energy cost", money(energyBefore, lang), teal, navy, light);
   card(doc, 60.5, 35, cardW, 27, it ? "Costo energia futuro" : "Future energy cost", money(energyAfter, lang), teal, navy, light);
   card(doc, 107, 35, cardW, 27, it ? "Beneficio netto annuo" : "Annual net benefit", money(netBenefit, lang), teal, navy, light);
-  card(doc, 153.5, 35, cardW, 27, "Payback", calculated.payback == null ? "–" : `${number(calculated.payback, 1, lang)} ${it ? "anni" : "yrs"}`, teal, navy, light);
+  card(doc, 153.5, 35, cardW, 27, "Payback", calculated.payback == null ? "-" : `${number(calculated.payback, 1, lang)} ${it ? "anni" : "yrs"}`, teal, navy, light);
 
-  section(it ? "Costo energetico annuo" : "Annual Energy Cost", 76);
+  sectionAt(it ? "Costo energetico annuo" : "Annual Energy Cost", 14, 76);
   horizontalBars(doc, 14, 83, 80,
     [it ? "Situazione attuale" : "Current", it ? "Dopo LED + Smart" : "After LED + Smart"],
     [energyBefore, energyAfter], lang, teal, navy, muted);
 
-  section(it ? "Composizione del beneficio annuo" : "Annual Benefit Composition", 76);
+  sectionAt(it ? "Composizione beneficio annuo" : "Annual Benefit Composition", 108, 76);
   horizontalBars(doc, 108, 83, 88,
     [it ? "Risparmio energia" : "Energy saving", it ? "Risparmio manutenzione" : "Maintenance saving", it ? "Canone Smart / CMS" : "Smart / CMS fee"],
     [safe(calculated.energySaving), maintenanceSaving, annualFee], lang, teal, navy, muted);
@@ -154,7 +168,7 @@ export function appendProposalVisualPages(doc, project, options = {}) {
     body: [
       [it ? "Riduzione energia" : "Energy reduction", `${number(calculated.energyReductionPercent, 1, lang)}%`, it ? "Riduzione rispetto alla baseline" : "Reduction versus baseline"],
       [it ? "Energia risparmiata" : "Energy saved", `${number(Math.max(0, safe(calculated.baselineKwh) - safe(calculated.finalKwh)), 0, lang)} kWh/anno`, it ? "Effetto LED + Smart" : "LED + Smart effect"],
-      [it ? "Riduzione CO₂" : "CO₂ reduction", `${number(safe(calculated.co2ReductionKg) / 1000, 1, lang)} t/anno`, it ? "Sulla base del fattore CO₂ impostato" : "Based on configured CO₂ factor"],
+      [it ? "Riduzione CO2" : "CO2 reduction", `${number(safe(calculated.co2ReductionKg) / 1000, 1, lang)} t/anno`, it ? "Sulla base del fattore CO2 impostato" : "Based on configured CO2 factor"],
       [it ? "Punti luce aggiornati" : "Upgraded lighting points", number(calculated.upgradedQuantity, 0, lang), it ? "Copertura del progetto" : "Project coverage"],
       [it ? "Punti Smart connessi" : "Smart connected points", number(calculated.lcuQuantity, 0, lang), it ? "Monitoraggio e controllo remoto" : "Remote monitoring and control"],
     ],
@@ -172,13 +186,13 @@ export function appendProposalVisualPages(doc, project, options = {}) {
     : "Charts are preliminary and follow the Business Case assumptions. Final lighting-design validation is completed in VIMALUX Planner.", 14, 262, { maxWidth: 182 });
 
   doc.addPage();
-  section(it ? `Cash flow cliente – ${calculated.analysisPeriod} anni` : `Customer Cash Flow – ${calculated.analysisPeriod} years`, 20);
+  section(it ? `Cash flow cliente - ${calculated.analysisPeriod} anni` : `Customer Cash Flow - ${calculated.analysisPeriod} years`, 20);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.2);
   doc.setTextColor(...muted);
   doc.text(it
-    ? "Il grafico mostra il cash flow cumulativo del Comune sulla base dell'investimento, dei risparmi e dei pagamenti previsti dal modello selezionato."
-    : "The chart shows cumulative municipality cash flow based on investment, savings and payments under the selected commercial model.", 14, 28, { maxWidth: 182 });
+    ? "Il grafico mostra il cash flow cumulativo del Comune includendo l'esborso iniziale, i risparmi e i pagamenti previsti dal modello selezionato."
+    : "The chart shows cumulative municipality cash flow including initial outlay, savings and payments under the selected commercial model.", 14, 28, { maxWidth: 182 });
 
   lineChart(doc, 14, 36, 182, 83, cashRows, teal, navy, muted);
 
@@ -190,11 +204,11 @@ export function appendProposalVisualPages(doc, project, options = {}) {
       it ? "Anno" : "Year",
       it ? "Beneficio lordo" : "Gross benefit",
       it ? "Servizi/OPEX" : "Service/OPEX",
-      it ? "Finanz./canone" : "Finance/payment",
+      it ? "Invest./finanz." : "Invest./finance",
       it ? "Cash flow netto" : "Net cash flow",
       it ? "Cumulativo" : "Cumulative",
     ]],
-    body: cashRows.map((row) => [
+    body: cashTableRows.map((row) => [
       row.year,
       money(row.grossBenefit, lang),
       money(row.serviceOpex, lang),
@@ -204,7 +218,7 @@ export function appendProposalVisualPages(doc, project, options = {}) {
     ]),
     headStyles: { fillColor: teal },
     alternateRowStyles: { fillColor: light },
-    styles: { font: "helvetica", fontSize: cashRows.length > 15 ? 5.8 : 6.5, cellPadding: cashRows.length > 15 ? 0.8 : 1.1 },
+    styles: { font: "helvetica", fontSize: cashTableRows.length > 15 ? 5.6 : 6.4, cellPadding: cashTableRows.length > 15 ? 0.72 : 1.0 },
     columnStyles: {
       0: { halign: "center", cellWidth: 13 },
       1: { halign: "right" },
