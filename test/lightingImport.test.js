@@ -53,6 +53,24 @@ test("individual rows aggregate into wattage and technology groups", () => {
   assert.equal(result.skipped, 1);
 });
 
+test("grouped import preserves perimetro and zone order from the source sheet", () => {
+  const headers = ["Localizzazione / gruppo *", "Categoria apparecchio *", "Wattaggio attuale (W) *", "Tecnologia attuale *", "N. apparecchi *", "Ore funzionamento annue *", "Modalità di sostituzione"];
+  const mapping = guessLightingMapping(headers);
+  const rows = [
+    ["P1 – Via Parrà", "Stradale", 70, "SAP", 4, 4200, "Sostituzione completa"],
+    ["P2 – Via dei Romani", "Arredo urbano", 70, "SAP", 3, 4200, "Sostituzione completa"],
+    ["P1 – Via Parrà", "Stradale", 150, "SAP", 12, 4200, "Sostituzione completa"],
+    ["P3 – Via Trieste", "Lanterna", 125, "SAP", 14, 4200, "Retrofit"],
+  ];
+  const result = buildImportedGroups(rows, mapping, [{ id: "led-1", wattage: 30, active: true }], "it");
+  assert.deepEqual(result.groups.map(group => group.name), [
+    "P1 – Via Parrà",
+    "P2 – Via dei Romani",
+    "P1 – Via Parrà",
+    "P3 – Via Trieste",
+  ]);
+});
+
 test("v2.3 groups retain category, replacement strategy and operating hours", () => {
   const rows = [["Via Roma", "Lanterna", 70, "SAP", 24, 4200, "Retrofit"]];
   const mapping = guessLightingMapping(["Localizzazione / gruppo *", "Categoria apparecchio *", "Wattaggio attuale (W) *", "Tecnologia attuale *", "N. apparecchi *", "Ore funzionamento annue *", "Modalità di sostituzione"]);

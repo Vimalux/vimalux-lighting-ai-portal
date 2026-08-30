@@ -264,7 +264,8 @@ export function buildImportedGroups(rows, mapping, ledProducts, language = "it",
     else grouped.set(key, importedGroupBase({ ...baseArgs, name: suppliedName || `${category} · ${technology} ${wattage} W`, quantity }));
   });
 
-  const groups = [...grouped.values()].sort((a, b) => (a.existingCategory || "").localeCompare(b.existingCategory || "") || a.technology.localeCompare(b.technology) || a.existingWattage - b.existingWattage);
+  // Preserve the first-occurrence order from the input sheet. Map insertion order is stable, so perimetri/zone remain aligned with the source document.
+  const groups = [...grouped.values()];
   const totalQuantity = groups.reduce((sum, group) => sum + group.quantity, 0);
   return { groups, skipped, totalQuantity, message: language === "it" ? `${groups.length} gruppi, ${totalQuantity} apparecchi` : `${groups.length} groups, ${totalQuantity} luminaires` };
 }
