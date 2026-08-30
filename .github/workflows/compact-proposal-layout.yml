@@ -1,0 +1,51 @@
+name: Compact proposal layout
+on:
+  push:
+    branches: [fix/proposal-page2-layout]
+permissions:
+  contents: write
+jobs:
+  patch-test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/proposal-page2-layout
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Compact page 2 layout
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/preliminaryProposalV2.js')
+          s=p.read_text()
+          replacements={
+            'y = doc.lastAutoTable.finalY + 6;\n  y = beginSection(it ? "Passaggio a VIMALUX Planner" : "Transition to VIMALUX Planner", y, 25);':
+            'y = doc.lastAutoTable.finalY + 4;\n  y = beginSection(it ? "Passaggio a VIMALUX Planner" : "Transition to VIMALUX Planner", y, 18);',
+            '  y += 17;\n  y = beginSection(it ? "Condizioni e limitazioni" : "Terms & Limitations", y, 28);':
+            '  y += 13;\n  y = beginSection(it ? "Condizioni e limitazioni" : "Terms & Limitations", y, 18);'
+          }
+          for old,new in replacements.items():
+              if old not in s:
+                  raise SystemExit('Expected layout block not found: '+old[:80])
+              s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+      - name: Verify isolated layout scope
+        run: |
+          git diff --name-only
+          test "$(git diff --name-only | grep -v '^\.github/workflows/compact-proposal-layout.yml$' | wc -l)" -eq 1
+          git diff --name-only | grep -q '^src/preliminaryProposalV2.js$'
+      - run: npm test -- --run
+      - run: npm run build
+      - name: Commit validated layout fix
+        run: |
+          git config user.name VIMALUX
+          git config user.email 99176508+Vimalux@users.noreply.github.com
+          git add src/preliminaryProposalV2.js
+          git diff --cached --quiet || git commit -m "Keep proposal terms on page two"
+          git push origin HEAD:fix/proposal-page2-layout
