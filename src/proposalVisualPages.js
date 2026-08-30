@@ -1,23 +1,12 @@
 import autoTable from "jspdf-autotable";
 import { calculateBusinessCase } from "./calculations.js";
 import { applyWarrantyPricing } from "./warranty.js";
+import { alignedTable, pdfSafeText, reportMoney, reportNumber } from "./reportPresentation.js";
 
 const safe = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 
-const groupedInteger = (value, separator) => String(Math.round(Math.abs(safe(value))))
-  .replace(/\B(?=(\d{3})+(?!\d))/g, separator);
-
-const money = (value, lang = "en") => {
-  const numeric = safe(value);
-  const sign = numeric < 0 ? "-" : "";
-  const grouped = groupedInteger(numeric, lang === "it" ? "." : ",");
-  return lang === "it" ? `${sign}${grouped} €` : `${sign}€${grouped}`;
-};
-
-const number = (value, digits = 0, lang = "en") => new Intl.NumberFormat(lang === "it" ? "it-IT" : "en-GB", {
-  minimumFractionDigits: digits,
-  maximumFractionDigits: digits,
-}).format(safe(value));
+const money = reportMoney;
+const number = reportNumber;
 
 function metricCard(doc, x, y, w, h, label, value, teal, navy, light) {
   doc.setFillColor(...light);
@@ -83,39 +72,43 @@ function lineChart(doc, x, y, w, h, rows, teal, navy, muted) {
   });
 }
 
-function phaseFromRow(row, startYear, endYear, active, label, sublabel) {
+export function phaseFromCustomerValueRow(row, startYear, endYear, active, label, sublabel, tolerance = 0.02) {
+  const currentOperatingCost = safe(row?.currentOperatingCost);
+  const futureOperatingCost = safe(row?.futureOperatingCost);
+  const servicePayment = safe(row?.servicePayment);
+  const investmentPayment = safe(row?.investmentPayment);
+  const residualSaving = currentOperatingCost - futureOperatingCost - servicePayment - investmentPayment;
+  const calculatedSaving = safe(row?.customerSaving);
+  if (residualSaving < -tolerance || Math.abs(residualSaving - calculatedSaving) > tolerance) {
+    throw new Error(`Customer-value phase does not reconcile to its current-cost baseline for year ${row?.year || startYear}.`);
+  }
   return {
     startYear,
     endYear,
     active,
     label,
     sublabel,
-    currentOperatingCost: safe(row?.currentOperatingCost),
-    futureOperatingCost: safe(row?.futureOperatingCost),
-    servicePayment: safe(row?.servicePayment),
-    investmentPayment: safe(row?.investmentPayment),
-    customerSaving: Math.max(0, safe(row?.customerSaving)),
+    sourceYear: safe(row?.year) || startYear,
+    currentOperatingCost,
+    futureOperatingCost,
+    servicePayment,
+    investmentPayment,
+    customerSaving: Math.max(0, residualSaving),
   };
 }
 
-function costEvolutionChart(doc, calculated, project, x, y, w, h, lang, colors) {
+export function buildCostEvolutionPhases(calculated, lang = "en") {
   const it = lang === "it";
-  const { teal, navy, muted } = colors;
-  const rows = Array.isArray(calculated.customerValueRows) ? calculated.customerValueRows : [];
+  const rows = Array.isArray(calculated?.customerValueRows) ? calculated.customerValueRows : [];
   const first = rows[0] || {};
-  const analysisPeriod = Math.max(1, Math.round(safe(calculated.analysisPeriod)));
-  const serviceYears = Math.max(0, Math.min(analysisPeriod, Math.round(safe(calculated.serviceAgreementPeriod))));
-  const financeYears = Math.max(0, Math.min(analysisPeriod, Math.round(safe(calculated.financingYears))));
-  const currentCost = safe(first.currentOperatingCost);
-
+  const analysisPeriod = Math.max(1, Math.round(safe(calculated?.analysisPeriod)));
+  const serviceYears = Math.max(0, Math.min(analysisPeriod, Math.round(safe(calculated?.serviceAgreementPeriod))));
+  const financeYears = Math.max(0, Math.min(analysisPeriod, Math.round(safe(calculated?.financingYears))));
   const phases = [];
   if (serviceYears > 0) {
-    phases.push(phaseFromRow(
-      rows[0] || first,
-      1,
-      serviceYears,
-      true,
-      `${it ? "Anni" : "Years"} 1–${serviceYears}`,
+    phases.push(phaseFromCustomerValueRow(
+      rows[0] || first, 1, serviceYears, true,
+      `${it ? "Anni" : "Years"} 1-${serviceYears}`,
       calculated.dealType === "cash"
         ? (it ? "Smart senza finanziamento" : "Smart without financing")
         : calculated.dealType === "finance"
@@ -124,26 +117,28 @@ function costEvolutionChart(doc, calculated, project, x, y, w, h, lang, colors) 
     ));
   }
   if (serviceYears < analysisPeriod) {
-    const postRow = rows[Math.min(serviceYears, Math.max(0, rows.length - 1))] || rows.at(-1) || first;
-    phases.push(phaseFromRow(
-      postRow,
-      Math.max(1, serviceYears + 1),
-      analysisPeriod,
-      false,
-      `${it ? "Anni" : "Years"} ${Math.max(1, serviceYears + 1)}–${analysisPeriod}`,
+    const postRow = rows[serviceYears] || rows.at(-1) || first;
+    phases.push(phaseFromCustomerValueRow(
+      postRow, Math.max(1, serviceYears + 1), analysisPeriod, false,
+      `${it ? "Anni" : "Years"} ${Math.max(1, serviceYears + 1)}-${analysisPeriod}`,
       it ? "Dopo il contratto Smart" : "After Smart contract",
     ));
   }
   if (!phases.length) {
-    phases.push(phaseFromRow(
-      first,
-      1,
-      analysisPeriod,
-      false,
-      `${it ? "Anni" : "Years"} 1–${analysisPeriod}`,
+    phases.push(phaseFromCustomerValueRow(
+      first, 1, analysisPeriod, false,
+      `${it ? "Anni" : "Years"} 1-${analysisPeriod}`,
       it ? "Scenario post-upgrade" : "Post-upgrade scenario",
     ));
   }
+  return { phases, rows, first, analysisPeriod, serviceYears };
+}
+
+function costEvolutionChart(doc, calculated, project, x, y, w, h, lang, colors) {
+  const it = lang === "it";
+  const { teal, navy, muted } = colors;
+  const { phases, first, analysisPeriod, serviceYears } = buildCostEvolutionPhases(calculated, lang);
+  const currentCost = safe(first.currentOperatingCost);
 
   const baselineY = y + 12;
   const chartBottom = y + h - 31;
@@ -152,8 +147,7 @@ function costEvolutionChart(doc, calculated, project, x, y, w, h, lang, colors) 
   const gap = 7;
   const timelineX = x + currentW + gap;
   const timelineW = w - currentW - gap;
-  const maxStack = Math.max(1, currentCost, ...phases.map((phase) => phase.futureOperatingCost + phase.servicePayment + phase.investmentPayment + phase.customerSaving));
-  const heightFor = (value) => chartHeight * Math.max(0, value) / maxStack;
+  const heightFor = (value) => chartHeight * Math.max(0, value) / Math.max(1, currentCost);
 
   doc.setDrawColor(100, 116, 139);
   doc.setLineDashPattern([1.2, 1.2], 0);
@@ -163,7 +157,7 @@ function costEvolutionChart(doc, calculated, project, x, y, w, h, lang, colors) 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.2);
   doc.setTextColor(...navy);
-  doc.text(`100% · ${money(currentCost, lang)} / ${it ? "anno" : "year"}`, x + w, baselineY - 3, { align: "right" });
+  doc.text(pdfSafeText(`100% | ${money(currentCost, lang)} / ${it ? "anno" : "year"}`), x + w, baselineY - 3, { align: "right" });
 
   const currentH = heightFor(currentCost);
   doc.setFillColor(31, 119, 180);
@@ -260,11 +254,13 @@ function costEvolutionChart(doc, calculated, project, x, y, w, h, lang, colors) 
   } else {
     const smartPhase = phases.find((phase) => phase.active) || phases[0];
     const postPhase = phases.find((phase) => !phase.active && phase.startYear > serviceYears) || phases.at(-1);
-    const incremental = Math.max(0, safe(smartPhase?.customerSaving) - safe(postPhase?.customerSaving));
-    doc.text(it ? `Smart attivo anni 1–${serviceYears}; scenario post-contratto anni ${serviceYears + 1}–${analysisPeriod}` : `Smart active years 1–${serviceYears}; post-contract scenario years ${serviceYears + 1}–${analysisPeriod}`, x + w / 2, legendY + 11, { align: "center" });
+    const displayedSmartSaving = Math.round(safe(smartPhase?.customerSaving));
+    const displayedPostSaving = Math.round(safe(postPhase?.customerSaving));
+    const phaseDifference = displayedPostSaving - displayedSmartSaving;
+    doc.text(it ? `Smart attivo anni 1-${serviceYears}; scenario post-contratto anni ${serviceYears + 1}-${analysisPeriod}` : `Smart active years 1-${serviceYears}; post-contract scenario years ${serviceYears + 1}-${analysisPeriod}`, x + w / 2, legendY + 11, { align: "center" });
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6.2);
-    doc.text(it ? `Differenza annua tra le due fasi: ${money(incremental, lang)}. Il rinnovo Smart sarà valutato alla scadenza del contratto.` : `Annual difference between the two phases: ${money(incremental, lang)}. Smart renewal will be assessed at contract expiry.`, x + w / 2, legendY + 16, { align: "center", maxWidth: w - 8 });
+    doc.text(it ? `Differenza annua tra le due fasi (post-contratto meno periodo Smart): ${money(phaseDifference, lang)}.` : `Annual difference between phases (post-contract minus Smart period): ${money(phaseDifference, lang)}.`, x + w / 2, legendY + 16, { align: "center", maxWidth: w - 8 });
   }
 }
 
@@ -329,7 +325,8 @@ export function appendProposalVisualPages(doc, project, options = {}) {
     headStyles: { fillColor: teal },
     alternateRowStyles: { fillColor: light },
     styles: { font: "helvetica", fontSize: 7.2, cellPadding: 1.4 },
-    columnStyles: { 1: { halign: "right", cellWidth: 50 } },
+    columnStyles: { 0: { halign: "left" }, 1: { halign: "right", cellWidth: 50 } },
+    didParseCell: alignedTable({ 0: "left", 1: "right" }).didParseCell,
   });
 
   doc.setFont("helvetica", "normal");
@@ -381,8 +378,10 @@ export function appendProposalVisualPages(doc, project, options = {}) {
       4: { halign: "right" },
       5: { halign: "right" },
     },
+    didParseCell: alignedTable({ 0: "center", 1: "right", 2: "right", 3: "right", 4: "right", 5: "right" }).didParseCell,
     margin: { left: 14, right: 14, bottom: 18 },
   });
 
   return calculated;
 }
+

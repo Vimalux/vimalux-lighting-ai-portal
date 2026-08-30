@@ -3,18 +3,23 @@ import autoTable from "jspdf-autotable";
 import { supabase } from "./supabase.js";
 import { warrantyLabel } from "./warranty.js";
 import { qualityGateMessage, validateProposalQuality } from "./proposalQuality.js";
+import {
+  PDF_FONT,
+  alignedTable,
+  buildCustomerCapexRows,
+  mergeTableHooks,
+  needsNewPdfPage,
+  pdfSafeText,
+  reportMoney,
+  reportNumber,
+} from "./reportPresentation.js";
 
 function pdfNumber(value, digits = 1, lang = "en") {
-  return new Intl.NumberFormat(lang === "it" ? "it-IT" : "en-GB", {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-    useGrouping: true,
-  }).format(Number(value) || 0).replace(/\u00a0|\u202f/g, " ");
+  return reportNumber(value, digits, lang);
 }
 
 function pdfMoney(value, lang = "en") {
-  const formatted = pdfNumber(value, 0, lang);
-  return lang === "it" ? `${formatted} €` : `€${formatted}`;
+  return reportMoney(value, lang);
 }
 
 const money = pdfMoney;
@@ -35,7 +40,9 @@ async function loadContext() {
   const code = currentBusinessCaseCode();
   const { data: rows, error } = await supabase.rpc("list_business_cases");
   if (error) throw error;
-  const row = (rows || []).find((item) => item.id === caseId || String(item.business_case_code || "").toUpperCase() === code);
+  const row = caseId
+    ? (rows || []).find((item) => item.id === caseId)
+    : (rows || []).find((item) => String(item.business_case_code || "").toUpperCase() === code);
   if (!row) throw new Error("Business Case not found.");
   if (!row.crm_opportunity_id) throw new Error("Business Case must be linked to CRM before a proposal can be published.");
   const { data: history, error: historyError } = await supabase.rpc("get_proposal_history", { opportunity_id: row.crm_opportunity_id });
@@ -65,65 +72,15 @@ function maintenanceSaving(project) {
   return upgraded * Math.max(0, existing - next);
 }
 
-function deliberateCapexRows(project, totalCapex, lang = "en") {
-  const it = lang === "it";
-  const additions = (Array.isArray(project?.additionalCosts) ? project.additionalCosts : [])
-    .filter((item) => String(item?.costType || "capex").toLowerCase() === "capex")
-    .map((item) => {
-      const quantity = Math.max(0, Number(item?.quantity) || 0);
-      const unitSalesPrice = Math.max(0, Number(item?.unitSalesPrice) || 0);
-      return { ...item, quantity, unitSalesPrice, total: quantity * unitSalesPrice };
-    })
-    .filter((item) => item.total > 0);
-
-  const additionsTotal = additions.reduce((sum, item) => sum + item.total, 0);
-  const baseCapex = Math.max(0, (Number(totalCapex) || 0) - additionsTotal);
-  const rows = [];
-
-  if (baseCapex > 0) {
-    rows.push([
-      it ? "Fornitura base LED / Smart / logistica e voci standard" : "Base LED / Smart / logistics and standard items",
-      money(baseCapex, lang),
-    ]);
-  }
-
-  additions.forEach((item) => {
-    const description = String(item.description || item.note || (it ? "Voce aggiuntiva" : "Additional item")).trim();
-    const unit = String(item.unit || "").trim();
-    const qtyLabel = `${number(item.quantity, 0, lang)}${unit ? ` ${unit}` : ""}`;
-    rows.push([
-      `${description} · ${qtyLabel} × ${money(item.unitSalesPrice, lang)}`,
-      money(item.total, lang),
-    ]);
-  });
-
-  rows.push([it ? "CAPEX totale" : "Total CAPEX", money(totalCapex, lang)]);
-  return { rows, additionsCount: additions.length, additionsTotal };
-}
-
-function drawFooter(doc, proposalId, version, lineage, it, muted) {
-  const pages = doc.getNumberOfPages();
-  for (let page = 1; page <= pages; page += 1) {
-    doc.setPage(page);
-    doc.setDrawColor(203, 213, 225);
-    doc.line(14, 281, 196, 281);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(...muted);
-    doc.text(`${proposalId} v${version}  |  ${lineage}  |  VIMALUX Intelligence`, 14, 286);
-    doc.text(`${it ? "Pagina" : "Page"} ${page}/${pages}`, 188, 286, { align: "right" });
-  }
-}
-
 function generatePdf(row, version) {
   const project = row.intelligence_data || {};
   const result = row.result_summary || {};
   const lang = project.language === "it" ? "it" : "en";
   const it = lang === "it";
-  const lineage = row.project_lineage_id || project.crm?.projectLineageId || "-";
-  const code = row.business_case_code || project.project?.businessCaseId || "-";
-  const customer = project.customer?.name || row.crm_fields?.customer || "-";
-  const projectName = project.project?.name || row.crm_fields?.project || customer;
+  const lineage = pdfSafeText(row.project_lineage_id || project.crm?.projectLineageId || "-");
+  const code = pdfSafeText(row.business_case_code || project.project?.businessCaseId || "-");
+  const customer = pdfSafeText(project.customer?.name || row.crm_fields?.customer || "-");
+  const projectName = pdfSafeText(project.project?.name || row.crm_fields?.project || customer);
   const proposalId = `PRE-${code}`;
   const date = new Date().toLocaleDateString(it ? "it-IT" : "en-GB");
   const contractYears = Math.round(Number(result.contractYears) || Number(project.assumptions?.serviceAgreementPeriod) || 0);
@@ -132,23 +89,31 @@ function generatePdf(row, version) {
   const maintSaving = maintenanceSaving(project);
   const energySaving = Number(result.annualEnergySavingEUR) || 0;
   const netBenefit = Number(result.annualCustomerNetBenefit) || (energySaving + maintSaving - annualFee);
-  const capexBreakdown = deliberateCapexRows(project, Number(result.capex) || 0, lang);
+  const capexBreakdown = buildCustomerCapexRows(project, Number(result.capex) || 0, lang, result.additionalCapexSales);
 
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const teal = [15, 118, 110];
   const navy = [15, 23, 42];
   const muted = [71, 85, 105];
-  const pale = [240, 253, 250];
   const light = [248, 250, 252];
   const section = (title, y) => {
-    doc.setTextColor(...teal); doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text(title, 14, y); doc.setTextColor(...navy);
+    doc.setTextColor(...teal); doc.setFont(PDF_FONT, "bold"); doc.setFontSize(13); doc.text(pdfSafeText(title), 14, y); doc.setTextColor(...navy);
   };
   const tableHead = { fillColor: teal, font: "helvetica", fontStyle: "bold" };
+  const beginSection = (title, currentY, requiredHeight) => {
+    let nextY = currentY;
+    if (needsNewPdfPage(nextY, requiredHeight)) {
+      doc.addPage();
+      nextY = 20;
+    }
+    section(title, nextY);
+    return nextY;
+  };
 
   doc.setFillColor(...navy); doc.rect(0, 0, 210, 48, "F");
   doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.text("VIMALUX Intelligence", 14, 17);
   doc.setFontSize(15); doc.text(it ? "Proposta Preliminare Smart Lighting" : "Preliminary Smart Lighting Proposal", 14, 29);
-  doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.text(`${proposalId} · v${version}  |  Project ID ${lineage}  |  ${date}`, 14, 39);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.text(`${proposalId} | v${version}  |  Project ID ${lineage}  |  ${date}`, 14, 39);
 
   section(it ? "Sintesi della proposta" : "Proposal Summary", 60);
   doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...navy);
@@ -162,7 +127,7 @@ function generatePdf(row, version) {
     head: [[it ? "Investimento iniziale" : "Initial investment", it ? "Canone annuale Smart / CMS" : "Annual Smart / CMS fee", it ? `TCV ${contractYears} anni` : `TCV ${contractYears} years`]],
     body: [[money(result.capex, lang), money(annualFee, lang), money(result.tcv, lang)]],
     headStyles: tableHead, styles: { font: "helvetica", fontSize: 8, cellPadding: 2.2 },
-    columnStyles: { 0: { halign: "right" }, 1: { halign: "right" }, 2: { halign: "right" } },
+    ...alignedTable({ 0: "right", 1: "right", 2: "right" }),
   });
   doc.setFont("helvetica", "normal"); doc.setFontSize(7.1); doc.setTextColor(...muted);
   doc.text(it
@@ -174,7 +139,7 @@ function generatePdf(row, version) {
     head: [[it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit", it ? "Riduzione energia" : "Energy reduction", it ? "Riduzione CO2" : "CO2 reduction", "Payback", it ? `VAN beneficio Comune (${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} anni)` : `Customer-benefit NPV (${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} years)`]],
     body: [[money(netBenefit, lang), `${number(result.energyReductionPct, 1, lang)}%`, `${number(result.co2ReductionTons, 1, lang)} t/${it ? "anno" : "yr"}`, result.paybackYears == null ? "-" : `${number(result.paybackYears, 1, lang)} ${it ? "anni" : "years"}`, money(result.npv, lang)]],
     headStyles: tableHead, styles: { font: "helvetica", fontSize: 7.1, cellPadding: 2 },
-    columnStyles: { 0: { halign: "right" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } },
+    ...alignedTable({ 0: "right", 1: "right", 2: "right", 3: "right", 4: "right" }),
   });
 
   let y = doc.lastAutoTable.finalY + 12;
@@ -188,7 +153,8 @@ function generatePdf(row, version) {
       [it ? "Apparecchi da aggiornare" : "Upgrade luminaires", String(Math.round(Number(result.upgradeLuminaires) || 0))],
       ["Smart connected", String(Math.round(Number(result.smartConnectedLuminaires) || 0))],
     ],
-    styles: { font: "helvetica", fontSize: 8.5, cellPadding: 1.2 }, columnStyles: { 0: { fontStyle: "bold", cellWidth: 58 } },
+    styles: { font: "helvetica", fontSize: 8.5, cellPadding: 1.2 },
+    columnStyles: { 0: { fontStyle: "bold", cellWidth: 58, halign: "left" }, 1: { halign: "left" } },
   });
 
   y = doc.lastAutoTable.finalY + 9;
@@ -202,7 +168,8 @@ function generatePdf(row, version) {
       [it ? `TCV ${contractYears} anni, indicizzato` : `Indexed TCV ${contractYears} years`, money(result.tcv, lang)],
       [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],
     ],
-    headStyles: tableHead, styles: { font: "helvetica", fontSize: 8, cellPadding: 1.5 }, columnStyles: { 1: { halign: "right" } },
+    headStyles: tableHead, styles: { font: "helvetica", fontSize: 8, cellPadding: 1.5 },
+    ...alignedTable({ 0: "left", 1: "right" }),
   });
 
   doc.addPage();
@@ -220,7 +187,8 @@ function generatePdf(row, version) {
       ["CMS", project.solution?.cmsEnabled ? (it ? "Monitoraggio, allarmi e gestione remota" : "Monitoring, alarms and remote management") : (it ? "Non incluso" : "Not included")],
       ["Adaptive Lighting", project.solution?.powerAidEnabled ? "PowerAiD" : (it ? "Predisposizione / da validare" : "Prepared / to be validated")],
     ],
-    headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 7.6, cellPadding: 1.25 }, columnStyles: { 0: { fontStyle: "bold", cellWidth: 48 } },
+    headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 7.6, cellPadding: 1.25 },
+    columnStyles: { 0: { fontStyle: "bold", cellWidth: 48, halign: "left" }, 1: { halign: "left" } },
   });
 
   y = doc.lastAutoTable.finalY + 7;
@@ -233,28 +201,40 @@ function generatePdf(row, version) {
       [it ? "Canone Smart Lighting / CMS" : "Smart Lighting / CMS fee", `(${money(annualFee, lang)})`],
       [it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit", money(netBenefit, lang)],
     ],
-    headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.25 }, columnStyles: { 1: { halign: "right" } },
-    didParseCell: (data) => { if (data.section === "body" && data.row.index === 3) data.cell.styles.fontStyle = "bold"; },
+    headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.25 },
+    ...alignedTable({ 0: "left", 1: "right" }),
+    didParseCell: mergeTableHooks(
+      alignedTable({ 0: "left", 1: "right" }).didParseCell,
+      (data) => { if (data.section === "body" && data.row.index === 3) data.cell.styles.fontStyle = "bold"; },
+    ),
   });
 
   y = doc.lastAutoTable.finalY + 7;
-  section(it ? "Composizione dell'investimento" : "Investment composition", y);
+  y = beginSection(it ? "Composizione dell'investimento" : "Investment composition", y, 22);
   autoTable(doc, {
     startY: y + 4,
     theme: "grid",
-    head: [[it ? "Voce" : "Item", it ? "Importo" : "Amount"]],
+    head: [[it ? "Voce" : "Item", it ? "Quantità" : "Quantity", it ? "Unità" : "Unit", it ? "Prezzo unitario" : "Unit price", it ? "Importo" : "Amount"]],
     body: capexBreakdown.rows,
     headStyles: tableHead,
     alternateRowStyles: { fillColor: light },
-    styles: { font: "helvetica", fontSize: capexBreakdown.rows.length > 8 ? 6.2 : 6.8, cellPadding: capexBreakdown.rows.length > 8 ? 0.7 : 0.9 },
-    columnStyles: { 0: { cellWidth: 137 }, 1: { halign: "right", cellWidth: 45 } },
-    didParseCell: (data) => {
-      if (data.section === "body" && data.row.index === capexBreakdown.rows.length - 1) data.cell.styles.fontStyle = "bold";
+    styles: { font: "helvetica", fontSize: 6.8, cellPadding: 0.9, overflow: "linebreak" },
+    columnStyles: {
+      0: { halign: "left", cellWidth: 82 },
+      1: { halign: "right", cellWidth: 22 },
+      2: { halign: "left", cellWidth: 18 },
+      3: { halign: "right", cellWidth: 30 },
+      4: { halign: "right", cellWidth: 30 },
     },
+    didParseCell: mergeTableHooks(
+      alignedTable({ 0: "left", 1: "right", 2: "left", 3: "right", 4: "right" }).didParseCell,
+      (data) => { if (data.section === "body" && data.row.index === capexBreakdown.rows.length - 1) data.cell.styles.fontStyle = "bold"; },
+    ),
+    margin: { left: 14, right: 14, bottom: 18 },
   });
 
   y = doc.lastAutoTable.finalY + 7;
-  section(it ? "Ipotesi principali" : "Key Assumptions", y);
+  y = beginSection(it ? "Ipotesi principali" : "Key Assumptions", y, 48);
   autoTable(doc, {
     startY: y + 4, theme: "grid", head: [[it ? "Parametro" : "Parameter", it ? "Valore" : "Value"]],
     body: [
@@ -266,22 +246,24 @@ function generatePdf(row, version) {
       [it ? "Modello commerciale" : "Commercial model", String(project.assumptions?.dealType || project.assumptions?.financingModel || "cash")],
       [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],
     ],
-    headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 6.8, cellPadding: 0.9 }, columnStyles: { 1: { halign: "right" } },
+    headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 6.8, cellPadding: 0.9 },
+    ...alignedTable({ 0: "left", 1: "right" }),
+    margin: { left: 14, right: 14, bottom: 18 },
   });
 
   y = doc.lastAutoTable.finalY + 6;
-  section(it ? "Passaggio a VIMALUX Planner" : "Transition to VIMALUX Planner", y);
+  y = beginSection(it ? "Passaggio a VIMALUX Planner" : "Transition to VIMALUX Planner", y, 25);
   doc.setFont("helvetica", "normal"); doc.setFontSize(6.8); doc.setTextColor(...navy);
   doc.text(it
-    ? "Prossimo passo: censimento e geolocalizzazione → classificazione UNI 11248 → dimensionamento e ottiche → BOM/logistica → proposta ufficiale Planner."
-    : "Next step: census and geolocation → UNI 11248 classification → sizing and optics → BOM/logistics → official Planner proposal.", 14, y + 5, { maxWidth: 182 });
+    ? "Prossimo passo: censimento e geolocalizzazione - classificazione UNI 11248 - dimensionamento e ottiche - BOM/logistica - proposta ufficiale Planner."
+    : "Next step: census and geolocation - UNI 11248 classification - sizing and optics - BOM/logistics - official Planner proposal.", 14, y + 5, { maxWidth: 182 });
   doc.setFontSize(6.5); doc.setTextColor(...muted);
   doc.text(it
     ? `Project ID ${lineage} resterà invariato in Intelligence, Planner e CRM, preservando Business Case, versioni e cronologia.`
     : `Project ID ${lineage} remains unchanged across Intelligence, Planner and CRM, preserving the Business Case, versions and history.`, 14, y + 10, { maxWidth: 182 });
 
   y += 17;
-  section(it ? "Condizioni e limitazioni" : "Terms & Limitations", y);
+  y = beginSection(it ? "Condizioni e limitazioni" : "Terms & Limitations", y, 28);
   doc.setFontSize(6.4); doc.setTextColor(...muted); doc.setFont("helvetica", "normal");
   doc.text(it
     ? "Questa proposta è indicativa e non costituisce un'offerta finale vincolante. È basata sui dati disponibili e sulle voci economiche inserite nel Business Case alla data di emissione. Prezzi, quantità, installazione, logistica, imposte, finanziamento e prestazioni definitive saranno confermati nella proposta ufficiale generata da VIMALUX Planner. IVA esclusa salvo diversa indicazione."
@@ -308,7 +290,7 @@ async function createAndPublish(button) {
     const project = row.intelligence_data || {};
     const validation = validateProposalQuality(project);
     if (!validation.ok) throw new Error(qualityGateMessage(validation, project.language === "it" ? "it" : "en"));
-    button.textContent = project.language === "it" ? "Generazione…" : "Generating…";
+    button.textContent = project.language === "it" ? "Generazione..." : "Generating...";
     const pdfName = generatePdf(row, version);
     const { error } = await supabase.rpc("publish_intelligence_preliminary_proposal", {
       case_id: row.id, quotation_id: `PRE-${row.business_case_code}`, proposal_status: "draft", pdf_reference: pdfName, savings_report_reference: null,
@@ -339,3 +321,4 @@ const observer = new MutationObserver(ensureButton);
 observer.observe(document.getElementById("root") || document.body, { childList: true, subtree: true });
 window.addEventListener("load", ensureButton, { once: true });
 setTimeout(ensureButton, 500);
+
