@@ -254,8 +254,8 @@ function generatePdf(row, version) {
     margin: { left: 14, right: 14, bottom: 18 },
   });
 
-  y = doc.lastAutoTable.finalY + 6;
-  y = beginSection(it ? "Passaggio a VIMALUX Planner" : "Transition to VIMALUX Planner", y, 25);
+  y = doc.lastAutoTable.finalY + 4;
+  y = beginSection(it ? "Passaggio a VIMALUX Planner" : "Transition to VIMALUX Planner", y, 18);
   doc.setFont("helvetica", "normal"); doc.setFontSize(6.8); doc.setTextColor(...navy);
   doc.text(it
     ? "Prossimo passo: censimento e geolocalizzazione - classificazione UNI 11248 - dimensionamento e ottiche - BOM/logistica - proposta ufficiale Planner."
@@ -265,8 +265,8 @@ function generatePdf(row, version) {
     ? `Project ID ${lineage} resterà invariato in Intelligence, Planner e CRM, preservando Business Case, versioni e cronologia.`
     : `Project ID ${lineage} remains unchanged across Intelligence, Planner and CRM, preserving the Business Case, versions and history.`, 14, y + 10, { maxWidth: 182 });
 
-  y += 17;
-  y = beginSection(it ? "Condizioni e limitazioni" : "Terms & Limitations", y, 28);
+  y += 13;
+  y = beginSection(it ? "Condizioni e limitazioni" : "Terms & Limitations", y, 18);
   doc.setFontSize(6.4); doc.setTextColor(...muted); doc.setFont("helvetica", "normal");
   doc.text(it
     ? "Questa proposta è indicativa e non costituisce un'offerta finale vincolante. È basata sui dati disponibili e sulle voci economiche inserite nel Business Case alla data di emissione. Prezzi, quantità, installazione, logistica, imposte, finanziamento e prestazioni definitive saranno confermati nella proposta ufficiale generata da VIMALUX Planner. IVA esclusa salvo diversa indicazione."
