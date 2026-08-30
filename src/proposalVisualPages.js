@@ -4,11 +4,15 @@ import { applyWarrantyPricing } from "./warranty.js";
 
 const safe = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 
-const money = (value, lang = "en") => new Intl.NumberFormat(lang === "it" ? "it-IT" : "en-GB", {
-  style: "currency",
-  currency: "EUR",
-  maximumFractionDigits: 0,
-}).format(safe(value));
+const groupedInteger = (value, separator) => String(Math.round(Math.abs(safe(value))))
+  .replace(/\B(?=(\d{3})+(?!\d))/g, separator);
+
+const money = (value, lang = "en") => {
+  const numeric = safe(value);
+  const sign = numeric < 0 ? "-" : "";
+  const grouped = groupedInteger(numeric, lang === "it" ? "." : ",");
+  return lang === "it" ? `${sign}${grouped} €` : `${sign}€${grouped}`;
+};
 
 const number = (value, digits = 0, lang = "en") => new Intl.NumberFormat(lang === "it" ? "it-IT" : "en-GB", {
   minimumFractionDigits: digits,
