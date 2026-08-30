@@ -80,7 +80,7 @@ function scenarioCard(doc, x, y, w, h, title, subtitle, rows, accent, navy, mute
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
-  doc.text(title, x + 4, y + 6.5);
+  doc.text(title, x + 4, y + 6.5, { maxWidth: w - 8 });
   doc.setTextColor(...muted);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6.3);
@@ -102,64 +102,101 @@ function scenarioCard(doc, x, y, w, h, title, subtitle, rows, accent, navy, mute
   });
 }
 
+function phaseKey(row) {
+  return `${Boolean(row?.cmsActive)}|${Boolean(row?.powerAidActive)}|${safe(row?.investmentPayment) > 0}`;
+}
+
+function buildDisplayedPhases(calculated) {
+  const rows = Array.isArray(calculated.customerValueRows) ? calculated.customerValueRows : [];
+  if (!rows.length) return [];
+  const phases = [];
+  let start = 0;
+  for (let index = 1; index <= rows.length; index += 1) {
+    if (index === rows.length || phaseKey(rows[index]) !== phaseKey(rows[start])) {
+      phases.push({ startYear: start + 1, endYear: index, row: rows[start] });
+      start = index;
+    }
+  }
+  return phases;
+}
+
+function phaseTitle(phase, lang) {
+  const it = lang === "it";
+  const range = `${phase.startYear}-${phase.endYear}`;
+  if (phase.row?.cmsActive && phase.row?.powerAidActive) return `${it ? "CMS + PowerAiD" : "CMS + PowerAiD"} ${range}`;
+  if (phase.row?.cmsActive) return `${it ? "Solo CMS" : "CMS only"} ${range}`;
+  if (safe(phase.row?.investmentPayment) > 0) return `${it ? "Finanziamento" : "Financing"} ${range}`;
+  return `${it ? "Post-servizi" : "Post-service"} ${range}`;
+}
+
+function phaseSubtitle(phase, lang) {
+  const it = lang === "it";
+  if (phase.row?.cmsActive && phase.row?.powerAidActive) return it ? "CMS, CLO, manutenzione e PowerAiD attivi" : "CMS, CLO, maintenance and PowerAiD active";
+  if (phase.row?.cmsActive) return it ? "CMS, CLO e manutenzione attivi; PowerAiD terminato" : "CMS, CLO and maintenance active; PowerAiD ended";
+  return it ? "Solo benefici LED non dipendenti dai servizi Smart" : "Only LED benefits independent of Smart services";
+}
+
 function renderScenarioComparison(doc, calculated, x, y, w, lang, colors) {
   const it = lang === "it";
   const { teal, navy, muted, light } = colors;
   const rows = Array.isArray(calculated.customerValueRows) ? calculated.customerValueRows : [];
   const first = rows[0] || {};
-  const analysisPeriod = Math.max(1, Math.round(safe(calculated.analysisPeriod)));
-  const serviceYears = Math.max(0, Math.min(analysisPeriod, Math.round(safe(calculated.serviceAgreementPeriod))));
-  const post = rows[serviceYears] || rows.at(-1) || first;
   const currentCost = safe(first.currentOperatingCost);
-  const smartSaving = safe(first.customerSaving);
-  const postSaving = safe(post.customerSaving);
-  const phaseDifference = postSaving - smartSaving;
-  const cardGap = 5;
-  const cardW = (w - cardGap * 2) / 3;
-  const cardH = 68;
+  const phases = buildDisplayedPhases(calculated);
+  const cards = [
+    {
+      title: it ? "Situazione attuale" : "Current situation",
+      subtitle: it ? "Costo annuo di riferimento" : "Current annual reference cost",
+      rows: [{ label: it ? "Costo annuo" : "Annual cost", value: money(currentCost, lang) }],
+      accent: [31, 119, 180],
+    },
+    ...phases.map((phase) => ({
+      title: phaseTitle(phase, lang),
+      subtitle: phaseSubtitle(phase, lang),
+      rows: [
+        { label: it ? "Costo operativo" : "Operating cost", value: money(phase.row.futureOperatingCost, lang) },
+        { label: it ? "Servizi/OPEX" : "Service/OPEX", value: money(phase.row.servicePayment, lang) },
+        { label: it ? "Beneficio netto Comune" : "Municipality net benefit", value: money(phase.row.customerSaving, lang) },
+      ],
+      accent: phase.row?.powerAidActive ? teal : phase.row?.cmsActive ? [14, 116, 144] : [22, 163, 74],
+    })),
+  ];
 
-  scenarioCard(doc, x, y, cardW, cardH,
-    it ? "Situazione attuale" : "Current situation",
-    it ? "Costo annuo di riferimento" : "Current annual reference cost",
-    [
-      { label: it ? "Costo annuo" : "Annual cost", value: money(currentCost, lang) },
-    ], [31, 119, 180], navy, muted, light);
+  const columns = cards.length <= 3 ? cards.length : 2;
+  const gap = 5;
+  const cardW = (w - gap * (columns - 1)) / columns;
+  const cardH = cards.length <= 3 ? 68 : 57;
+  const rowsCount = Math.ceil(cards.length / columns);
+  cards.forEach((card, index) => {
+    const col = index % columns;
+    const row = Math.floor(index / columns);
+    scenarioCard(doc, x + col * (cardW + gap), y + row * (cardH + gap), cardW, cardH, card.title, card.subtitle, card.rows, card.accent, navy, muted, light);
+  });
 
-  scenarioCard(doc, x + cardW + cardGap, y, cardW, cardH,
-    `${it ? "Scenario Smart" : "Smart scenario"} 1-${serviceYears}`,
-    it ? "Durante il contratto Smart" : "During the Smart contract",
-    [
-      { label: it ? "Costo operativo" : "Operating cost", value: money(first.futureOperatingCost, lang) },
-      { label: it ? "Canone Smart/CMS" : "Smart/CMS fee", value: money(first.servicePayment, lang) },
-      { label: it ? "Beneficio netto Comune" : "Municipality net benefit", value: money(smartSaving, lang) },
-    ], teal, navy, muted, light);
-
-  scenarioCard(doc, x + (cardW + cardGap) * 2, y, cardW, cardH,
-    `${it ? "Post-contratto" : "Post-contract"} ${serviceYears + 1}-${analysisPeriod}`,
-    it ? "Scenario dopo la scadenza Smart" : "Scenario after Smart contract expiry",
-    [
-      { label: it ? "Costo operativo" : "Operating cost", value: money(post.futureOperatingCost, lang) },
-      { label: it ? "Canone Smart/CMS" : "Smart/CMS fee", value: money(post.servicePayment, lang) },
-      { label: it ? "Beneficio netto Comune" : "Municipality net benefit", value: money(postSaving, lang) },
-    ], [22, 163, 74], navy, muted, light);
-
+  const cardsBottom = y + rowsCount * cardH + (rowsCount - 1) * gap;
+  const firstPhase = phases[0]?.row;
+  const lastPhase = phases.at(-1)?.row;
+  const displayedFirstSaving = Math.round(safe(firstPhase?.customerSaving));
+  const displayedLastSaving = Math.round(safe(lastPhase?.customerSaving));
+  const phaseDifference = displayedLastSaving - displayedFirstSaving;
   doc.setFillColor(236, 253, 245);
   doc.setDrawColor(110, 231, 183);
-  doc.roundedRect(x, y + cardH + 7, w, 22, 2, 2, "FD");
+  doc.roundedRect(x, cardsBottom + 7, w, 22, 2, 2, "FD");
   doc.setTextColor(4, 120, 87);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.text(it
-    ? `Differenza annua post-contratto vs periodo Smart: ${money(phaseDifference, lang)}`
-    : `Annual post-contract difference vs Smart period: ${money(phaseDifference, lang)}`,
-    x + 5, y + cardH + 15);
+    ? `Variazione beneficio netto tra prima e ultima fase: ${money(phaseDifference, lang)}`
+    : `Net-benefit change between first and final phase: ${money(phaseDifference, lang)}`,
+    x + 5, cardsBottom + 15);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6.3);
   doc.setTextColor(...muted);
   doc.text(it
-    ? "I valori sono importi annui calcolati direttamente dallo stesso Business Case del dashboard."
-    : "Values are annual amounts calculated directly from the same Business Case used by the dashboard.",
-    x + 5, y + cardH + 20, { maxWidth: w - 10 });
+    ? "Ogni fase segue le durate effettive di CMS e PowerAiD configurate nel Business Case."
+    : "Each phase follows the actual CMS and PowerAiD durations configured in the Business Case.",
+    x + 5, cardsBottom + 20, { maxWidth: w - 10 });
+  return cardsBottom + 29;
 }
 
 export function appendProposalVisualPages(doc, project, options = {}) {
@@ -189,24 +226,25 @@ export function appendProposalVisualPages(doc, project, options = {}) {
   doc.setFontSize(8.2);
   doc.setTextColor(...muted);
   doc.text(it
-    ? "Confronto diretto dei tre scenari. Gli importi in euro sono il riferimento principale; le percentuali energetiche sono riportate separatamente negli indicatori."
-    : "Direct comparison of the three scenarios. Euro amounts are the primary reference; energy percentages are shown separately in the indicators.", 14, 28, { maxWidth: 182 });
+    ? "Confronto diretto delle fasi operative. Gli importi in euro sono il riferimento principale; le percentuali energetiche sono riportate separatamente negli indicatori."
+    : "Direct comparison of the operating phases. Euro amounts are the primary reference; energy percentages are shown separately in the indicators.", 14, 28, { maxWidth: 182 });
 
-  renderScenarioComparison(doc, calculated, 14, 38, 182, lang, { teal, navy, muted, light });
-
-  section(it ? "Indicatori chiave" : "Key Indicators", 151);
+  const comparisonBottom = renderScenarioComparison(doc, calculated, 14, 38, 182, lang, { teal, navy, muted, light });
+  const indicatorsY = Math.max(151, comparisonBottom + 12);
+  section(it ? "Indicatori chiave" : "Key Indicators", indicatorsY);
   const cardW = 42.5;
-  metricCard(doc, 14, 158, cardW, 25, it ? "Riduzione energia" : "Energy reduction", `${number(calculated.energyReductionPercent, 1, lang)}%`, teal, navy, light);
-  metricCard(doc, 60.5, 158, cardW, 25, it ? "Energia risparmiata" : "Energy saved", `${number(Math.max(0, safe(calculated.baselineKwh) - safe(calculated.finalKwh)), 0, lang)} kWh`, teal, navy, light);
-  metricCard(doc, 107, 158, cardW, 25, it ? "Riduzione CO2" : "CO2 reduction", `${number(safe(calculated.co2ReductionKg) / 1000, 1, lang)} t/${it ? "anno" : "yr"}`, teal, navy, light);
-  metricCard(doc, 153.5, 158, cardW, 25, it ? "Punti Smart" : "Smart points", number(calculated.lcuQuantity, 0, lang), teal, navy, light);
+  const metricsY = indicatorsY + 7;
+  metricCard(doc, 14, metricsY, cardW, 25, it ? "Riduzione energia (anno 1)" : "Energy reduction (year 1)", `${number(calculated.energyReductionPercent, 1, lang)}%`, teal, navy, light);
+  metricCard(doc, 60.5, metricsY, cardW, 25, it ? "Energia risparmiata (anno 1)" : "Energy saved (year 1)", `${number(Math.max(0, safe(calculated.baselineKwh) - safe(calculated.finalKwh)), 0, lang)} kWh`, teal, navy, light);
+  metricCard(doc, 107, metricsY, cardW, 25, it ? "Riduzione CO2 (anno 1)" : "CO2 reduction (year 1)", `${number(safe(calculated.co2ReductionKg) / 1000, 1, lang)} t/${it ? "anno" : "yr"}`, teal, navy, light);
+  metricCard(doc, 153.5, metricsY, cardW, 25, it ? "Punti Smart" : "Smart points", number(calculated.lcuQuantity, 0, lang), teal, navy, light);
 
   autoTable(doc, {
-    startY: 193,
+    startY: metricsY + 35,
     theme: "grid",
     head: [[it ? "Indicatore economico" : "Economic indicator", it ? "Valore" : "Value"]],
     body: [
-      [it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit", money(calculated.customerAnnualNetBenefit, lang)],
+      [it ? "Beneficio netto annuo Comune (anno 1)" : "Municipality annual net benefit (year 1)", money(calculated.customerAnnualNetBenefit, lang)],
       ["Payback", calculated.payback == null ? "-" : `${number(calculated.payback, 1, lang)} ${it ? "anni" : "yrs"}`],
       [it ? "Investimento iniziale" : "Initial investment", money(calculated.totalCapex, lang)],
     ],
@@ -222,7 +260,7 @@ export function appendProposalVisualPages(doc, project, options = {}) {
   doc.setTextColor(...muted);
   doc.text(it
     ? "Visualizzazione preliminare basata sullo stesso motore di calcolo del dashboard Intelligence. La validazione illuminotecnica definitiva avviene in VIMALUX Planner."
-    : "Preliminary visualization based on the same calculation engine as the Intelligence dashboard. Final lighting-design validation is completed in VIMALUX Planner.", 14, 239, { maxWidth: 182 });
+    : "Preliminary visualization based on the same calculation engine as the Intelligence dashboard. Final lighting-design validation is completed in VIMALUX Planner.", 14, Math.min(270, doc.lastAutoTable.finalY + 12), { maxWidth: 182 });
 
   doc.addPage();
   section(it ? `Cash flow cliente - ${calculated.analysisPeriod} anni` : `Customer Cash Flow - ${calculated.analysisPeriod} years`, 20);
