@@ -26,3 +26,13 @@ test("legacy two-page footer is not drawn before final four-page footer", () => 
   const generateBlock = source.slice(source.indexOf("function generatePdf"), source.indexOf("function showToast"));
   assert.doesNotMatch(generateBlock, /drawFooter\(doc,/);
 });
+
+test("customer proposal exposes deliberate project CAPEX additions without changing total CAPEX", () => {
+  assert.match(source, /function deliberateCapexRows/);
+  assert.match(source, /project\?\.additionalCosts/);
+  assert.match(source, /unitSalesPrice/);
+  assert.match(source, /Composizione dell'investimento/);
+  assert.match(source, /Fornitura base LED \/ Smart \/ logistica e voci standard/);
+  assert.match(source, /CAPEX totale/);
+  assert.match(source, /\(Number\(totalCapex\) \|\| 0\) - additionsTotal/);
+});
