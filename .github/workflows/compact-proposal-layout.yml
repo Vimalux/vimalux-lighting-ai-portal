@@ -14,7 +14,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - name: Compact page 2 layout
@@ -40,7 +40,7 @@ jobs:
           git diff --name-only
           test "$(git diff --name-only | grep -v '^\.github/workflows/compact-proposal-layout.yml$' | wc -l)" -eq 1
           git diff --name-only | grep -q '^src/preliminaryProposalV2.js$'
-      - run: npm test -- --run
+      - run: npm test
       - run: npm run build
       - name: Commit validated layout fix
         run: |
