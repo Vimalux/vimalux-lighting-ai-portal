@@ -34,7 +34,7 @@ test("dynamic section guard protects the footer safety zone", () => {
   assert.equal(needsNewPdfPage(260, 15), true);
 });
 
-test("customer CAPEX additions remain visible and reconcile to total CAPEX", () => {
+test("customer CAPEX additions remain visible, use five report columns and reconcile to total CAPEX", () => {
   const project = {
     additionalCosts: [
       { description: "Nuovi Pali", costType: "capex", quantity: 2, unit: "pz", unitSalesPrice: 15000 },
@@ -44,8 +44,10 @@ test("customer CAPEX additions remain visible and reconcile to total CAPEX", () 
   const breakdown = buildCustomerCapexRows(project, 131308, "it", 30050);
   assert.equal(breakdown.additionsTotal, 30050);
   assert.equal(breakdown.baseCapex, 101258);
-  assert.match(breakdown.rows[1][0], /Nuovi Pali/);
-  assert.equal(breakdown.rows.at(-1)[1], "131.308 €");
+  assert.equal(breakdown.rows.every((row) => row.length === 5), true);
+  assert.deepEqual(breakdown.rows[1], ["Nuovi Pali", "2", "pz", "15.000 €", "30.000 €"]);
+  assert.equal(breakdown.rows.at(-1)[0], "CAPEX totale");
+  assert.equal(breakdown.rows.at(-1)[4], "131.308 €");
   assert.throws(() => buildCustomerCapexRows(project, 20000, "it", 30050), /exceeds total CAPEX/);
 });
 
