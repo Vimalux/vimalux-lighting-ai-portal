@@ -30,7 +30,8 @@ const groups = [
   {
     title: "Finanziaria",
     fields: [
-      ["serviceAgreementPeriod", "Periodo accordo servizi (anni)"],
+      ["serviceAgreementPeriod", "Durata servizi CMS (anni)"],
+      ["powerAidServicePeriod", "Durata PowerAiD (anni)"],
       ["financingPeriod", "Periodo finanziamento (anni)"],
       ["analysisPeriod", "Periodo di analisi (anni)"],
       ["interestRate", "Tasso interesse (%)"],
@@ -55,13 +56,8 @@ const style = `
   align-items:flex-start; justify-content:center; overflow:auto; padding:28px;
 `;
 
-function hideModal(overlay) {
-  overlay.style.display = "none";
-}
-
-function showModal(overlay) {
-  overlay.style.display = "flex";
-}
+function hideModal(overlay) { overlay.style.display = "none"; }
+function showModal(overlay) { overlay.style.display = "flex"; }
 
 function modal() {
   const existing = document.getElementById("vimalux-default-assumptions-modal");
@@ -114,6 +110,8 @@ function modal() {
       const parsed = Number(String(input.value).replace(",", "."));
       if (Number.isFinite(parsed)) values[key] = parsed;
     });
+    values.serviceAgreementPeriod = Math.max(1, Math.round(Number(values.serviceAgreementPeriod) || 10));
+    values.powerAidServicePeriod = Math.max(1, Math.min(values.serviceAgreementPeriod, Math.round(Number(values.powerAidServicePeriod) || 10)));
     values.financingYears = values.financingPeriod;
     values.contractYears = values.serviceAgreementPeriod;
     values.rateProfileId = "custom";
