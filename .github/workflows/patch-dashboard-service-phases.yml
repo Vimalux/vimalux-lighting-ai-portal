@@ -1,0 +1,91 @@
+name: Patch dashboard service phases
+
+on:
+  push:
+    branches:
+      - fix/dashboard-service-phases
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/dashboard-service-phases
+          fetch-depth: 0
+      - name: Patch CustomerValueChart
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('src/App.jsx')
+          source = path.read_text()
+          pattern = r'function CustomerValueChart\(\{ p, r, money \}\) \{.*?\nfunction CashTable\('
+          replacement = r'''function CustomerValueChart({ p, r, money }) {
+            const it = p.language === "it";
+            const rows = r.customerValueRows || [];
+            const first = rows[0];
+            const firstCash = r.cashFlowRows?.[0] || {};
+            if (!first) return null;
+            const phaseKey = (row) => `${Boolean(row?.cmsActive)}|${Boolean(row?.powerAidActive)}|${Number(row?.investmentPayment || 0) > 0}`;
+            const buildDashboardYearOneScenario = (row) => {
+              const currentOperatingCost = Number(first.currentOperatingCost || 0);
+              const cmsActive = Boolean(row?.cmsActive);
+              const powerAidActive = cmsActive && Boolean(row?.powerAidActive);
+              const ledSaving = Number(firstCash.ledEnergySavingEUR || 0);
+              const cloSaving = cmsActive ? Number(firstCash.cloSavingEUR || 0) : 0;
+              const maintenanceSaving = cmsActive ? Number(r.maintenanceSaving || 0) : 0;
+              const powerAidSaving = powerAidActive ? Number(firstCash.powerAidGrossSavingEUR || 0) : 0;
+              const grossBenefit = ledSaving + cloSaving + maintenanceSaving + powerAidSaving;
+              const fixedServiceOpex = cmsActive ? Number(r.fixedAnnualOpex || 0) : 0;
+              const powerAidFee = powerAidActive ? Number(firstCash.powerAidCustomerFee || 0) : 0;
+              const servicePayment = r.dealType === "noleggio_operativo" ? 0 : fixedServiceOpex + powerAidFee;
+              const investmentPayment = Number(row?.investmentPayment || 0);
+              const futureOperatingCost = Math.max(0, currentOperatingCost - grossBenefit);
+              const customerSaving = grossBenefit - servicePayment - investmentPayment;
+              return { currentOperatingCost, futureOperatingCost, servicePayment, investmentPayment, customerSaving, cmsActive, powerAidActive };
+            };
+            const segments = (display) => {
+              const values = { future: display.futureOperatingCost, service: display.servicePayment, payment: display.investmentPayment, saving: display.customerSaving };
+              return Object.entries(values).map(([key,value]) => ({ key, value, pct: display.currentOperatingCost ? value / display.currentOperatingCost * 100 : 0 }));
+            };
+            const phases = [];
+            let startIndex = 0;
+            for (let index = 1; index <= rows.length; index += 1) {
+              if (index === rows.length || phaseKey(rows[index]) !== phaseKey(rows[startIndex])) {
+                const row = rows[startIndex];
+                const display = buildDashboardYearOneScenario(row);
+                phases.push({ start: startIndex + 1, end: index, row, display, financing: display.investmentPayment > 0, cmsActive: display.cmsActive, powerAidActive: display.powerAidActive, parts: segments(display) });
+                startIndex = index;
+              }
+            }
+            const phaseStateLabel = (phase) => phase.cmsActive && phase.powerAidActive
+              ? "CMS + PowerAiD"
+              : phase.cmsActive
+                ? (it ? "Solo CMS" : "CMS only")
+                : (it ? "Post-servizi" : "Post-service");
+            const partLabel = { future: it ? "Energia + manutenzione" : "Energy + maintenance", service: "OPEX", payment: it ? "Investimento" : "Investment", saving: it ? "Risparmio cliente" : "Customer saving" };
+            const allConfiguredServicesFullPeriod = Boolean(r.cmsEnabled)
+              && r.serviceAgreementPeriod >= r.analysisPeriod
+              && (!r.powerAidEnabled || r.powerAidServicePeriod >= r.analysisPeriod);
+            return <section className="customer-value-chart"><h3>{it ? `Evoluzione dei costi e dei risparmi - ${r.analysisPeriod} anni` : `Cost and savings development - ${r.analysisPeriod} years`}</h3><p className="chart-intro">{it ? "Confronto delle fasi a prezzi costanti dell'anno 1. La larghezza di ogni fase corrisponde alla sua durata." : "Phase comparison at constant year-1 prices. Each phase width reflects its duration."}</p><div className="value-period-plot"><div className="value-period-current"><div className="value-summary-bar"><span className="value-current" style={{height:"100%"}}><b>100%</b><small>{money(first.currentOperatingCost)}</small></span></div><strong>{it ? "Situazione attuale" : "Current situation"}</strong></div><div className="value-period-timeline"><div className="value-period-reference">100% · {money(first.currentOperatingCost)} / {it ? "anno" : "year"}</div><div className="value-period-phases">{phases.map((phase) => <div className={`value-period-phase ${phase.cmsActive ? "smart-active" : "smart-inactive"}`} style={{flexGrow:phase.end-phase.start+1}} key={phase.start}><div className="value-summary-bar">{phase.parts.map((part) => part.value > 0 && <span key={part.key} className={`value-${part.key}`} style={{height:`${Math.max(0,part.pct)}%`}} title={`${partLabel[part.key]}: ${money(part.value)}`}>{part.pct >= 11 && <><b>{Math.round(part.pct)}%</b><small>{money(part.value)}</small></>}</span>)}</div><strong>{it ? "Anni" : "Years"} {phase.start}{phase.end > phase.start ? `–${phase.end}` : ""}</strong><span>{phase.financing ? `${it ? "Finanziamento" : "Financing"} · ${phaseStateLabel(phase)}` : phaseStateLabel(phase)}</span><b>{money(phase.display.customerSaving)} / {it ? "anno" : "year"}</b></div>)}</div></div></div><div className="value-chart-legend"><span><i className="value-future" />{it ? "Energia + manutenzione" : "Energy + maintenance"}</span><span><i className="value-service" />{it ? "OPEX servizi" : "Service OPEX"}</span><span><i className="value-payment" />{it ? "Pagamento contratto / investimento" : "Contract / investment payment"}</span><span><i className="value-saving" />{it ? "Risparmio netto cliente" : "Customer net saving"}</span></div>{allConfiguredServicesFullPeriod && <div className="smart-full-period-note">✓ {it ? `CMS${r.powerAidEnabled ? " + PowerAiD" : ""} attivo per l'intero periodo di analisi - ${r.analysisPeriod} anni` : `CMS${r.powerAidEnabled ? " + PowerAiD" : ""} active throughout the full analysis period - ${r.analysisPeriod} years`}</div>}{!allConfiguredServicesFullPeriod && r.cmsEnabled && <div className="smart-full-period-note">{it ? `Durate servizi: CMS ${r.serviceAgreementPeriod} anni${r.powerAidEnabled ? ` · PowerAiD ${r.powerAidServicePeriod} anni` : ""}` : `Service terms: CMS ${r.serviceAgreementPeriod} years${r.powerAidEnabled ? ` · PowerAiD ${r.powerAidServicePeriod} years` : ""}`}</div>}</section>;
+          }
+          function CashTable('''
+          updated, count = re.subn(pattern, replacement, source, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit(f'CustomerValueChart patch target count: {count}')
+          path.write_text(updated)
+          PY
+      - name: Remove temporary workflow and commit patch
+        run: |
+          git config user.name "VIMALUX"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          git rm .github/workflows/patch-dashboard-service-phases.yml
+          git add src/App.jsx
+          git commit -m "Align dashboard with CMS and PowerAiD service phases"
+          git push origin fix/dashboard-service-phases
