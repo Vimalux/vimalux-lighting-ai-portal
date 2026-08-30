@@ -83,6 +83,9 @@ export function buildCustomerCapexRows(project, totalCapex, lang = "en", expecte
   if (baseCapex > tolerance) {
     rows.push([
       it ? "Fornitura base LED / Smart / logistica e voci standard" : "Base LED / Smart / logistics and standard items",
+      "",
+      "",
+      "",
       reportMoney(baseCapex, lang),
     ]);
   }
@@ -90,13 +93,21 @@ export function buildCustomerCapexRows(project, totalCapex, lang = "en", expecte
   additions.forEach((item) => {
     const description = pdfSafeText(String(item.description || item.note || (it ? "Voce aggiuntiva" : "Additional item")).trim());
     const unit = pdfSafeText(String(item.unit || "").trim());
-    const qtyLabel = `${reportNumber(item.quantity, 0, lang)}${unit ? ` ${unit}` : ""}`;
     rows.push([
-      `${description} - ${qtyLabel} x ${reportMoney(item.unitSalesPrice, lang)}`,
+      description,
+      reportNumber(item.quantity, 0, lang),
+      unit,
+      reportMoney(item.unitSalesPrice, lang),
       reportMoney(item.total, lang),
     ]);
   });
 
-  rows.push([it ? "CAPEX totale" : "Total CAPEX", reportMoney(numericTotalCapex, lang)]);
+  rows.push([
+    it ? "CAPEX totale" : "Total CAPEX",
+    "",
+    "",
+    "",
+    reportMoney(numericTotalCapex, lang),
+  ]);
   return { rows, additionsCount: additions.length, additionsTotal, baseCapex: Math.max(0, baseCapex) };
 }
