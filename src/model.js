@@ -22,6 +22,7 @@ export const BASE_ASSUMPTIONS = {
   dealType: "cash",
   financingPeriod: 5,
   serviceAgreementPeriod: 10,
+  powerAidServicePeriod: 10,
   analysisPeriod: 20,
   contractYears: 10,
   financingYears: 5,
@@ -71,6 +72,7 @@ export function readStoredDefaultAssumptions() {
     const merged = { ...BASE_ASSUMPTIONS, ...safe };
     merged.financingYears = merged.financingPeriod;
     merged.contractYears = merged.serviceAgreementPeriod;
+    merged.powerAidServicePeriod = Math.max(1, Math.min(merged.serviceAgreementPeriod, Math.round(numberValue(merged.powerAidServicePeriod) || 10)));
     merged.interestRateSnapshot = {
       profileId: merged.rateProfileId || "custom",
       annualRate: numberValue(merged.interestRate),
@@ -141,7 +143,7 @@ export const defaultProject = ({ applyStoredDefaults = true } = {}) => ({
 const isImportedTotalGroup = (group) => /^(grand total|hovedtotal|total|totale generale|totale complessivo|i alt)$/i.test(String(group?.name ?? "").trim());
 const normalizeIdentity = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 const commercialAssumptionKeys = [
-  "dealType", "financingModel", "contractYears", "financingYears", "financingPeriod", "serviceAgreementPeriod",
+  "dealType", "financingModel", "contractYears", "financingYears", "financingPeriod", "serviceAgreementPeriod", "powerAidServicePeriod",
   "interestRate", "rateProfileId", "interestRateSnapshot", "allInclusiveAnnualPayment", "officialOfferCapex", "officialAnnualOpex",
 ];
 
@@ -249,8 +251,12 @@ export function migrateProject(saved) {
   const legacyContractYears = numberValue(saved?.assumptions?.contractYears ?? saved?.assumptions?.years);
   const savedFinancingPeriod = numberValue(saved?.assumptions?.financingPeriod);
   const savedServicePeriod = numberValue(saved?.assumptions?.serviceAgreementPeriod);
+  const savedPowerAidServicePeriod = numberValue(saved?.assumptions?.powerAidServicePeriod);
   project.assumptions.financingPeriod = Math.max(1, Math.round((savedFinancingPeriod !== 5 ? savedFinancingPeriod : numberValue(saved?.assumptions?.financingYears)) || legacyContractYears || 5));
   project.assumptions.serviceAgreementPeriod = Math.max(1, Math.round((savedServicePeriod !== 10 ? savedServicePeriod : legacyContractYears) || 10));
+  // Legacy projects did not have a separate PowerAiD duration. Keep the historic 10-year PowerAiD default,
+  // while never allowing PowerAiD to outlive the CMS/core Smart service it depends on.
+  project.assumptions.powerAidServicePeriod = Math.max(1, Math.min(project.assumptions.serviceAgreementPeriod, Math.round(savedPowerAidServicePeriod || Math.min(10, project.assumptions.serviceAgreementPeriod))));
   project.assumptions.analysisPeriod = Math.max(1, Math.round(numberValue(saved?.assumptions?.analysisPeriod) || Math.max(legacyContractYears, 20)));
   project.assumptions.financingYears = project.assumptions.financingPeriod;
   project.assumptions.contractYears = project.assumptions.serviceAgreementPeriod;
