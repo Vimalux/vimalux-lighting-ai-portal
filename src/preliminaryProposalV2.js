@@ -84,6 +84,7 @@ function generatePdf(row, version) {
   const proposalId = `PRE-${code}`;
   const date = new Date().toLocaleDateString(it ? "it-IT" : "en-GB");
   const contractYears = Math.round(Number(result.contractYears) || Number(project.assumptions?.serviceAgreementPeriod) || 0);
+  const powerAidYears = project.solution?.powerAidEnabled ? Math.max(1, Math.min(contractYears, Math.round(Number(project.assumptions?.powerAidServicePeriod) || 10))) : 0;
   const escalation = Number(project.assumptions?.opexEscalation) || 0;
   const annualFee = Number(result.annualCustomerPayment ?? result.annualOpex) || 0;
   const maintSaving = maintenanceSaving(project);
@@ -164,7 +165,8 @@ function generatePdf(row, version) {
     body: [
       [it ? "Investimento iniziale (CAPEX)" : "Initial investment (CAPEX)", money(result.capex, lang)],
       [it ? "Canone annuale Smart Lighting / CMS" : "Annual Smart Lighting / CMS fee", money(annualFee, lang)],
-      [it ? "Durata servizi" : "Service term", `${contractYears} ${it ? "anni" : "years"}`],
+      [it ? "Durata CMS" : "CMS service term", `${contractYears} ${it ? "anni" : "years"}`],
+      ...(project.solution?.powerAidEnabled ? [[it ? "Durata PowerAiD" : "PowerAiD service term", `${powerAidYears} ${it ? "anni" : "years"}`]] : []),
       [it ? `TCV ${contractYears} anni, indicizzato` : `Indexed TCV ${contractYears} years`, money(result.tcv, lang)],
       [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],
     ],
@@ -241,7 +243,8 @@ function generatePdf(row, version) {
       [it ? "Prezzo energia" : "Energy price", `${number(project.assumptions?.energyPrice, 2, lang)} €/kWh`],
       [it ? "Ore di funzionamento annue" : "Annual operating hours", number(project.assumptions?.operatingHours, 0, lang)],
       [it ? "Periodo di analisi" : "Analysis period", `${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} ${it ? "anni" : "years"}`],
-      [it ? "Durata servizi Smart" : "Smart service term", `${contractYears} ${it ? "anni" : "years"}`],
+      [it ? "Durata CMS" : "CMS service term", `${contractYears} ${it ? "anni" : "years"}`],
+      ...(project.solution?.powerAidEnabled ? [[it ? "Durata PowerAiD" : "PowerAiD service term", `${powerAidYears} ${it ? "anni" : "years"}`]] : []),
       [it ? "Indicizzazione canone/OPEX" : "Service/OPEX escalation", `${number(escalation, 1, lang)}% ${it ? "annuo" : "p.a."}`],
       [it ? "Modello commerciale" : "Commercial model", String(project.assumptions?.dealType || project.assumptions?.financingModel || "cash")],
       [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],
