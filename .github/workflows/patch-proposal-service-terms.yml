@@ -1,0 +1,49 @@
+name: Patch proposal service terms
+on:
+  push:
+    branches: [fix/proposal-service-term-labels]
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply isolated proposal label patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/preliminaryProposalV2.js')
+          s=p.read_text()
+          old='  const contractYears = Math.round(Number(result.contractYears) || Number(project.assumptions?.serviceAgreementPeriod) || 0);\n'
+          new=old+'  const powerAidYears = project.solution?.powerAidEnabled ? Math.max(1, Math.min(contractYears, Math.round(Number(project.assumptions?.powerAidServicePeriod) || 10))) : 0;\n'
+          assert old in s
+          s=s.replace(old,new,1)
+          old='      [it ? "Durata servizi" : "Service term", `${contractYears} ${it ? "anni" : "years"}`],\n'
+          new='      [it ? "Durata CMS" : "CMS service term", `${contractYears} ${it ? "anni" : "years"}`],\n      ...(project.solution?.powerAidEnabled ? [[it ? "Durata PowerAiD" : "PowerAiD service term", `${powerAidYears} ${it ? "anni" : "years"}`]] : []),\n'
+          assert old in s
+          s=s.replace(old,new,1)
+          old='      [it ? "Durata servizi Smart" : "Smart service term", `${contractYears} ${it ? "anni" : "years"}`],\n'
+          new='      [it ? "Durata CMS" : "CMS service term", `${contractYears} ${it ? "anni" : "years"}`],\n      ...(project.solution?.powerAidEnabled ? [[it ? "Durata PowerAiD" : "PowerAiD service term", `${powerAidYears} ${it ? "anni" : "years"}`]] : []),\n'
+          assert old in s
+          s=s.replace(old,new,1)
+          p.write_text(s)
+          t=Path('test/proposalServiceTermLabels.test.js')
+          t.write_text('''import test from "node:test";\nimport assert from "node:assert/strict";\nimport fs from "node:fs";\n\nconst source = fs.readFileSync(new URL("../src/preliminaryProposalV2.js", import.meta.url), "utf8");\n\ntest("proposal shows CMS and PowerAiD service terms separately", () => {\n  assert.match(source, /Durata CMS/);\n  assert.match(source, /Durata PowerAiD/);\n  assert.match(source, /powerAidServicePeriod/);\n  assert.doesNotMatch(source, /Durata servizi Smart/);\n  assert.doesNotMatch(source, /\"Durata servizi\"/);\n});\n''')
+          PY
+      - name: Validate
+        run: |
+          npm ci
+          npm test
+          npm run build
+      - name: Commit only intended files
+        run: |
+          git config user.name "VIMALUX"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          git rm .github/workflows/patch-proposal-service-terms.yml
+          git add src/preliminaryProposalV2.js test/proposalServiceTermLabels.test.js
+          git commit -m "Show CMS and PowerAiD service terms separately"
+          git push
