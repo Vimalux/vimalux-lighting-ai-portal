@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import { appendProposalVisualPages } from "./proposalVisualPages.js";
+import { appendProposalVisualPages } from "./proposalVisualPagesSimple.js";
 
 function businessCaseCodeFromFilename(filename) {
   return String(filename || "").match(/BC-[A-Z0-9]+/i)?.[0]?.toUpperCase() || "";
