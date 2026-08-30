@@ -65,6 +65,42 @@ function maintenanceSaving(project) {
   return upgraded * Math.max(0, existing - next);
 }
 
+function deliberateCapexRows(project, totalCapex, lang = "en") {
+  const it = lang === "it";
+  const additions = (Array.isArray(project?.additionalCosts) ? project.additionalCosts : [])
+    .filter((item) => String(item?.costType || "capex").toLowerCase() === "capex")
+    .map((item) => {
+      const quantity = Math.max(0, Number(item?.quantity) || 0);
+      const unitSalesPrice = Math.max(0, Number(item?.unitSalesPrice) || 0);
+      return { ...item, quantity, unitSalesPrice, total: quantity * unitSalesPrice };
+    })
+    .filter((item) => item.total > 0);
+
+  const additionsTotal = additions.reduce((sum, item) => sum + item.total, 0);
+  const baseCapex = Math.max(0, (Number(totalCapex) || 0) - additionsTotal);
+  const rows = [];
+
+  if (baseCapex > 0) {
+    rows.push([
+      it ? "Fornitura base LED / Smart / logistica e voci standard" : "Base LED / Smart / logistics and standard items",
+      money(baseCapex, lang),
+    ]);
+  }
+
+  additions.forEach((item) => {
+    const description = String(item.description || item.note || (it ? "Voce aggiuntiva" : "Additional item")).trim();
+    const unit = String(item.unit || "").trim();
+    const qtyLabel = `${number(item.quantity, 0, lang)}${unit ? ` ${unit}` : ""}`;
+    rows.push([
+      `${description} · ${qtyLabel} × ${money(item.unitSalesPrice, lang)}`,
+      money(item.total, lang),
+    ]);
+  });
+
+  rows.push([it ? "CAPEX totale" : "Total CAPEX", money(totalCapex, lang)]);
+  return { rows, additionsCount: additions.length, additionsTotal };
+}
+
 function drawFooter(doc, proposalId, version, lineage, it, muted) {
   const pages = doc.getNumberOfPages();
   for (let page = 1; page <= pages; page += 1) {
@@ -96,6 +132,7 @@ function generatePdf(row, version) {
   const maintSaving = maintenanceSaving(project);
   const energySaving = Number(result.annualEnergySavingEUR) || 0;
   const netBenefit = Number(result.annualCustomerNetBenefit) || (energySaving + maintSaving - annualFee);
+  const capexBreakdown = deliberateCapexRows(project, Number(result.capex) || 0, lang);
 
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const teal = [15, 118, 110];
@@ -172,74 +209,83 @@ function generatePdf(row, version) {
   section(it ? "Soluzione e ambito preliminare" : "Preliminary Solution & Scope", 20);
   doc.setFont("helvetica", "normal"); doc.setFontSize(8.8); doc.setTextColor(...navy);
   doc.text(it
-    ? `La configurazione preliminare prevede ${solutionDescription(project, true)}. Il Business Case ha superato il controllo automatico di compatibilità tra categoria esistente e prodotto proposto. La progettazione illuminotecnica definitiva resta soggetta a validazione in Planner.`
-    : `The preliminary configuration includes ${solutionDescription(project, false)}. The Business Case passed the automatic compatibility check between existing category and proposed product. Final lighting design remains subject to validation in Planner.`, 14, 28, { maxWidth: 182 });
+    ? `La configurazione preliminare prevede ${solutionDescription(project, true)}. La progettazione illuminotecnica definitiva resta soggetta a validazione in Planner.`
+    : `The preliminary configuration includes ${solutionDescription(project, false)}. Final lighting design remains subject to validation in Planner.`, 14, 28, { maxWidth: 182 });
 
   autoTable(doc, {
-    startY: 41, theme: "grid", head: [[it ? "Ambito" : "Scope", it ? "Configurazione preliminare" : "Preliminary configuration"]],
+    startY: 39, theme: "grid", head: [[it ? "Ambito" : "Scope", it ? "Configurazione preliminare" : "Preliminary configuration"]],
     body: [
       [it ? "Upgrade LED" : "LED upgrade", `${Math.round(Number(result.upgradeLuminaires) || 0)} ${it ? "punti luce" : "lighting points"}`],
       [it ? "Controllo connesso" : "Connected control", `${Math.round(Number(result.smartConnectedLuminaires) || 0)} ${it ? "punti luce Smart" : "Smart lighting points"}`],
       ["CMS", project.solution?.cmsEnabled ? (it ? "Monitoraggio, allarmi e gestione remota" : "Monitoring, alarms and remote management") : (it ? "Non incluso" : "Not included")],
       ["Adaptive Lighting", project.solution?.powerAidEnabled ? "PowerAiD" : (it ? "Predisposizione / da validare" : "Prepared / to be validated")],
     ],
-    headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 7.8, cellPadding: 1.5 }, columnStyles: { 0: { fontStyle: "bold", cellWidth: 48 } },
+    headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 7.6, cellPadding: 1.25 }, columnStyles: { 0: { fontStyle: "bold", cellWidth: 48 } },
   });
 
-  y = doc.lastAutoTable.finalY + 10;
+  y = doc.lastAutoTable.finalY + 7;
   section(it ? "Come si genera il beneficio annuo" : "Annual benefit bridge", y);
   autoTable(doc, {
-    startY: y + 5, theme: "grid", head: [[it ? "Componente" : "Component", it ? "Valore annuo" : "Annual value"]],
+    startY: y + 4, theme: "grid", head: [[it ? "Componente" : "Component", it ? "Valore annuo" : "Annual value"]],
     body: [
       [it ? "Risparmio energia" : "Energy saving", money(energySaving, lang)],
       [it ? "Risparmio manutenzione" : "Maintenance saving", money(maintSaving, lang)],
       [it ? "Canone Smart Lighting / CMS" : "Smart Lighting / CMS fee", `(${money(annualFee, lang)})`],
       [it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit", money(netBenefit, lang)],
     ],
-    headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 8, cellPadding: 1.6 }, columnStyles: { 1: { halign: "right" } },
+    headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.25 }, columnStyles: { 1: { halign: "right" } },
     didParseCell: (data) => { if (data.section === "body" && data.row.index === 3) data.cell.styles.fontStyle = "bold"; },
   });
 
-  y = doc.lastAutoTable.finalY + 10;
+  y = doc.lastAutoTable.finalY + 7;
+  section(it ? "Composizione dell'investimento" : "Investment composition", y);
+  autoTable(doc, {
+    startY: y + 4,
+    theme: "grid",
+    head: [[it ? "Voce" : "Item", it ? "Importo" : "Amount"]],
+    body: capexBreakdown.rows,
+    headStyles: tableHead,
+    alternateRowStyles: { fillColor: light },
+    styles: { font: "helvetica", fontSize: capexBreakdown.rows.length > 8 ? 6.2 : 6.8, cellPadding: capexBreakdown.rows.length > 8 ? 0.7 : 0.9 },
+    columnStyles: { 0: { cellWidth: 137 }, 1: { halign: "right", cellWidth: 45 } },
+    didParseCell: (data) => {
+      if (data.section === "body" && data.row.index === capexBreakdown.rows.length - 1) data.cell.styles.fontStyle = "bold";
+    },
+  });
+
+  y = doc.lastAutoTable.finalY + 7;
   section(it ? "Ipotesi principali" : "Key Assumptions", y);
   autoTable(doc, {
-    startY: y + 5, theme: "grid", head: [[it ? "Parametro" : "Parameter", it ? "Valore" : "Value"]],
+    startY: y + 4, theme: "grid", head: [[it ? "Parametro" : "Parameter", it ? "Valore" : "Value"]],
     body: [
       [it ? "Prezzo energia" : "Energy price", `${number(project.assumptions?.energyPrice, 2, lang)} €/kWh`],
       [it ? "Ore di funzionamento annue" : "Annual operating hours", number(project.assumptions?.operatingHours, 0, lang)],
       [it ? "Periodo di analisi" : "Analysis period", `${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} ${it ? "anni" : "years"}`],
+      [it ? "Durata servizi Smart" : "Smart service term", `${contractYears} ${it ? "anni" : "years"}`],
       [it ? "Indicizzazione canone/OPEX" : "Service/OPEX escalation", `${number(escalation, 1, lang)}% ${it ? "annuo" : "p.a."}`],
       [it ? "Modello commerciale" : "Commercial model", String(project.assumptions?.dealType || project.assumptions?.financingModel || "cash")],
       [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],
     ],
-    headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 7.6, cellPadding: 1.35 }, columnStyles: { 1: { halign: "right" } },
+    headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 6.8, cellPadding: 0.9 }, columnStyles: { 1: { halign: "right" } },
   });
 
-  y = doc.lastAutoTable.finalY + 9;
+  y = doc.lastAutoTable.finalY + 6;
   section(it ? "Passaggio a VIMALUX Planner" : "Transition to VIMALUX Planner", y);
-  const steps = it ? [
-    ["1", "Censimento tecnico e geolocalizzazione"], ["2", "Classificazione stradale e verifica UNI 11248"],
-    ["3", "Dimensionamento, ottiche e assegnazione prodotti"], ["4", "BOM, installazione, logistica e struttura commerciale definitiva"],
-    ["5", "Proposta ufficiale Planner con lo stesso Project ID"],
-  ] : [
-    ["1", "Technical census and geolocation"], ["2", "Road classification and UNI 11248 verification"],
-    ["3", "Sizing, optics and final product assignment"], ["4", "BOM, installation, logistics and final commercial structure"],
-    ["5", "Official Planner proposal using the same Project ID"],
-  ];
-  autoTable(doc, { startY: y + 5, theme: "plain", body: steps, styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.0, textColor: navy }, columnStyles: { 0: { cellWidth: 8, fontStyle: "bold", textColor: teal, halign: "center" } } });
-
-  y = doc.lastAutoTable.finalY + 7;
-  doc.setFillColor(...pale); doc.setDrawColor(167, 243, 208); doc.roundedRect(14, y, 182, 17, 2, 2, "FD");
-  doc.setFont("helvetica", "bold"); doc.setFontSize(7.8); doc.setTextColor(...teal); doc.text(it ? "Continuità del progetto" : "Project continuity", 18, y + 5.5);
-  doc.setFont("helvetica", "normal"); doc.setFontSize(7.3); doc.setTextColor(...navy);
-  doc.text(it ? `Project ID ${lineage} resterà invariato in Intelligence, Planner e CRM, preservando Business Case, versioni e cronologia.` : `Project ID ${lineage} remains unchanged across Intelligence, Planner and CRM, preserving the Business Case, versions and history.`, 18, y + 10, { maxWidth: 174 });
-
-  y += 25;
-  section(it ? "Condizioni e limitazioni" : "Terms & Limitations", y);
-  doc.setFontSize(7.2); doc.setTextColor(...muted); doc.setFont("helvetica", "normal");
+  doc.setFont("helvetica", "normal"); doc.setFontSize(6.8); doc.setTextColor(...navy);
   doc.text(it
-    ? "Questa proposta è indicativa e non costituisce un'offerta finale vincolante. È basata sui dati disponibili, quantità aggregate, potenze e ipotesi economiche del Business Case alla data di emissione. Prezzi, quantità, installazione, logistica, imposte, finanziamento e prestazioni definitive saranno confermati nella proposta ufficiale generata da VIMALUX Planner. IVA esclusa salvo diversa indicazione."
-    : "This proposal is indicative and does not constitute a final binding quotation. It is based on available data, aggregated quantities, wattages and commercial assumptions in the Business Case at the issue date. Final prices, quantities, installation, logistics, taxes, financing and performance will be confirmed in the official proposal generated by VIMALUX Planner. VAT excluded unless otherwise stated.", 14, y + 7, { maxWidth: 182 });
+    ? "Prossimo passo: censimento e geolocalizzazione → classificazione UNI 11248 → dimensionamento e ottiche → BOM/logistica → proposta ufficiale Planner."
+    : "Next step: census and geolocation → UNI 11248 classification → sizing and optics → BOM/logistics → official Planner proposal.", 14, y + 5, { maxWidth: 182 });
+  doc.setFontSize(6.5); doc.setTextColor(...muted);
+  doc.text(it
+    ? `Project ID ${lineage} resterà invariato in Intelligence, Planner e CRM, preservando Business Case, versioni e cronologia.`
+    : `Project ID ${lineage} remains unchanged across Intelligence, Planner and CRM, preserving the Business Case, versions and history.`, 14, y + 10, { maxWidth: 182 });
+
+  y += 17;
+  section(it ? "Condizioni e limitazioni" : "Terms & Limitations", y);
+  doc.setFontSize(6.4); doc.setTextColor(...muted); doc.setFont("helvetica", "normal");
+  doc.text(it
+    ? "Questa proposta è indicativa e non costituisce un'offerta finale vincolante. È basata sui dati disponibili e sulle voci economiche inserite nel Business Case alla data di emissione. Prezzi, quantità, installazione, logistica, imposte, finanziamento e prestazioni definitive saranno confermati nella proposta ufficiale generata da VIMALUX Planner. IVA esclusa salvo diversa indicazione."
+    : "This proposal is indicative and does not constitute a final binding quotation. It is based on available data and the economic items entered in the Business Case at the issue date. Final prices, quantities, installation, logistics, taxes, financing and performance will be confirmed in the official proposal generated by VIMALUX Planner. VAT excluded unless otherwise stated.", 14, y + 5, { maxWidth: 182 });
 
   const pdfName = filename(code, version);
   doc.save(pdfName);
