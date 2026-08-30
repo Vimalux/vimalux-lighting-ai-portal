@@ -83,29 +83,77 @@ function lineChart(doc, x, y, w, h, rows, teal, navy, muted) {
   });
 }
 
+function phaseFromRow(row, startYear, endYear, active, label, sublabel) {
+  return {
+    startYear,
+    endYear,
+    active,
+    label,
+    sublabel,
+    currentOperatingCost: safe(row?.currentOperatingCost),
+    futureOperatingCost: safe(row?.futureOperatingCost),
+    servicePayment: safe(row?.servicePayment),
+    investmentPayment: safe(row?.investmentPayment),
+    customerSaving: Math.max(0, safe(row?.customerSaving)),
+  };
+}
+
 function costEvolutionChart(doc, calculated, project, x, y, w, h, lang, colors) {
   const it = lang === "it";
   const { teal, navy, muted } = colors;
   const rows = Array.isArray(calculated.customerValueRows) ? calculated.customerValueRows : [];
   const first = rows[0] || {};
+  const analysisPeriod = Math.max(1, Math.round(safe(calculated.analysisPeriod)));
+  const serviceYears = Math.max(0, Math.min(analysisPeriod, Math.round(safe(calculated.serviceAgreementPeriod))));
+  const financeYears = Math.max(0, Math.min(analysisPeriod, Math.round(safe(calculated.financingYears))));
   const currentCost = safe(first.currentOperatingCost);
-  const futureOperating = safe(first.futureOperatingCost);
-  const servicePayment = safe(first.servicePayment);
-  const investmentPayment = safe(first.investmentPayment);
-  const customerSaving = Math.max(0, safe(first.customerSaving));
-  const analysisPeriod = Math.max(1, safe(calculated.analysisPeriod));
-  const serviceYears = Math.max(0, Math.min(analysisPeriod, safe(calculated.serviceAgreementPeriod)));
-  const financeYears = Math.max(0, Math.min(analysisPeriod, safe(calculated.financingYears)));
+
+  const phases = [];
+  if (serviceYears > 0) {
+    phases.push(phaseFromRow(
+      rows[0] || first,
+      1,
+      serviceYears,
+      true,
+      `${it ? "Anni" : "Years"} 1–${serviceYears}`,
+      calculated.dealType === "cash"
+        ? (it ? "Smart senza finanziamento" : "Smart without financing")
+        : calculated.dealType === "finance"
+          ? (it ? `Finanziamento ${financeYears} anni` : `${financeYears}-year financing`)
+          : (it ? "Pagamento all-inclusive" : "All-inclusive payment"),
+    ));
+  }
+  if (serviceYears < analysisPeriod) {
+    const postRow = rows[Math.min(serviceYears, Math.max(0, rows.length - 1))] || rows.at(-1) || first;
+    phases.push(phaseFromRow(
+      postRow,
+      Math.max(1, serviceYears + 1),
+      analysisPeriod,
+      false,
+      `${it ? "Anni" : "Years"} ${Math.max(1, serviceYears + 1)}–${analysisPeriod}`,
+      it ? "Dopo il contratto Smart" : "After Smart contract",
+    ));
+  }
+  if (!phases.length) {
+    phases.push(phaseFromRow(
+      first,
+      1,
+      analysisPeriod,
+      false,
+      `${it ? "Anni" : "Years"} 1–${analysisPeriod}`,
+      it ? "Scenario post-upgrade" : "Post-upgrade scenario",
+    ));
+  }
 
   const baselineY = y + 12;
-  const chartBottom = y + h - 28;
+  const chartBottom = y + h - 31;
   const chartHeight = chartBottom - baselineY;
-  const currentW = 35;
+  const currentW = 34;
   const gap = 7;
   const timelineX = x + currentW + gap;
   const timelineW = w - currentW - gap;
-  const maxCost = Math.max(1, currentCost, futureOperating + servicePayment + investmentPayment + customerSaving);
-  const heightFor = (value) => chartHeight * Math.max(0, value) / maxCost;
+  const maxStack = Math.max(1, currentCost, ...phases.map((phase) => phase.futureOperatingCost + phase.servicePayment + phase.investmentPayment + phase.customerSaving));
+  const heightFor = (value) => chartHeight * Math.max(0, value) / maxStack;
 
   doc.setDrawColor(100, 116, 139);
   doc.setLineDashPattern([1.2, 1.2], 0);
@@ -123,82 +171,101 @@ function costEvolutionChart(doc, calculated, project, x, y, w, h, lang, colors) 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(7.4);
   doc.text("100%", x + currentW / 2, chartBottom - currentH / 2 - 1, { align: "center" });
-  doc.setFontSize(6.3);
+  doc.setFontSize(6.1);
   doc.text(money(currentCost, lang), x + currentW / 2, chartBottom - currentH / 2 + 4, { align: "center" });
   doc.setTextColor(...navy);
-  doc.setFontSize(8.2);
+  doc.setFontSize(8);
   doc.text(it ? "Situazione attuale" : "Current situation", x + currentW / 2, chartBottom + 6, { align: "center" });
 
-  const stack = [
-    { value: futureOperating, color: [77, 182, 172], label: it ? "Costo operativo post-upgrade" : "Post-upgrade operating cost" },
-    { value: servicePayment, color: [245, 158, 11], label: it ? "OPEX servizi" : "Service OPEX" },
-    { value: investmentPayment, color: [148, 163, 184], label: it ? "Pagamento contratto / investimento" : "Contract / investment payment" },
-    { value: customerSaving, color: [22, 163, 74], label: it ? "Risparmio netto cliente" : "Customer net saving" },
-  ];
+  const colorsByKey = {
+    futureOperatingCost: [77, 182, 172],
+    servicePayment: [245, 158, 11],
+    investmentPayment: [148, 163, 184],
+    customerSaving: [22, 163, 74],
+  };
+  const labelsByKey = {
+    futureOperatingCost: it ? "Costo operativo post-upgrade" : "Post-upgrade operating cost",
+    servicePayment: it ? "OPEX servizi" : "Service OPEX",
+    investmentPayment: it ? "Pagamento contratto / investimento" : "Contract / investment payment",
+    customerSaving: it ? "Risparmio netto cliente" : "Customer net saving",
+  };
+  const keys = ["futureOperatingCost", "servicePayment", "investmentPayment", "customerSaving"];
 
-  let cursor = chartBottom;
-  stack.forEach((segment) => {
-    if (segment.value <= 0) return;
-    const segmentH = heightFor(segment.value);
-    cursor -= segmentH;
-    doc.setFillColor(...segment.color);
-    doc.rect(timelineX, cursor, timelineW, segmentH, "F");
-    if (segmentH >= 8) {
-      const pct = currentCost ? segment.value / currentCost * 100 : 0;
-      doc.setTextColor(255, 255, 255);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(6.6);
-      doc.text(`${number(pct, 0, lang)}%`, timelineX + timelineW / 2, cursor + segmentH / 2 - 0.5, { align: "center" });
-      doc.setFontSize(5.8);
-      doc.text(money(segment.value, lang), timelineX + timelineW / 2, cursor + segmentH / 2 + 4, { align: "center" });
+  let phaseX = timelineX;
+  phases.forEach((phase, phaseIndex) => {
+    const duration = Math.max(1, phase.endYear - phase.startYear + 1);
+    const phaseW = timelineW * duration / analysisPeriod;
+    let cursor = chartBottom;
+    keys.forEach((key) => {
+      const value = safe(phase[key]);
+      if (value <= 0) return;
+      const segmentH = heightFor(value);
+      cursor -= segmentH;
+      doc.setFillColor(...colorsByKey[key]);
+      doc.rect(phaseX, cursor, phaseW, segmentH, "F");
+      if (segmentH >= 8 && phaseW >= 36) {
+        const pct = currentCost ? value / currentCost * 100 : 0;
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(6.4);
+        doc.text(`${number(pct, 0, lang)}%`, phaseX + phaseW / 2, cursor + segmentH / 2 - 0.5, { align: "center" });
+        if (segmentH >= 13) {
+          doc.setFontSize(5.6);
+          doc.text(money(value, lang), phaseX + phaseW / 2, cursor + segmentH / 2 + 4, { align: "center" });
+        }
+      }
+    });
+
+    if (phaseIndex > 0) {
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.45);
+      doc.line(phaseX, baselineY, phaseX, chartBottom);
     }
-  });
 
-  doc.setTextColor(...navy);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.2);
-  doc.text(`${it ? "Anni" : "Years"} 1–${analysisPeriod}`, timelineX + timelineW / 2, chartBottom + 6, { align: "center" });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.5);
-  const modelLabel = calculated.dealType === "cash"
-    ? (it ? "Smart senza finanziamento" : "Smart without financing")
-    : calculated.dealType === "finance"
-      ? (it ? `Finanziamento ${financeYears} anni` : `${financeYears}-year financing`)
-      : (it ? "Pagamento all-inclusive" : "All-inclusive payment");
-  doc.setTextColor(...muted);
-  doc.text(modelLabel, timelineX + timelineW / 2, chartBottom + 11, { align: "center" });
-  doc.setTextColor(...navy);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.2);
-  doc.text(`${money(customerSaving, lang)} / ${it ? "anno" : "year"}`, timelineX + timelineW / 2, chartBottom + 16, { align: "center" });
+    doc.setTextColor(...navy);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.text(phase.label, phaseX + phaseW / 2, chartBottom + 6, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.1);
+    doc.setTextColor(...muted);
+    doc.text(phase.sublabel, phaseX + phaseW / 2, chartBottom + 11, { align: "center", maxWidth: Math.max(28, phaseW - 4) });
+    doc.setTextColor(...navy);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.7);
+    doc.text(`${money(phase.customerSaving, lang)} / ${it ? "anno" : "year"}`, phaseX + phaseW / 2, chartBottom + 16, { align: "center" });
+    phaseX += phaseW;
+  });
 
   const legendY = chartBottom + 24;
   let legendX = x;
-  stack.forEach((segment) => {
-    doc.setFillColor(...segment.color);
+  keys.forEach((key) => {
+    doc.setFillColor(...colorsByKey[key]);
     doc.roundedRect(legendX, legendY - 3, 3, 3, 0.5, 0.5, "F");
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(5.9);
+    doc.setFontSize(5.7);
     doc.setTextColor(...muted);
-    doc.text(segment.label, legendX + 4.5, legendY);
-    legendX += Math.min(48, 8 + segment.label.length * 1.2);
+    doc.text(labelsByKey[key], legendX + 4.5, legendY);
+    legendX += Math.min(48, 8 + labelsByKey[key].length * 1.15);
   });
 
-  const smartActiveYears = Math.min(analysisPeriod, serviceYears || analysisPeriod);
   doc.setFillColor(236, 253, 245);
   doc.setDrawColor(110, 231, 183);
-  doc.roundedRect(x, legendY + 5, w, 11, 2, 2, "FD");
+  doc.roundedRect(x, legendY + 5, w, serviceYears < analysisPeriod ? 18 : 11, 2, 2, "FD");
   doc.setTextColor(4, 120, 87);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.2);
-  doc.text(
-    smartActiveYears >= analysisPeriod
-      ? (it ? `Smart attivo per l'intero periodo di analisi - ${analysisPeriod} anni` : `Smart active for the full analysis period - ${analysisPeriod} years`)
-      : (it ? `Smart attivo per ${smartActiveYears} anni su ${analysisPeriod}` : `Smart active for ${smartActiveYears} of ${analysisPeriod} years`),
-    x + w / 2,
-    legendY + 12,
-    { align: "center" },
-  );
+  doc.setFontSize(7);
+  if (serviceYears >= analysisPeriod) {
+    doc.text(it ? `Smart attivo per l'intero periodo di analisi - ${analysisPeriod} anni` : `Smart active for the full analysis period - ${analysisPeriod} years`, x + w / 2, legendY + 12, { align: "center" });
+  } else {
+    const smartPhase = phases.find((phase) => phase.active) || phases[0];
+    const postPhase = phases.find((phase) => !phase.active && phase.startYear > serviceYears) || phases.at(-1);
+    const incremental = Math.max(0, safe(smartPhase?.customerSaving) - safe(postPhase?.customerSaving));
+    doc.text(it ? `Smart attivo anni 1–${serviceYears}; scenario post-contratto anni ${serviceYears + 1}–${analysisPeriod}` : `Smart active years 1–${serviceYears}; post-contract scenario years ${serviceYears + 1}–${analysisPeriod}`, x + w / 2, legendY + 11, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.2);
+    doc.text(it ? `Differenza annua tra le due fasi: ${money(incremental, lang)}. Il rinnovo Smart sarà valutato alla scadenza del contratto.` : `Annual difference between the two phases: ${money(incremental, lang)}. Smart renewal will be assessed at contract expiry.`, x + w / 2, legendY + 16, { align: "center", maxWidth: w - 8 });
+  }
 }
 
 export function appendProposalVisualPages(doc, project, options = {}) {
@@ -238,20 +305,20 @@ export function appendProposalVisualPages(doc, project, options = {}) {
   doc.setFontSize(8.2);
   doc.setTextColor(...muted);
   doc.text(it
-    ? "La larghezza della fase rappresenta la durata. La linea superiore rappresenta il costo annuo attuale."
-    : "Phase width represents duration. The upper line represents the current annual cost.", 14, 28, { maxWidth: 182 });
+    ? "La larghezza di ogni fase corrisponde alla sua durata. La linea superiore rappresenta il costo annuo attuale."
+    : "Each phase width represents its duration. The upper line represents the current annual cost.", 14, 28, { maxWidth: 182 });
 
   costEvolutionChart(doc, calculated, project, 14, 34, 182, 126, lang, { teal, navy, muted });
 
-  section(it ? "Indicatori chiave" : "Key Indicators", 177);
+  section(it ? "Indicatori chiave" : "Key Indicators", 181);
   const cardW = 42.5;
-  metricCard(doc, 14, 184, cardW, 25, it ? "Riduzione energia" : "Energy reduction", `${number(calculated.energyReductionPercent, 1, lang)}%`, teal, navy, light);
-  metricCard(doc, 60.5, 184, cardW, 25, it ? "Energia risparmiata" : "Energy saved", `${number(Math.max(0, safe(calculated.baselineKwh) - safe(calculated.finalKwh)), 0, lang)} kWh`, teal, navy, light);
-  metricCard(doc, 107, 184, cardW, 25, it ? "Riduzione CO2" : "CO2 reduction", `${number(safe(calculated.co2ReductionKg) / 1000, 1, lang)} t/${it ? "anno" : "yr"}`, teal, navy, light);
-  metricCard(doc, 153.5, 184, cardW, 25, it ? "Punti Smart" : "Smart points", number(calculated.lcuQuantity, 0, lang), teal, navy, light);
+  metricCard(doc, 14, 188, cardW, 25, it ? "Riduzione energia" : "Energy reduction", `${number(calculated.energyReductionPercent, 1, lang)}%`, teal, navy, light);
+  metricCard(doc, 60.5, 188, cardW, 25, it ? "Energia risparmiata" : "Energy saved", `${number(Math.max(0, safe(calculated.baselineKwh) - safe(calculated.finalKwh)), 0, lang)} kWh`, teal, navy, light);
+  metricCard(doc, 107, 188, cardW, 25, it ? "Riduzione CO2" : "CO2 reduction", `${number(safe(calculated.co2ReductionKg) / 1000, 1, lang)} t/${it ? "anno" : "yr"}`, teal, navy, light);
+  metricCard(doc, 153.5, 188, cardW, 25, it ? "Punti Smart" : "Smart points", number(calculated.lcuQuantity, 0, lang), teal, navy, light);
 
   autoTable(doc, {
-    startY: 218,
+    startY: 222,
     theme: "grid",
     head: [[it ? "Indicatore economico" : "Economic indicator", it ? "Valore" : "Value"]],
     body: [
@@ -261,16 +328,16 @@ export function appendProposalVisualPages(doc, project, options = {}) {
     ],
     headStyles: { fillColor: teal },
     alternateRowStyles: { fillColor: light },
-    styles: { font: "helvetica", fontSize: 7.4, cellPadding: 1.6 },
+    styles: { font: "helvetica", fontSize: 7.2, cellPadding: 1.4 },
     columnStyles: { 1: { halign: "right", cellWidth: 50 } },
   });
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.1);
+  doc.setFontSize(6.8);
   doc.setTextColor(...muted);
   doc.text(it
     ? "Visualizzazione preliminare basata sullo stesso motore di calcolo del dashboard Intelligence. La validazione illuminotecnica definitiva avviene in VIMALUX Planner."
-    : "Preliminary visualization based on the same calculation engine as the Intelligence dashboard. Final lighting-design validation is completed in VIMALUX Planner.", 14, 262, { maxWidth: 182 });
+    : "Preliminary visualization based on the same calculation engine as the Intelligence dashboard. Final lighting-design validation is completed in VIMALUX Planner.", 14, 263, { maxWidth: 182 });
 
   doc.addPage();
   section(it ? `Cash flow cliente - ${calculated.analysisPeriod} anni` : `Customer Cash Flow - ${calculated.analysisPeriod} years`, 20);
