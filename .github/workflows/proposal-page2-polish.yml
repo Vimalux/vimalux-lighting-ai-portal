@@ -1,0 +1,53 @@
+name: Proposal page 2 polish
+on:
+  push:
+    branches: [fix/proposal-page2-polish]
+permissions:
+  contents: write
+jobs:
+  patch-test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/proposal-page2-polish
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Polish page 2 spacing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/preliminaryProposalV2.js')
+          s=p.read_text()
+          replacements=[
+            ('y = doc.lastAutoTable.finalY + 7;\n  section(it ? "Come si genera il beneficio annuo"', 'y = doc.lastAutoTable.finalY + 6;\n  section(it ? "Come si genera il beneficio annuo"'),
+            ('y = doc.lastAutoTable.finalY + 7;\n  y = beginSection(it ? "Composizione dell\'investimento"', 'y = doc.lastAutoTable.finalY + 6;\n  y = beginSection(it ? "Composizione dell\'investimento"'),
+            ('styles: { font: "helvetica", fontSize: 6.8, cellPadding: 0.9 },\n    ...alignedTable({ 0: "left", 1: "right" })', 'styles: { font: "helvetica", fontSize: 6.8, cellPadding: 0.8 },\n    ...alignedTable({ 0: "left", 1: "right" })'),
+            ('  y += 13;\n  y = beginSection(it ? "Condizioni e limitazioni"', '  y += 15;\n  y = beginSection(it ? "Condizioni e limitazioni"'),
+            ('doc.setFontSize(6.4); doc.setTextColor(...muted); doc.setFont("helvetica", "normal");', 'doc.setFontSize(6.5); doc.setTextColor(...muted); doc.setFont("helvetica", "normal");')
+          ]
+          for old,new in replacements:
+              count=s.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one match, found {count}: {old[:90]}')
+              s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+      - name: Verify isolated scope
+        run: |
+          git diff --name-only
+          test "$(git diff --name-only | grep -v '^\.github/workflows/proposal-page2-polish.yml$' | wc -l)" -eq 1
+          git diff --name-only | grep -q '^src/preliminaryProposalV2.js$'
+      - run: npm test
+      - run: npm run build
+      - name: Commit validated polish
+        run: |
+          git config user.name VIMALUX
+          git config user.email 99176508+Vimalux@users.noreply.github.com
+          git add src/preliminaryProposalV2.js
+          git diff --cached --quiet || git commit -m "Polish proposal page two spacing"
+          git push origin HEAD:fix/proposal-page2-polish
