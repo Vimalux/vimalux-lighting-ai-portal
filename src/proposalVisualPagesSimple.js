@@ -123,7 +123,7 @@ function buildDisplayedPhases(calculated) {
 function phaseTitle(phase, lang) {
   const it = lang === "it";
   const range = `${phase.startYear}-${phase.endYear}`;
-  if (phase.row?.cmsActive && phase.row?.powerAidActive) return `${it ? "CMS + PowerAiD" : "CMS + PowerAiD"} ${range}`;
+  if (phase.row?.cmsActive && phase.row?.powerAidActive) return `CMS + PowerAiD ${range}`;
   if (phase.row?.cmsActive) return `${it ? "Solo CMS" : "CMS only"} ${range}`;
   if (safe(phase.row?.investmentPayment) > 0) return `${it ? "Finanziamento" : "Financing"} ${range}`;
   return `${it ? "Post-servizi" : "Post-service"} ${range}`;
@@ -136,6 +136,38 @@ function phaseSubtitle(phase, lang) {
   return it ? "Solo benefici LED non dipendenti dai servizi Smart" : "Only LED benefits independent of Smart services";
 }
 
+export function buildYearOneScenario(calculated, phase) {
+  const firstValue = Array.isArray(calculated?.customerValueRows) ? calculated.customerValueRows[0] || {} : {};
+  const firstCash = Array.isArray(calculated?.cashFlowRows) ? calculated.cashFlowRows[0] || {} : {};
+  const currentCost = safe(firstValue.currentOperatingCost);
+  const cmsActive = Boolean(phase?.row?.cmsActive);
+  const powerAidActive = Boolean(phase?.row?.powerAidActive) && cmsActive;
+
+  const ledSaving = safe(firstCash.ledEnergySavingEUR);
+  const cloSaving = cmsActive ? safe(firstCash.cloSavingEUR) : 0;
+  const maintenanceSaving = cmsActive ? safe(calculated?.maintenanceSaving) : 0;
+  const powerAidSaving = powerAidActive ? safe(firstCash.powerAidGrossSavingEUR) : 0;
+  const grossBenefit = ledSaving + cloSaving + maintenanceSaving + powerAidSaving;
+
+  const fixedServiceOpex = cmsActive ? safe(calculated?.fixedAnnualOpex) : 0;
+  const powerAidFee = powerAidActive ? safe(firstCash.powerAidCustomerFee) : 0;
+  const servicePayment = calculated?.dealType === "noleggio_operativo" ? 0 : fixedServiceOpex + powerAidFee;
+  const investmentPayment = safe(phase?.row?.investmentPayment);
+  const futureOperatingCost = Math.max(0, currentCost - grossBenefit);
+  const customerSaving = grossBenefit - servicePayment - investmentPayment;
+
+  return {
+    currentCost,
+    futureOperatingCost,
+    servicePayment,
+    investmentPayment,
+    customerSaving,
+    grossBenefit,
+    cmsActive,
+    powerAidActive,
+  };
+}
+
 function renderScenarioComparison(doc, calculated, x, y, w, lang, colors) {
   const it = lang === "it";
   const { teal, navy, muted, light } = colors;
@@ -143,29 +175,32 @@ function renderScenarioComparison(doc, calculated, x, y, w, lang, colors) {
   const first = rows[0] || {};
   const currentCost = safe(first.currentOperatingCost);
   const phases = buildDisplayedPhases(calculated);
+  const normalizedPhases = phases.map((phase) => ({ phase, display: buildYearOneScenario(calculated, phase) }));
   const cards = [
     {
       title: it ? "Situazione attuale" : "Current situation",
-      subtitle: it ? "Costo annuo di riferimento" : "Current annual reference cost",
+      subtitle: it ? "Costo annuo di riferimento - prezzi anno 1" : "Current annual reference cost - year-1 prices",
       rows: [{ label: it ? "Costo annuo" : "Annual cost", value: money(currentCost, lang) }],
       accent: [31, 119, 180],
     },
-    ...phases.map((phase) => ({
+    ...normalizedPhases.map(({ phase, display }) => ({
       title: phaseTitle(phase, lang),
-      subtitle: phaseSubtitle(phase, lang),
+      subtitle: `${phaseSubtitle(phase, lang)}${it ? " - prezzi anno 1" : " - year-1 prices"}`,
       rows: [
-        { label: it ? "Costo operativo" : "Operating cost", value: money(phase.row.futureOperatingCost, lang) },
-        { label: it ? "Servizi/OPEX" : "Service/OPEX", value: money(phase.row.servicePayment, lang) },
-        { label: it ? "Beneficio netto Comune" : "Municipality net benefit", value: money(phase.row.customerSaving, lang) },
+        { label: it ? "Energia + manutenzione" : "Energy + maintenance", value: money(display.futureOperatingCost, lang) },
+        { label: it ? "Servizi/OPEX" : "Service/OPEX", value: money(display.servicePayment, lang) },
+        ...(display.investmentPayment > 0 ? [{ label: it ? "Invest./finanz." : "Invest./finance", value: money(display.investmentPayment, lang) }] : []),
+        { label: it ? "Beneficio netto Comune" : "Municipality net benefit", value: money(display.customerSaving, lang) },
       ],
-      accent: phase.row?.powerAidActive ? teal : phase.row?.cmsActive ? [14, 116, 144] : [22, 163, 74],
+      accent: display.powerAidActive ? teal : display.cmsActive ? [14, 116, 144] : [22, 163, 74],
     })),
   ];
 
   const columns = cards.length <= 3 ? cards.length : 2;
   const gap = 5;
   const cardW = (w - gap * (columns - 1)) / columns;
-  const cardH = cards.length <= 3 ? 68 : 57;
+  const hasPaymentRow = cards.some((card) => card.rows.length > 3);
+  const cardH = cards.length <= 3 ? (hasPaymentRow ? 76 : 68) : (hasPaymentRow ? 65 : 57);
   const rowsCount = Math.ceil(cards.length / columns);
   cards.forEach((card, index) => {
     const col = index % columns;
@@ -174,29 +209,29 @@ function renderScenarioComparison(doc, calculated, x, y, w, lang, colors) {
   });
 
   const cardsBottom = y + rowsCount * cardH + (rowsCount - 1) * gap;
-  const firstPhase = phases[0]?.row;
-  const lastPhase = phases.at(-1)?.row;
-  const displayedFirstSaving = Math.round(safe(firstPhase?.customerSaving));
-  const displayedLastSaving = Math.round(safe(lastPhase?.customerSaving));
+  const firstDisplay = normalizedPhases[0]?.display;
+  const lastDisplay = normalizedPhases.at(-1)?.display;
+  const displayedFirstSaving = Math.round(safe(firstDisplay?.customerSaving));
+  const displayedLastSaving = Math.round(safe(lastDisplay?.customerSaving));
   const phaseDifference = displayedLastSaving - displayedFirstSaving;
   doc.setFillColor(236, 253, 245);
   doc.setDrawColor(110, 231, 183);
-  doc.roundedRect(x, cardsBottom + 7, w, 22, 2, 2, "FD");
+  doc.roundedRect(x, cardsBottom + 7, w, 25, 2, 2, "FD");
   doc.setTextColor(4, 120, 87);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.text(it
-    ? `Variazione beneficio netto tra prima e ultima fase: ${money(phaseDifference, lang)}`
-    : `Net-benefit change between first and final phase: ${money(phaseDifference, lang)}`,
+    ? `Variazione beneficio netto tra prima e ultima fase, a prezzi anno 1: ${money(phaseDifference, lang)}`
+    : `Net-benefit change between first and final phase, at year-1 prices: ${money(phaseDifference, lang)}`,
     x + 5, cardsBottom + 15);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6.3);
   doc.setTextColor(...muted);
   doc.text(it
-    ? "Ogni fase segue le durate effettive di CMS e PowerAiD configurate nel Business Case."
-    : "Each phase follows the actual CMS and PowerAiD durations configured in the Business Case.",
-    x + 5, cardsBottom + 20, { maxWidth: w - 10 });
-  return cardsBottom + 29;
+    ? "Il confronto mantiene costante il livello prezzi dell'anno 1. L'indicizzazione effettiva anno per anno resta nel cash flow di pagina 4."
+    : "The comparison holds the year-1 price level constant. Actual year-by-year escalation remains in the page-4 cash flow.",
+    x + 5, cardsBottom + 21, { maxWidth: w - 10 });
+  return cardsBottom + 32;
 }
 
 export function appendProposalVisualPages(doc, project, options = {}) {
@@ -226,11 +261,11 @@ export function appendProposalVisualPages(doc, project, options = {}) {
   doc.setFontSize(8.2);
   doc.setTextColor(...muted);
   doc.text(it
-    ? "Confronto diretto delle fasi operative. Gli importi in euro sono il riferimento principale; le percentuali energetiche sono riportate separatamente negli indicatori."
-    : "Direct comparison of the operating phases. Euro amounts are the primary reference; energy percentages are shown separately in the indicators.", 14, 28, { maxWidth: 182 });
+    ? "Confronto diretto delle fasi operative a prezzi costanti dell'anno 1. Il cash flow di pagina 4 mostra invece gli importi nominali indicizzati anno per anno."
+    : "Direct comparison of operating phases at constant year-1 prices. Page 4 cash flow instead shows nominal year-by-year escalated amounts.", 14, 28, { maxWidth: 182 });
 
   const comparisonBottom = renderScenarioComparison(doc, calculated, 14, 38, 182, lang, { teal, navy, muted, light });
-  const indicatorsY = Math.max(151, comparisonBottom + 12);
+  const indicatorsY = Math.max(154, comparisonBottom + 12);
   section(it ? "Indicatori chiave" : "Key Indicators", indicatorsY);
   const cardW = 42.5;
   const metricsY = indicatorsY + 7;
