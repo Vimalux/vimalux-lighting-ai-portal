@@ -4,12 +4,21 @@ import { supabase } from "./supabase.js";
 import { warrantyLabel } from "./warranty.js";
 import { qualityGateMessage, validateProposalQuality } from "./proposalQuality.js";
 
-const money = (value, lang = "en") => new Intl.NumberFormat(lang === "it" ? "it-IT" : "en-GB", {
-  style: "currency", currency: "EUR", maximumFractionDigits: 0,
-}).format(Number(value) || 0);
-const number = (value, digits = 1, lang = "en") => new Intl.NumberFormat(lang === "it" ? "it-IT" : "en-GB", {
-  minimumFractionDigits: digits, maximumFractionDigits: digits,
-}).format(Number(value) || 0);
+function pdfNumber(value, digits = 1, lang = "en") {
+  return new Intl.NumberFormat(lang === "it" ? "it-IT" : "en-GB", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+    useGrouping: true,
+  }).format(Number(value) || 0).replace(/\u00a0|\u202f/g, " ");
+}
+
+function pdfMoney(value, lang = "en") {
+  const formatted = pdfNumber(value, 0, lang);
+  return lang === "it" ? `${formatted} €` : `€${formatted}`;
+}
+
+const money = pdfMoney;
+const number = pdfNumber;
 
 function currentBusinessCaseId() {
   return new URLSearchParams(window.location.search).get("business_case_id") || "";
@@ -62,6 +71,7 @@ function drawFooter(doc, proposalId, version, lineage, it, muted) {
     doc.setPage(page);
     doc.setDrawColor(203, 213, 225);
     doc.line(14, 281, 196, 281);
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
     doc.setTextColor(...muted);
     doc.text(`${proposalId} v${version}  |  ${lineage}  |  VIMALUX Intelligence`, 14, 286);
@@ -96,6 +106,7 @@ function generatePdf(row, version) {
   const section = (title, y) => {
     doc.setTextColor(...teal); doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text(title, 14, y); doc.setTextColor(...navy);
   };
+  const tableHead = { fillColor: teal, font: "helvetica", fontStyle: "bold" };
 
   doc.setFillColor(...navy); doc.rect(0, 0, 210, 48, "F");
   doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.text("VIMALUX Intelligence", 14, 17);
@@ -113,19 +124,19 @@ function generatePdf(row, version) {
     startY: 86, theme: "grid",
     head: [[it ? "Investimento iniziale" : "Initial investment", it ? "Canone annuale Smart / CMS" : "Annual Smart / CMS fee", it ? `TCV ${contractYears} anni` : `TCV ${contractYears} years`]],
     body: [[money(result.capex, lang), money(annualFee, lang), money(result.tcv, lang)]],
-    headStyles: { fillColor: teal }, styles: { font: "helvetica", fontSize: 8, cellPadding: 2.2 },
+    headStyles: tableHead, styles: { font: "helvetica", fontSize: 8, cellPadding: 2.2 },
     columnStyles: { 0: { halign: "right" }, 1: { halign: "right" }, 2: { halign: "right" } },
   });
-  doc.setFontSize(7.1); doc.setTextColor(...muted);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(7.1); doc.setTextColor(...muted);
   doc.text(it
     ? `TCV include l'indicizzazione del canone/OPEX del ${number(escalation, 1, lang)}% annuo, ove applicabile.`
     : `TCV includes ${number(escalation, 1, lang)}% annual service/OPEX escalation where applicable.`, 14, doc.lastAutoTable.finalY + 4.5);
 
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 8, theme: "grid",
-    head: [[it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit", it ? "Riduzione energia" : "Energy reduction", it ? "Riduzione CO₂" : "CO₂ reduction", "Payback", it ? `VAN beneficio Comune (${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} anni)` : `Customer-benefit NPV (${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} years)`]],
+    head: [[it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit", it ? "Riduzione energia" : "Energy reduction", it ? "Riduzione CO2" : "CO2 reduction", "Payback", it ? `VAN beneficio Comune (${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} anni)` : `Customer-benefit NPV (${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} years)`]],
     body: [[money(netBenefit, lang), `${number(result.energyReductionPct, 1, lang)}%`, `${number(result.co2ReductionTons, 1, lang)} t/${it ? "anno" : "yr"}`, result.paybackYears == null ? "-" : `${number(result.paybackYears, 1, lang)} ${it ? "anni" : "years"}`, money(result.npv, lang)]],
-    headStyles: { fillColor: teal }, styles: { font: "helvetica", fontSize: 7.1, cellPadding: 2 },
+    headStyles: tableHead, styles: { font: "helvetica", fontSize: 7.1, cellPadding: 2 },
     columnStyles: { 0: { halign: "right" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } },
   });
 
@@ -154,7 +165,7 @@ function generatePdf(row, version) {
       [it ? `TCV ${contractYears} anni, indicizzato` : `Indexed TCV ${contractYears} years`, money(result.tcv, lang)],
       [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],
     ],
-    headStyles: { fillColor: teal }, styles: { font: "helvetica", fontSize: 8, cellPadding: 1.5 }, columnStyles: { 1: { halign: "right" } },
+    headStyles: tableHead, styles: { font: "helvetica", fontSize: 8, cellPadding: 1.5 }, columnStyles: { 1: { halign: "right" } },
   });
 
   doc.addPage();
@@ -172,7 +183,7 @@ function generatePdf(row, version) {
       ["CMS", project.solution?.cmsEnabled ? (it ? "Monitoraggio, allarmi e gestione remota" : "Monitoring, alarms and remote management") : (it ? "Non incluso" : "Not included")],
       ["Adaptive Lighting", project.solution?.powerAidEnabled ? "PowerAiD" : (it ? "Predisposizione / da validare" : "Prepared / to be validated")],
     ],
-    headStyles: { fillColor: teal }, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 7.8, cellPadding: 1.5 }, columnStyles: { 0: { fontStyle: "bold", cellWidth: 48 } },
+    headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 7.8, cellPadding: 1.5 }, columnStyles: { 0: { fontStyle: "bold", cellWidth: 48 } },
   });
 
   y = doc.lastAutoTable.finalY + 10;
@@ -182,10 +193,10 @@ function generatePdf(row, version) {
     body: [
       [it ? "Risparmio energia" : "Energy saving", money(energySaving, lang)],
       [it ? "Risparmio manutenzione" : "Maintenance saving", money(maintSaving, lang)],
-      [it ? "Canone Smart Lighting / CMS" : "Smart Lighting / CMS fee", `− ${money(annualFee, lang)}`],
+      [it ? "Canone Smart Lighting / CMS" : "Smart Lighting / CMS fee", `(${money(annualFee, lang)})`],
       [it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit", money(netBenefit, lang)],
     ],
-    headStyles: { fillColor: teal }, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 8, cellPadding: 1.6 }, columnStyles: { 1: { halign: "right" } },
+    headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 8, cellPadding: 1.6 }, columnStyles: { 1: { halign: "right" } },
     didParseCell: (data) => { if (data.section === "body" && data.row.index === 3) data.cell.styles.fontStyle = "bold"; },
   });
 
@@ -201,7 +212,7 @@ function generatePdf(row, version) {
       [it ? "Modello commerciale" : "Commercial model", String(project.assumptions?.dealType || project.assumptions?.financingModel || "cash")],
       [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],
     ],
-    headStyles: { fillColor: teal }, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 7.6, cellPadding: 1.35 }, columnStyles: { 1: { halign: "right" } },
+    headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 7.6, cellPadding: 1.35 }, columnStyles: { 1: { halign: "right" } },
   });
 
   y = doc.lastAutoTable.finalY + 9;
@@ -230,7 +241,6 @@ function generatePdf(row, version) {
     ? "Questa proposta è indicativa e non costituisce un'offerta finale vincolante. È basata sui dati disponibili, quantità aggregate, potenze e ipotesi economiche del Business Case alla data di emissione. Prezzi, quantità, installazione, logistica, imposte, finanziamento e prestazioni definitive saranno confermati nella proposta ufficiale generata da VIMALUX Planner. IVA esclusa salvo diversa indicazione."
     : "This proposal is indicative and does not constitute a final binding quotation. It is based on available data, aggregated quantities, wattages and commercial assumptions in the Business Case at the issue date. Final prices, quantities, installation, logistics, taxes, financing and performance will be confirmed in the official proposal generated by VIMALUX Planner. VAT excluded unless otherwise stated.", 14, y + 7, { maxWidth: 182 });
 
-  drawFooter(doc, proposalId, version, lineage, it, muted);
   const pdfName = filename(code, version);
   doc.save(pdfName);
   return pdfName;
