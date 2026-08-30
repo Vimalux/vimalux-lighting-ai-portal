@@ -17,6 +17,14 @@ test("proposal page 3 uses dashboard-style cost evolution instead of duplicate m
   assert.doesNotMatch(visualSource, /Composizione beneficio annuo/);
 });
 
+test("proposal page 3 splits the visual at the actual Smart service expiry", () => {
+  assert.match(visualSource, /serviceYears < analysisPeriod/);
+  assert.match(visualSource, /Dopo il contratto Smart/);
+  assert.match(visualSource, /Smart attivo anni 1–\$\{serviceYears\}/);
+  assert.match(visualSource, /post-contract scenario/);
+  assert.match(visualSource, /rows\[Math\.min\(serviceYears/);
+});
+
 test("proposal keeps cashflow as page 4 and final four-page footer redraw", () => {
   assert.match(visualSource, /Cash flow cliente/);
   assert.match(visualSource, /year: 0/);
