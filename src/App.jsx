@@ -161,6 +161,15 @@ export default function App() {
     ? agentWorkflow
     : workflow;
   const t = useT(project.language);
+  useEffect(() => {
+    const crmMode = view === "crm";
+    document.title = crmMode ? "VIMALUX CRM" : "VIMALUX Intelligence";
+    const favicon = document.querySelector('link[rel="icon"]');
+    if (favicon) {
+      favicon.setAttribute("href", crmMode ? "/favicon-crm.svg" : "/favicon-intelligence.svg");
+      favicon.setAttribute("type", "image/svg+xml");
+    }
+  }, [view]);
   const result = useMemo(() => calculateBusinessCase(applyWarrantyPricing(project)), [project]);
   const syncedProjects = useMemo(() => projects.map((item) => syncBusinessCaseResult(item, item.updatedAt || item.createdAt)), [projects]);
   const syncedProject = syncedProjects.find((item) => item.id === project.id) || syncBusinessCaseResult(project, project.updatedAt || project.createdAt);
