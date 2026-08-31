@@ -42,11 +42,14 @@ function updateHeaderContext() {
   if (!header) return;
   const small = header.querySelector("div > small");
   if (!small) return;
-  const raw = String(small.dataset.businessCaseId || small.textContent || "").trim();
-  const match = raw.match(/BC-[A-Z0-9-]+/i);
-  const businessCaseId = match?.[0] || currentParams().get("business_case_id") || "";
+
+  // A business_case_id explicitly present in the URL is canonical. Never let a
+  // previously rendered header value or persisted DOM dataset override it.
+  const urlBusinessCaseId = String(currentParams().get("business_case_id") || "").trim();
+  const renderedMatch = String(small.textContent || "").match(/BC-[A-Z0-9-]+/i);
+  const businessCaseId = urlBusinessCaseId || renderedMatch?.[0] || "";
   if (!businessCaseId) return;
-  small.dataset.businessCaseId = businessCaseId;
+
   rememberBusinessCaseId(businessCaseId);
   const projectName = projectNameForBusinessCase(businessCaseId);
   const desired = projectName ? `${projectName} · ${businessCaseId}` : businessCaseId;
