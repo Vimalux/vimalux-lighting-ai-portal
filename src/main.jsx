@@ -12,4 +12,5 @@ import "./importedProductCategoryReconcile.js";
 import "./catalogueTabsRuntime.js";
 import "./defaultAssumptionsRuntime.js";
 import "./servicePeriodsRuntime.js";
+import "./activeProjectContextRuntime.js";
 ReactDOM.createRoot(document.getElementById("root")).render(<React.StrictMode><App/></React.StrictMode>);
