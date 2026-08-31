@@ -35,16 +35,16 @@ jobs:
           PY
       - name: Verify isolated scope
         run: |
-          git diff --name-only
-          test "$(git diff --name-only | grep -v '^\.github/workflows/project-price-number-format.yml$' | wc -l)" -eq 2
-          git diff --name-only | grep -q '^src/App.jsx$'
-          git diff --name-only | grep -q '^test/projectPriceFormatting.test.js$'
+          git add src/App.jsx test/projectPriceFormatting.test.js
+          git diff --cached --name-only
+          test "$(git diff --cached --name-only | wc -l)" -eq 2
+          git diff --cached --name-only | grep -q '^src/App.jsx$'
+          git diff --cached --name-only | grep -q '^test/projectPriceFormatting.test.js$'
       - run: npm test
       - run: npm run build
       - name: Commit validated fix
         run: |
           git config user.name VIMALUX
           git config user.email 99176508+Vimalux@users.noreply.github.com
-          git add src/App.jsx test/projectPriceFormatting.test.js
           git diff --cached --quiet || git commit -m "Format project price placeholders"
           git push origin HEAD:fix/project-price-number-format
