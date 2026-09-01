@@ -10,8 +10,18 @@ const preliminaryProposal = read('src/preliminaryProposal.js');
 
 const checks = [
   {
-    name: 'Agent workflow includes Assunzioni after Additional Costs',
-    ok: /\["additionalCosts", "additionalCosts"\],\r?\n\s*\["assumptions", "assumptions"\]/.test(app),
+    name: 'Additional Costs is a dedicated workflow step before pricing/assumptions',
+    ok: /\["solution", "solution"\],\r?\n\s*\["additionalCosts", "additionalCosts"\],\r?\n\s*\["pricing", "pricing"\],\r?\n\s*\["assumptions", "assumptions"\]/.test(app),
+  },
+  {
+    name: 'Agent workflow reuses the shared workflow while excluding internal pricing only',
+    ok: app.includes('const agentWorkflow = workflow.filter(([id]) => id !== "pricing");'),
+  },
+  {
+    name: 'Additional Costs renders as its own view for admin and agent',
+    ok: app.includes('view === "additionalCosts" && <AdditionalCostsCard')
+      && app.includes('mode={isAgent ? "agent" : "admin"}')
+      && !app.includes('<VatSettings p={p} r={r} update={update} /><AdditionalCostsCard p={p} update={update} />'),
   },
   {
     name: 'Agent Assunzioni component is rendered',
