@@ -1,8 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isAgentViewAllowed, sanitizeAgentAdditionalCosts } from "./additionalCostsAccess.js";
+import {
+  AGENT_ADDITIONAL_COST_MARKUP_PERCENT,
+  isAgentViewAllowed,
+  sanitizeAgentAdditionalCosts,
+} from "./additionalCostsAccess.js";
 
-test("agent edits preserve the admin unit cost and discard supplied internal fields", () => {
+test("agent supplier-cost edits recalculate project price with hidden default markup", () => {
   const existing = [{
     id: "poles",
     description: "Nuovi pali",
@@ -19,26 +23,41 @@ test("agent edits preserve the admin unit cost and discard supplied internal fie
     ...existing[0],
     description: "Nuovi pali rinforzati",
     quantity: 24,
-    unitCost: 0,
-    unitSalesPrice: 125,
+    unitCost: 110,
+    unitSalesPrice: 999,
     margin: 999,
   }];
 
-  assert.deepEqual(sanitizeAgentAdditionalCosts(existing, incoming), [{
-    id: "poles",
-    description: "Nuovi pali rinforzati",
-    category: "materiale",
-    costType: "capex",
-    quantity: 24,
-    unit: "pz",
-    unitSalesPrice: 125,
-    note: "",
-    unitCost: 100,
-    internalReference: "admin-only",
-  }]);
+  const result = sanitizeAgentAdditionalCosts(existing, incoming);
+  assert.equal(AGENT_ADDITIONAL_COST_MARKUP_PERCENT, 15);
+  assert.equal(result[0].unitCost, 110);
+  assert.equal(result[0].unitSalesPrice, 126.5);
+  assert.equal(result[0].internalReference, "admin-only");
+  assert.equal(result[0].description, "Nuovi pali rinforzati");
+  assert.equal(result[0].quantity, 24);
 });
 
-test("new agent items receive a neutral internal cost while retaining sales data", () => {
+test("non-price agent edits preserve an existing approved project price", () => {
+  const existing = [{
+    id: "installation",
+    description: "Installazione",
+    category: "lavoro",
+    costType: "capex",
+    quantity: 1,
+    unit: "forfait",
+    unitCost: 82000,
+    unitSalesPrice: 90000,
+    note: "admin baseline",
+  }];
+  const incoming = [{ ...existing[0], note: "updated note", unitSalesPrice: 1 }];
+  const result = sanitizeAgentAdditionalCosts(existing, incoming);
+
+  assert.equal(result[0].unitCost, 82000);
+  assert.equal(result[0].unitSalesPrice, 90000);
+  assert.equal(result[0].note, "updated note");
+});
+
+test("new agent items use supplier cost and receive automatic 15 percent project markup", () => {
   const result = sanitizeAgentAdditionalCosts([], [{
     id: "new-poles",
     description: "Nuovi pali",
@@ -46,15 +65,17 @@ test("new agent items receive a neutral internal cost while retaining sales data
     costType: "capex",
     quantity: 20,
     unit: "pz",
-    unitSalesPrice: 120,
+    unitCost: 120,
+    unitSalesPrice: 1,
     note: "",
   }]);
 
-  assert.equal(result[0].unitCost, 0);
-  assert.equal(result[0].quantity * result[0].unitSalesPrice, 2400);
+  assert.equal(result[0].unitCost, 120);
+  assert.equal(result[0].unitSalesPrice, 138);
+  assert.equal(result[0].quantity * result[0].unitSalesPrice, 2760);
 });
 
-test("agent can append a project-specific cost without exposing or changing existing internal costs", () => {
+test("agent can append a project-specific supplier cost without changing existing admin pricing", () => {
   const existing = [{
     id: "installation",
     description: "Installazione",
@@ -68,16 +89,7 @@ test("agent can append a project-specific cost without exposing or changing exis
   }];
 
   const incoming = [
-    {
-      id: "installation",
-      description: "Installazione",
-      category: "lavoro",
-      costType: "capex",
-      quantity: 1,
-      unit: "forfait",
-      unitSalesPrice: 90000,
-      note: "admin baseline",
-    },
+    { ...existing[0] },
     {
       id: "agent-extra-work",
       description: "Opere aggiuntive rilevate dall'agente",
@@ -85,7 +97,7 @@ test("agent can append a project-specific cost without exposing or changing exis
       costType: "capex",
       quantity: 2,
       unit: "pz",
-      unitSalesPrice: 750,
+      unitCost: 750,
       note: "Da verificare in sopralluogo",
     },
   ];
@@ -94,9 +106,10 @@ test("agent can append a project-specific cost without exposing or changing exis
 
   assert.equal(result.length, 2);
   assert.equal(result[0].unitCost, 82000);
-  assert.equal(result[1].unitCost, 0);
+  assert.equal(result[0].unitSalesPrice, 90000);
+  assert.equal(result[1].unitCost, 750);
+  assert.equal(result[1].unitSalesPrice, 862.5);
   assert.equal(result[1].description, "Opere aggiuntive rilevate dall'agente");
-  assert.equal(result[1].quantity * result[1].unitSalesPrice, 1500);
 });
 
 test("agent navigation allows additional project costs while protecting internal pricing", () => {
