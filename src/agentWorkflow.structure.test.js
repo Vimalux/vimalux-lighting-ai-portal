@@ -8,19 +8,24 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const appSource = fs.readFileSync(path.join(here, "App.jsx"), "utf8");
 const cardSource = fs.readFileSync(path.join(here, "AdditionalCostsCard.jsx"), "utf8");
 
-test("agent workflow permanently includes project additional costs between solution and assumptions", () => {
+test("shared workflow includes project additional costs before pricing and assumptions", () => {
   assert.match(
     appSource,
-    /const agentWorkflow = \[[\s\S]*workflow\.slice\(0, 3\)[\s\S]*\["additionalCosts", "additionalCosts"\][\s\S]*\["assumptions", "assumptions"\]/,
+    /const workflow = \[[\s\S]*\["solution", "solution"\][\s\S]*\["additionalCosts", "additionalCosts"\][\s\S]*\["pricing", "pricing"\][\s\S]*\["assumptions", "assumptions"\]/,
   );
+  assert.match(appSource, /const agentWorkflow = workflow\.filter\(\(\[id\]\) => id !== "pricing"\);/);
 });
 
-test("agent additional-cost view is rendered with agent mode and remains outside internal pricing", () => {
+test("additional-cost view is shared while internal pricing remains admin-only", () => {
   assert.match(
     appSource,
-    /isAgent && view === "additionalCosts" && <AdditionalCostsCard p=\{project\} update=\{update\} mode="agent" \/>/,
+    /view === "additionalCosts" && <AdditionalCostsCard p=\{project\} update=\{update\} mode=\{isAgent \? "agent" : "admin"\} \/>/,
   );
   assert.match(appSource, /!isAgent && view === "pricing"/);
+});
+
+test("additional costs are no longer embedded inside admin assumptions", () => {
+  assert.doesNotMatch(appSource, /<VatSettings p=\{p\} r=\{r\} update=\{update\} \/><AdditionalCostsCard p=\{p\} update=\{update\} \/>/);
 });
 
 test("agent additional-cost card keeps add action while hiding internal unit cost", () => {
