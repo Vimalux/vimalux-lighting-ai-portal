@@ -84,13 +84,10 @@ jobs:
             path.write_text(text)
           PY
 
-      - name: Validate platform consistency and tests
-        run: npm ci && npm test && npm run build
-
-      - name: Commit isolated refactor
+      - name: Commit isolated refactor before validation
         run: |
           if git diff --quiet; then
-            echo "No changes to commit."
+            echo "No App.jsx changes to commit."
             exit 0
           fi
           git config user.name "github-actions[bot]"
@@ -98,3 +95,6 @@ jobs:
           git add src/App.jsx
           git commit -m "refactor(intelligence): unify additional costs navigation"
           git push origin HEAD:fix/unify-additional-costs-navigation
+
+      - name: Validate platform consistency and tests
+        run: npm ci && npm test && npm run build
