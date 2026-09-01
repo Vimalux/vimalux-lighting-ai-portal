@@ -28,10 +28,14 @@ test("additional costs are no longer embedded inside admin assumptions", () => {
   assert.doesNotMatch(appSource, /<VatSettings p=\{p\} r=\{r\} update=\{update\} \/><AdditionalCostsCard p=\{p\} update=\{update\} \/>/);
 });
 
-test("agent additional-cost card keeps add action while hiding internal unit cost", () => {
-  assert.match(cardSource, /showInternalCosts = mode !== "agent"/);
+test("agent additional-cost card accepts supplier cost and shows calculated project price", () => {
+  assert.match(cardSource, /const isAgent = mode === "agent"/);
+  assert.match(cardSource, /showInternalCosts = !isAgent/);
+  assert.match(cardSource, /"Costo unitario"/);
+  assert.match(cardSource, /"Prezzo progetto"/);
+  assert.match(cardSource, /change\(index, "unitCost"/);
+  assert.match(cardSource, /formatter\.format\(row\.unitSalesPrice \|\| 0\)/);
   assert.match(cardSource, /\+ Aggiungi costo/);
-  assert.match(cardSource, /replaceRows\(\[\.\.\.rows, emptyRow\(\)\]\)/);
 });
 
 test("agent update path is explicitly accepted and sanitized", () => {
