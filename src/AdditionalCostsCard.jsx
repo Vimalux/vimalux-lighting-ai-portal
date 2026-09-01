@@ -41,7 +41,8 @@ const numberValue = (value) => {
 
 export default function AdditionalCostsCard({ p, update, mode = "admin" }) {
   const it = p.language === "it";
-  const showInternalCosts = mode !== "agent";
+  const isAgent = mode === "agent";
+  const showInternalCosts = !isAgent;
   const rows = Array.isArray(p.additionalCosts) ? p.additionalCosts : [];
   const totals = calculateAdditionalCosts(rows);
   const formatter = new Intl.NumberFormat(it ? "it-IT" : "en-GB", {
@@ -66,9 +67,13 @@ export default function AdditionalCostsCard({ p, update, mode = "admin" }) {
         <div>
           <h3>{it ? "Costi aggiuntivi di progetto" : "Additional project costs"}</h3>
           <p className="hint">
-            {it
-              ? "Costi specifici del progetto. Le voci CAPEX entrano nell'investimento; le voci OPEX annuali entrano nei costi/ricavi ricorrenti."
-              : "Project-specific costs. CAPEX items are included in the investment; annual OPEX items are included in recurring costs/revenue."}
+            {isAgent
+              ? (it
+                ? "Inserisci il costo comunicato dal fornitore o subappaltatore. Il prezzo progetto viene calcolato automaticamente secondo i parametri commerciali VIMALUX."
+                : "Enter the cost quoted by the supplier or subcontractor. The project price is calculated automatically using VIMALUX commercial parameters.")
+              : (it
+                ? "Costi specifici del progetto. Le voci CAPEX entrano nell'investimento; le voci OPEX annuali entrano nei costi/ricavi ricorrenti."
+                : "Project-specific costs. CAPEX items are included in the investment; annual OPEX items are included in recurring costs/revenue.")}
           </p>
         </div>
         <button type="button" className="primary" onClick={() => replaceRows([...rows, emptyRow()])}>
@@ -92,8 +97,8 @@ export default function AdditionalCostsCard({ p, update, mode = "admin" }) {
                 <th>{it ? "Tipo" : "Type"}</th>
                 <th>{it ? "Quantità" : "Quantity"}</th>
                 <th>{it ? "Unità" : "Unit"}</th>
-                {showInternalCosts && <th>{it ? "Costo unitario" : "Unit cost"}</th>}
-                <th>{it ? "Prezzo unitario" : "Unit sales price"}</th>
+                <th>{it ? "Costo unitario" : "Unit cost"}</th>
+                <th>{isAgent ? (it ? "Prezzo progetto" : "Project price") : (it ? "Prezzo unitario" : "Unit sales price")}</th>
                 {showInternalCosts && <th>{it ? "Costo totale" : "Total cost"}</th>}
                 <th>{it ? "Prezzo totale" : "Total sales"}</th>
                 <th>{it ? "Note" : "Notes"}</th>
@@ -130,11 +135,13 @@ export default function AdditionalCostsCard({ p, update, mode = "admin" }) {
                         {units.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
                       </select>
                     </td>
-                    {showInternalCosts && <td>
-                      <input type="number" min="0" step="any" value={row.unitCost ?? 0} onChange={(e) => change(index, "unitCost", numberValue(e.target.value))} />
-                    </td>}
                     <td>
-                      <input type="number" min="0" step="any" value={row.unitSalesPrice ?? 0} onChange={(e) => change(index, "unitSalesPrice", numberValue(e.target.value))} />
+                      <input type="number" min="0" step="any" value={row.unitCost ?? 0} onChange={(e) => change(index, "unitCost", numberValue(e.target.value))} />
+                    </td>
+                    <td>
+                      {isAgent
+                        ? <span className="calculated-value">{formatter.format(row.unitSalesPrice || 0)}</span>
+                        : <input type="number" min="0" step="any" value={row.unitSalesPrice ?? 0} onChange={(e) => change(index, "unitSalesPrice", numberValue(e.target.value))} />}
                     </td>
                     {showInternalCosts && <td>{formatter.format(calculated.costTotal || 0)}</td>}
                     <td>{formatter.format(calculated.salesTotal || 0)}</td>
