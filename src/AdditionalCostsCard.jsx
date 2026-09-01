@@ -42,7 +42,7 @@ const numberValue = (value) => {
 export default function AdditionalCostsCard({ p, update, mode = "admin" }) {
   const it = p.language === "it";
   const isAgent = mode === "agent";
-  const showInternalCosts = !isAgent;
+  const showSalesPrices = !isAgent;
   const rows = Array.isArray(p.additionalCosts) ? p.additionalCosts : [];
   const totals = calculateAdditionalCosts(rows);
   const formatter = new Intl.NumberFormat(it ? "it-IT" : "en-GB", {
@@ -69,8 +69,8 @@ export default function AdditionalCostsCard({ p, update, mode = "admin" }) {
           <p className="hint">
             {isAgent
               ? (it
-                ? "Inserisci il costo comunicato dal fornitore o subappaltatore. Il prezzo progetto viene calcolato automaticamente secondo i parametri commerciali VIMALUX."
-                : "Enter the cost quoted by the supplier or subcontractor. The project price is calculated automatically using VIMALUX commercial parameters.")
+                ? "Inserisci il costo comunicato dal fornitore o subappaltatore. Il prezzo di vendita viene calcolato automaticamente secondo i parametri commerciali VIMALUX e resta riservato a VIMALUX."
+                : "Enter the cost quoted by the supplier or subcontractor. The sales price is calculated automatically using VIMALUX commercial parameters and remains visible only to VIMALUX.")
               : (it
                 ? "Costi specifici del progetto. Le voci CAPEX entrano nell'investimento; le voci OPEX annuali entrano nei costi/ricavi ricorrenti."
                 : "Project-specific costs. CAPEX items are included in the investment; annual OPEX items are included in recurring costs/revenue.")}
@@ -83,9 +83,7 @@ export default function AdditionalCostsCard({ p, update, mode = "admin" }) {
 
       {!rows.length ? (
         <p className="hint">
-          {it
-            ? "Nessun costo aggiuntivo inserito."
-            : "No additional project costs entered."}
+          {it ? "Nessun costo aggiuntivo inserito." : "No additional project costs entered."}
         </p>
       ) : (
         <div className="table-scroll">
@@ -98,9 +96,9 @@ export default function AdditionalCostsCard({ p, update, mode = "admin" }) {
                 <th>{it ? "Quantità" : "Quantity"}</th>
                 <th>{it ? "Unità" : "Unit"}</th>
                 <th>{it ? "Costo unitario" : "Unit cost"}</th>
-                <th>{isAgent ? (it ? "Prezzo progetto" : "Project price") : (it ? "Prezzo unitario" : "Unit sales price")}</th>
-                {showInternalCosts && <th>{it ? "Costo totale" : "Total cost"}</th>}
-                <th>{it ? "Prezzo totale" : "Total sales"}</th>
+                <th>{it ? "Costo totale" : "Total cost"}</th>
+                {showSalesPrices && <th>{it ? "Prezzo unitario" : "Unit sales price"}</th>}
+                {showSalesPrices && <th>{it ? "Prezzo totale" : "Total sales"}</th>}
                 <th>{it ? "Note" : "Notes"}</th>
                 <th />
               </tr>
@@ -110,47 +108,17 @@ export default function AdditionalCostsCard({ p, update, mode = "admin" }) {
                 const calculated = totals.rows[index] || {};
                 return (
                   <tr key={row.id || index}>
-                    <td>
-                      <input
-                        value={row.description || ""}
-                        placeholder={it ? "Es. Nuovi pali" : "e.g. New poles"}
-                        onChange={(e) => change(index, "description", e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <select value={row.category || "altro"} onChange={(e) => change(index, "category", e.target.value)}>
-                        {categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                      </select>
-                    </td>
-                    <td>
-                      <select value={row.costType || "capex"} onChange={(e) => change(index, "costType", e.target.value)}>
-                        {types.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                      </select>
-                    </td>
-                    <td>
-                      <input type="number" min="0" step="any" value={row.quantity ?? 0} onChange={(e) => change(index, "quantity", numberValue(e.target.value))} />
-                    </td>
-                    <td>
-                      <select value={row.unit || "pz"} onChange={(e) => change(index, "unit", e.target.value)}>
-                        {units.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
-                      </select>
-                    </td>
-                    <td>
-                      <input type="number" min="0" step="any" value={row.unitCost ?? 0} onChange={(e) => change(index, "unitCost", numberValue(e.target.value))} />
-                    </td>
-                    <td>
-                      {isAgent
-                        ? <span className="calculated-value">{formatter.format(row.unitSalesPrice || 0)}</span>
-                        : <input type="number" min="0" step="any" value={row.unitSalesPrice ?? 0} onChange={(e) => change(index, "unitSalesPrice", numberValue(e.target.value))} />}
-                    </td>
-                    {showInternalCosts && <td>{formatter.format(calculated.costTotal || 0)}</td>}
-                    <td>{formatter.format(calculated.salesTotal || 0)}</td>
-                    <td>
-                      <input value={row.note || ""} onChange={(e) => change(index, "note", e.target.value)} />
-                    </td>
-                    <td>
-                      <button type="button" className="danger secondary" onClick={() => remove(index)} aria-label={it ? "Elimina voce" : "Delete item"}>×</button>
-                    </td>
+                    <td><input value={row.description || ""} placeholder={it ? "Es. Nuovi pali" : "e.g. New poles"} onChange={(e) => change(index, "description", e.target.value)} /></td>
+                    <td><select value={row.category || "altro"} onChange={(e) => change(index, "category", e.target.value)}>{categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></td>
+                    <td><select value={row.costType || "capex"} onChange={(e) => change(index, "costType", e.target.value)}>{types.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></td>
+                    <td><input type="number" min="0" step="any" value={row.quantity ?? 0} onChange={(e) => change(index, "quantity", numberValue(e.target.value))} /></td>
+                    <td><select value={row.unit || "pz"} onChange={(e) => change(index, "unit", e.target.value)}>{units.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select></td>
+                    <td><input type="number" min="0" step="any" value={row.unitCost ?? 0} onChange={(e) => change(index, "unitCost", numberValue(e.target.value))} /></td>
+                    <td>{formatter.format(calculated.costTotal || 0)}</td>
+                    {showSalesPrices && <td><input type="number" min="0" step="any" value={row.unitSalesPrice ?? 0} onChange={(e) => change(index, "unitSalesPrice", numberValue(e.target.value))} /></td>}
+                    {showSalesPrices && <td>{formatter.format(calculated.salesTotal || 0)}</td>}
+                    <td><input value={row.note || ""} onChange={(e) => change(index, "note", e.target.value)} /></td>
+                    <td><button type="button" className="danger secondary" onClick={() => remove(index)} aria-label={it ? "Elimina voce" : "Delete item"}>×</button></td>
                   </tr>
                 );
               })}
@@ -160,8 +128,17 @@ export default function AdditionalCostsCard({ p, update, mode = "admin" }) {
       )}
 
       <div className="additional-costs-summary">
-        <span>CAPEX: <strong>{formatter.format(totals.capexSales)}</strong>{showInternalCosts && <> ({it ? "costo" : "cost"} {formatter.format(totals.capexCost)})</>}</span>
-        <span>OPEX/{it ? "anno" : "year"}: <strong>{formatter.format(totals.annualOpexSales)}</strong>{showInternalCosts && <> ({it ? "costo" : "cost"} {formatter.format(totals.annualOpexCost)})</>}</span>
+        {isAgent ? (
+          <>
+            <span>CAPEX: <strong>{formatter.format(totals.capexCost)}</strong></span>
+            <span>OPEX/{it ? "anno" : "year"}: <strong>{formatter.format(totals.annualOpexCost)}</strong></span>
+          </>
+        ) : (
+          <>
+            <span>CAPEX: <strong>{formatter.format(totals.capexSales)}</strong> ({it ? "costo" : "cost"} {formatter.format(totals.capexCost)})</span>
+            <span>OPEX/{it ? "anno" : "year"}: <strong>{formatter.format(totals.annualOpexSales)}</strong> ({it ? "costo" : "cost"} {formatter.format(totals.annualOpexCost)})</span>
+          </>
+        )}
       </div>
     </section>
   );
