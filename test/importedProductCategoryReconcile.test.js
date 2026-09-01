@@ -43,3 +43,18 @@ test("Stradale cannot keep an OPERA product id", () => {
   }, products);
   assert.equal(result.proposedProductId, "manta-30");
 });
+
+test("existing assignment is preserved when catalogue has no compatible replacement", () => {
+  const group = {
+    technology: "SAP",
+    existingWattage: 125,
+    luminaireCategory: "Lanterna",
+    replacementRequirement: "RETROFIT",
+    proposedProductId: "manta-50",
+    projectLedWattage: 50,
+  };
+  const result = reconcileImportedGroupProduct(group, products);
+  assert.equal(result, group);
+  assert.equal(result.proposedProductId, "manta-50");
+  assert.equal(result.projectLedWattage, 50);
+});
