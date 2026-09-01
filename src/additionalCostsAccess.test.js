@@ -54,9 +54,54 @@ test("new agent items receive a neutral internal cost while retaining sales data
   assert.equal(result[0].quantity * result[0].unitSalesPrice, 2400);
 });
 
-test("agent navigation rejects pricing and the full assumptions view", () => {
-  const allowed = new Set(["customer", "additionalCosts", "business", "report"]);
+test("agent can append a project-specific cost without exposing or changing existing internal costs", () => {
+  const existing = [{
+    id: "installation",
+    description: "Installazione",
+    category: "lavoro",
+    costType: "capex",
+    quantity: 1,
+    unit: "forfait",
+    unitCost: 82000,
+    unitSalesPrice: 90000,
+    note: "admin baseline",
+  }];
+
+  const incoming = [
+    {
+      id: "installation",
+      description: "Installazione",
+      category: "lavoro",
+      costType: "capex",
+      quantity: 1,
+      unit: "forfait",
+      unitSalesPrice: 90000,
+      note: "admin baseline",
+    },
+    {
+      id: "agent-extra-work",
+      description: "Opere aggiuntive rilevate dall'agente",
+      category: "opere_civili",
+      costType: "capex",
+      quantity: 2,
+      unit: "pz",
+      unitSalesPrice: 750,
+      note: "Da verificare in sopralluogo",
+    },
+  ];
+
+  const result = sanitizeAgentAdditionalCosts(existing, incoming);
+
+  assert.equal(result.length, 2);
+  assert.equal(result[0].unitCost, 82000);
+  assert.equal(result[1].unitCost, 0);
+  assert.equal(result[1].description, "Opere aggiuntive rilevate dall'agente");
+  assert.equal(result[1].quantity * result[1].unitSalesPrice, 1500);
+});
+
+test("agent navigation allows additional project costs while protecting internal pricing", () => {
+  const allowed = new Set(["customer", "additionalCosts", "assumptions", "business", "report"]);
   assert.equal(isAgentViewAllowed("additionalCosts", allowed), true);
   assert.equal(isAgentViewAllowed("pricing", allowed), false);
-  assert.equal(isAgentViewAllowed("assumptions", allowed), false);
+  assert.equal(isAgentViewAllowed("assumptions", allowed), true);
 });
