@@ -1,3 +1,5 @@
+export const AGENT_ADDITIONAL_COST_MARKUP_PERCENT = 15;
+
 const AGENT_EDITABLE_FIELDS = [
   "id",
   "description",
@@ -5,7 +7,7 @@ const AGENT_EDITABLE_FIELDS = [
   "costType",
   "quantity",
   "unit",
-  "unitSalesPrice",
+  "unitCost",
   "note",
 ];
 
@@ -16,7 +18,19 @@ const copyAgentFields = (item = {}) =>
       .map((key) => [key, item[key]]),
   );
 
-export const sanitizeAgentAdditionalCosts = (existingRows = [], incomingRows = []) => {
+const priceFromSupplierCost = (unitCost, markupPercent = AGENT_ADDITIONAL_COST_MARKUP_PERCENT) => {
+  const cost = Number(unitCost);
+  const markup = Number(markupPercent);
+  if (!Number.isFinite(cost) || cost < 0) return 0;
+  const safeMarkup = Number.isFinite(markup) ? Math.max(0, markup) : AGENT_ADDITIONAL_COST_MARKUP_PERCENT;
+  return Math.round(cost * (1 + safeMarkup / 100) * 100) / 100;
+};
+
+export const sanitizeAgentAdditionalCosts = (
+  existingRows = [],
+  incomingRows = [],
+  markupPercent = AGENT_ADDITIONAL_COST_MARKUP_PERCENT,
+) => {
   const existingById = new Map(
     existingRows.filter((item) => item?.id).map((item) => [item.id, item]),
   );
@@ -27,10 +41,19 @@ export const sanitizeAgentAdditionalCosts = (existingRows = [], incomingRows = [
       : existingRows[index]?.id
         ? undefined
         : existingRows[index];
+    const copied = copyAgentFields(incoming);
+    const nextUnitCost = Object.hasOwn(copied, "unitCost")
+      ? copied.unitCost
+      : existing?.unitCost ?? 0;
+    const supplierCostChanged = !existing || Number(nextUnitCost) !== Number(existing.unitCost ?? 0);
+
     return {
       ...(existing || {}),
-      ...copyAgentFields(incoming),
-      unitCost: existing?.unitCost ?? 0,
+      ...copied,
+      unitCost: nextUnitCost,
+      unitSalesPrice: supplierCostChanged
+        ? priceFromSupplierCost(nextUnitCost, markupPercent)
+        : existing?.unitSalesPrice ?? priceFromSupplierCost(nextUnitCost, markupPercent),
     };
   });
 };
