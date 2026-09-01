@@ -27,9 +27,12 @@ export function reconcileImportedGroupProduct(group, ledProducts = []) {
 
   const candidates = compatibleLedProducts(ledProducts, category, requirement)
     .filter((product) => numberValue(product?.wattage) > 0);
-  if (!candidates.length) {
-    return current ? { ...group, proposedProductId: "" } : group;
-  }
+
+  // Never turn an existing assignment into an empty product just because the
+  // current catalogue has no compatible automatic replacement. Existing
+  // Business Cases must remain usable and the product must be changed manually
+  // when a valid replacement is eventually available.
+  if (!candidates.length) return group;
 
   const target = targetLedWattage(group);
   const selected = [...candidates].sort((a, b) => {
