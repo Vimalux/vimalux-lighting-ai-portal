@@ -2,6 +2,14 @@ import { numberValue } from "./calculations.js";
 
 const positive = (value) => Math.max(0, numberValue(value));
 
+export function isArchivedOpportunity(project) {
+  return Boolean(project?.crm?.archivedAt);
+}
+
+export function activePipelineProjects(projects = []) {
+  return projects.filter((project) => !isArchivedOpportunity(project));
+}
+
 export function normalizeProbability(value) {
   return Math.min(100, positive(value));
 }
@@ -49,7 +57,7 @@ export function crmMetrics(project) {
 }
 
 export function pipelineTotals(projects = []) {
-  return projects.reduce((totals, project) => {
+  return activePipelineProjects(projects).reduce((totals, project) => {
     const row = crmMetrics(project);
     totals.totalContractValue += row.totalContractValue;
     totals.weightedTcv += row.weightedTcv;
@@ -61,8 +69,9 @@ export function pipelineTotals(projects = []) {
 }
 
 export function pipelineStageTotals(projects = [], stages = ["lead", "qualified", "proposal", "negotiation", "closing", "won"]) {
+  const activeProjects = activePipelineProjects(projects);
   return stages.map((stage) => {
-    const rows = projects.map(crmMetrics).filter((row) => row.status === stage);
+    const rows = activeProjects.map(crmMetrics).filter((row) => row.status === stage);
     const count = rows.length;
     return {
       stage,
@@ -75,5 +84,5 @@ export function pipelineStageTotals(projects = [], stages = ["lead", "qualified"
 }
 
 export function probabilityWeightedForecast(projects = []) {
-  return projects.reduce((total, project) => total + crmMetrics(project).weightedTcv, 0);
+  return activePipelineProjects(projects).reduce((total, project) => total + crmMetrics(project).weightedTcv, 0);
 }
