@@ -3,6 +3,7 @@ import { uid } from "./model.js";
 import { normalizeCatalogueProduct } from "./productCatalogue.js";
 import { catalogueWarranty } from "./warranty.js";
 import { mergeCatalogueProducts, readProductCatalogueWorkbook } from "./catalogueImport.js";
+import ProcurementPanel from "./ProcurementPanel.jsx";
 
 const CATEGORIES = ["STREET", "URBAN", "GLOBO", "FLOODLIGHT", "UPLIGHT", "LANTERN", "RETROFIT_KIT", "OTHER"];
 const STRATEGIES = ["REPLACE", "RETROFIT", "EITHER"];
@@ -65,6 +66,8 @@ export default function CatalogueExtended({ p, update }) {
     {
       id: `led-${uid()}`,
       brand: "",
+      supplier: "",
+      supplierSku: "",
       name: it ? "Nuovo prodotto LED" : "New LED product",
       model: it ? "Nuovo prodotto LED" : "New LED product",
       productCategory: "STREET",
@@ -90,7 +93,7 @@ export default function CatalogueExtended({ p, update }) {
 
   const addSmart = () => update(["catalogue", "smart"], [
     ...(p.catalogue?.smart || []),
-    { id: `smart-${uid()}`, brand: "", name: it ? "Nuovo prodotto Smart" : "New Smart product", type: "LCU", costPrice: 0, salesPrice: 0, implementationCost: 0, implementationSalesPrice: 0, annualCost: 0, annualSalesPrice: 0, active: true },
+    { id: `smart-${uid()}`, brand: "", supplier: "", supplierSku: "", name: it ? "Nuovo prodotto Smart" : "New Smart product", type: "LCU", costPrice: 0, salesPrice: 0, implementationCost: 0, implementationSalesPrice: 0, annualCost: 0, annualSalesPrice: 0, active: true },
   ]);
 
   const remove = (kind, index) => {
@@ -108,8 +111,8 @@ export default function CatalogueExtended({ p, update }) {
         <div>
           <h2>{it ? "Armature LED e Retrofit" : "LED luminaires & Retrofit"}</h2>
           <p className="hint">{it
-            ? "Master catalogo Intelligence. Categoria, compatibilità, strategia, codice CCT/CRI, prestazioni, prezzi e capability Smart vengono usati nel Business Case; ottiche, interfaccia, colore e codice variante definitivo vengono configurati in Planner."
-            : "Intelligence master catalogue. Category, compatibility, strategy, CCT/CRI performance code, performance, pricing and Smart capabilities are used in the Business Case; optics, interface, colour and final variant code are configured in Planner."}</p>
+            ? "Master catalogo Intelligence. Brand e fornitore restano separati: il brand identifica il prodotto, il fornitore alimenta la lista acquisti del progetto."
+            : "Intelligence master catalogue. Brand and supplier remain separate: brand identifies the product, supplier feeds the project procurement list."}</p>
         </div>
         <div className="import-actions">
           <label className="file-button"><input type="file" accept=".xlsx" disabled={importing} onChange={(e) => { importCatalogue(e.target.files?.[0]); e.target.value = ""; }} />{importing ? (it ? "Importazione..." : "Importing...") : (it ? "Importa catalogo Excel" : "Import Excel catalogue")}</label>
@@ -126,6 +129,8 @@ export default function CatalogueExtended({ p, update }) {
       </div>
       <div className="table-scroll catalogue-main-table"><table><thead><tr>{[
         "Brand",
+        it ? "Fornitore" : "Supplier",
+        "Supplier SKU",
         it ? "Prodotto / Modello" : "Product / Model",
         it ? "Categoria" : "Category",
         it ? "Compatibile con" : "Compatible with",
@@ -144,6 +149,8 @@ export default function CatalogueExtended({ p, update }) {
         return <React.Fragment key={product.id || index}>
           <tr>
             <td><input value={source.brand || ""} onChange={(e) => setLed(index, "brand", e.target.value)} /></td>
+            <td><input value={source.supplier || ""} onChange={(e) => setLed(index, "supplier", e.target.value)} placeholder={it ? "Fornitore" : "Supplier"} /></td>
+            <td><input value={source.supplierSku || ""} onChange={(e) => setLed(index, "supplierSku", e.target.value)} /></td>
             <td><input value={source.model || source.name || ""} onChange={(e) => setModel(index, e.target.value)} /></td>
             <td><select value={product.productCategory} onChange={(e) => setLed(index, "productCategory", e.target.value)}>{CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select></td>
             <td><input value={asListText(source.compatibleExistingCategories)} placeholder="STREET, URBAN" onChange={(e) => setLed(index, "compatibleExistingCategories", parseList(e.target.value))} /></td>
@@ -157,14 +164,16 @@ export default function CatalogueExtended({ p, update }) {
             <td><button className="secondary" onClick={() => setExpanded((current) => ({ ...current, [product.id || index]: !current[product.id || index] }))}>{expanded[product.id || index] ? (it ? "Chiudi" : "Close") : (it ? "Dettagli" : "Details")}</button></td>
             <td><button className="danger" onClick={() => remove("led", index)}>{it ? "Elimina" : "Delete"}</button></td>
           </tr>
-          {expanded[product.id || index] && <tr className="catalogue-tech-row"><td colSpan="13"><TechnicalDetails product={normalizeCatalogueProduct(source)} index={index} update={update} it={it} /></td></tr>}
+          {expanded[product.id || index] && <tr className="catalogue-tech-row"><td colSpan="15"><TechnicalDetails product={normalizeCatalogueProduct(source)} index={index} update={update} it={it} /></td></tr>}
         </React.Fragment>;
       })}</tbody></table></div>
     </section>
 
     <section className="card">
       <div className="catalogue-title-row"><div><h2>Smart Lighting</h2><p className="hint">LCU, Gateway, Antenna, Energy Meter e relativi costi/OPEX.</p></div><button className="primary" onClick={addSmart}>+ {it ? "Nuovo prodotto Smart" : "New Smart product"}</button></div>
-      <div className="table-scroll"><table><thead><tr>{["Brand", it ? "Prodotto" : "Product", it ? "Tipo" : "Type", it ? "Costo" : "Cost", it ? "Prezzo standard" : "Standard sales", it ? "Costo implementazione" : "Implementation cost", it ? "Prezzo implementazione" : "Implementation sales", it ? "Costo annuo" : "Annual cost", it ? "Prezzo annuo cliente" : "Annual customer sales", it ? "Attivo" : "Active", ""].map((x) => <th key={x}>{x}</th>)}</tr></thead><tbody>{(p.catalogue?.smart || []).map((x, i) => <tr key={x.id}><td><input value={x.brand || ""} onChange={(e) => update(["catalogue", "smart", i, "brand"], e.target.value)} /></td><td><input value={x.name || ""} onChange={(e) => update(["catalogue", "smart", i, "name"], e.target.value)} /></td><td><select value={x.type} onChange={(e) => update(["catalogue", "smart", i, "type"], e.target.value)}>{["LCU", "Gateway", "Antenna", "Energy Meter", "Other"].map((type) => <option key={type} value={type}>{type}</option>)}</select></td><td><NumericField value={x.costPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "costPrice"], v)} /></td><td><NumericField value={x.salesPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "salesPrice"], v)} /></td><td><NumericField value={x.implementationCost || 0} onChange={(v) => update(["catalogue", "smart", i, "implementationCost"], v)} /></td><td><NumericField value={x.implementationSalesPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "implementationSalesPrice"], v)} /></td><td><NumericField value={x.annualCost || 0} onChange={(v) => update(["catalogue", "smart", i, "annualCost"], v)} /></td><td><NumericField value={x.annualSalesPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "annualSalesPrice"], v)} /></td><td><input type="checkbox" checked={x.active !== false} onChange={(e) => update(["catalogue", "smart", i, "active"], e.target.checked)} /></td><td><button className="danger" onClick={() => remove("smart", i)}>{it ? "Elimina" : "Delete"}</button></td></tr>)}</tbody></table></div>
+      <div className="table-scroll"><table><thead><tr>{["Brand", it ? "Fornitore" : "Supplier", "Supplier SKU", it ? "Prodotto" : "Product", it ? "Tipo" : "Type", it ? "Costo" : "Cost", it ? "Prezzo standard" : "Standard sales", it ? "Costo implementazione" : "Implementation cost", it ? "Prezzo implementazione" : "Implementation sales", it ? "Costo annuo" : "Annual cost", it ? "Prezzo annuo cliente" : "Annual customer sales", it ? "Attivo" : "Active", ""].map((x) => <th key={x}>{x}</th>)}</tr></thead><tbody>{(p.catalogue?.smart || []).map((x, i) => <tr key={x.id}><td><input value={x.brand || ""} onChange={(e) => update(["catalogue", "smart", i, "brand"], e.target.value)} /></td><td><input value={x.supplier || ""} onChange={(e) => update(["catalogue", "smart", i, "supplier"], e.target.value)} /></td><td><input value={x.supplierSku || ""} onChange={(e) => update(["catalogue", "smart", i, "supplierSku"], e.target.value)} /></td><td><input value={x.name || ""} onChange={(e) => update(["catalogue", "smart", i, "name"], e.target.value)} /></td><td><select value={x.type} onChange={(e) => update(["catalogue", "smart", i, "type"], e.target.value)}>{["LCU", "Gateway", "Antenna", "Energy Meter", "Other"].map((type) => <option key={type} value={type}>{type}</option>)}</select></td><td><NumericField value={x.costPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "costPrice"], v)} /></td><td><NumericField value={x.salesPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "salesPrice"], v)} /></td><td><NumericField value={x.implementationCost || 0} onChange={(v) => update(["catalogue", "smart", i, "implementationCost"], v)} /></td><td><NumericField value={x.implementationSalesPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "implementationSalesPrice"], v)} /></td><td><NumericField value={x.annualCost || 0} onChange={(v) => update(["catalogue", "smart", i, "annualCost"], v)} /></td><td><NumericField value={x.annualSalesPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "annualSalesPrice"], v)} /></td><td><input type="checkbox" checked={x.active !== false} onChange={(e) => update(["catalogue", "smart", i, "active"], e.target.checked)} /></td><td><button className="danger" onClick={() => remove("smart", i)}>{it ? "Elimina" : "Delete"}</button></td></tr>)}</tbody></table></div>
     </section>
+
+    <ProcurementPanel p={p} update={update} />
   </>;
 }
