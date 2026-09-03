@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { projectFromBusinessCaseRow } from "./businessCaseTransport.js";
 import { isStableCloudId, persistIntelligenceProject } from "./businessCasePersistence.js";
+import { activeIntelligenceProjects, isArchivedProject } from "./projectVisibility.js";
 import {
   createOrGetBusinessCaseForOpportunity,
   lookupBusinessCaseForOpportunity,
@@ -34,12 +35,13 @@ export async function loadCloudState(localProjects, includeLocalProjects = true)
   if (projectError) throw projectError;
   if (catalogueError) throw catalogueError;
   const masterCatalogue = catalogue ? { led: catalogue.led || [], smart: catalogue.smart || [] } : null;
-  const cloudProjects = (projectRows || []).map((row) => {
+  const cloudProjects = activeIntelligenceProjects((projectRows || []).map((row) => {
     const project = projectFromBusinessCaseRow(row);
     return masterCatalogue ? { ...project, catalogue: masterCatalogue } : project;
-  });
+  }));
   if (!includeLocalProjects) return cloudProjects;
   const pendingImports = (localProjects || []).filter((item) =>
+    !isArchivedProject(item) &&
     !isStableCloudId(item?.id) &&
     (item?.importedTechnical || item?.importedCommercial) &&
     !cloudProjects.some((cloud) => cloud.id === item.id)
@@ -71,7 +73,9 @@ export async function deleteCloudProject(projectId) {
 export async function loadBusinessCase(caseId) {
   const { data, error } = await supabase.rpc("get_business_case_v2", { case_id: caseId });
   if (error) throw error;
-  return data?.[0] ? projectFromBusinessCaseRow(data[0]) : null;
+  if (!data?.[0]) return null;
+  const project = projectFromBusinessCaseRow(data[0]);
+  return isArchivedProject(project) ? null : project;
 }
 
 export async function getLinkedBusinessCaseId(opportunityId) {
