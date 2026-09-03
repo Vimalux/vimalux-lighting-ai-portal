@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { crmMetrics, formatProbabilityPoints, pipelineStageTotals, pipelineTotals } from "./crm.js";
+import { crmMetrics, formatProbabilityPoints, isArchivedOpportunity, pipelineStageTotals, pipelineTotals } from "./crm.js";
 import { buildPlannerHandoff, canCreatePlannerProject, canonicalOpportunityFromProject } from "./opportunity.js";
 import { parseOpportunityWorkbook, validateOpportunity } from "./opportunityImport.js";
 import { readLightingWorkbook } from "./lightingImport.js";
@@ -14,6 +14,35 @@ const Field = ({ label, value, onChange, children, type = "text", disabled = fal
 );
 const Kpi = ({ label, value }) => <div className="kpi"><span>{label}</span><strong>{value}</strong></div>;
 const Card = ({ title, children, className = "" }) => <section className={`card ${className}`}><h2>{title}</h2>{children}</section>;
+
+const ARCHIVE_REASONS = [
+  ["not_relevant", "Non rilevante / Not relevant"],
+  ["municipality_not_interested", "Comune non interessato / Municipality not interested"],
+  ["lost_to_competitor", "Perso a concorrente / Lost to competitor"],
+  ["duplicate", "Duplicato / Duplicate"],
+  ["created_by_mistake", "Creato per errore / Created by mistake"],
+  ["on_hold", "Rinviato / In attesa / On hold"],
+  ["other", "Altro / Other"],
+];
+
+function ArchiveModal({ close, apply, projectName }) {
+  const [reasonCode, setReasonCode] = useState("");
+  const [reason, setReason] = useState("");
+  const selectedLabel = ARCHIVE_REASONS.find(([code]) => code === reasonCode)?.[1] || "";
+  const valid = Boolean(reasonCode && (reasonCode !== "other" || reason.trim()));
+  return <div className="modal-backdrop" role="dialog" aria-modal="true"><section className="import-modal crm-import-modal">
+    <div className="modal-head"><div><h2>Archivia Opportunity</h2><p>{projectName}</p></div><button onClick={close} aria-label="Close">×</button></div>
+    <div className="form-grid">
+      <Field label="Motivo / Reason" value={reasonCode} onChange={setReasonCode}>
+        <option value="">Seleziona / Select</option>
+        {ARCHIVE_REASONS.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+      </Field>
+      <Field label="Nota / Note" value={reason} onChange={setReason} />
+    </div>
+    <p className="muted">L’archiviazione non elimina il progetto, il Business Case, i dati Intelligence o la cronologia. / Archiving does not delete the project, Business Case, Intelligence data or history.</p>
+    <div className="modal-actions"><button className="secondary" onClick={close}>Annulla / Cancel</button><button className="primary" disabled={!valid} onClick={() => apply({ reasonCode, reason: reason.trim() || selectedLabel })}>Archivia / Archive</button></div>
+  </section></div>;
+}
 
 function ImportModal({ close, apply, currentUser }) {
   const [source, setSource] = useState("agent");
@@ -51,6 +80,7 @@ function ImportModal({ close, apply, currentUser }) {
 
 export default function CrmOpportunity({ projects, active, update, money, onImport, onManual, setView, currentUser, getLinkedBusinessCaseId, createOrOpenBusinessCase, onBusinessCaseLinked }) {
   const [importOpen, setImportOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [linkedCaseId, setLinkedCaseId] = useState(() => existingBusinessCaseRecordId(active));
   const [businessCaseBusy, setBusinessCaseBusy] = useState(false);
   const [businessCaseError, setBusinessCaseError] = useState("");
@@ -58,6 +88,7 @@ export default function CrmOpportunity({ projects, active, update, money, onImpo
   const stages = pipelineStageTotals(projects);
   const row = crmMetrics(active);
   const canonical = useMemo(() => canonicalOpportunityFromProject(active), [active]);
+  const archived = isArchivedOpportunity(active);
   const bc = active.crm?.businessCase || {};
   const probability = (value) => formatProbabilityPoints(value, active.language);
   const opportunityId = canonical.opportunity.opportunityId || active.id;
@@ -99,19 +130,33 @@ export default function CrmOpportunity({ projects, active, update, money, onImpo
       setBusinessCaseBusy(false);
     }
   };
+  const archiveOpportunity = ({ reasonCode, reason }) => {
+    const now = new Date().toISOString();
+    update(["crm"], {
+      ...(active.crm || {}),
+      archivedAt: now,
+      archivedBy: currentUser || "",
+      archiveReasonCode: reasonCode,
+      archiveReason: reason,
+      archiveStatusBefore: active.crm?.status || "lead",
+    });
+    setArchiveOpen(false);
+  };
   return <>
     <div className="crm-toolbar"><button className="primary" onClick={() => setImportOpen(true)}>New Opportunity · Import Data</button><button onClick={onManual}>Enter manually</button></div>
     <div className="kpis"><Kpi label="Total TCV" value={money(totals.totalContractValue)} /><Kpi label="Weighted TCV" value={money(totals.weightedTcv)} /><Kpi label="ARR" value={money(totals.annualRecurringRevenue)} /><Kpi label="Weighted ARR" value={money(totals.weightedArr)} /></div>
     <div className="cards-grid">{stages.map((stage) => <Card title={stage.stage[0].toUpperCase() + stage.stage.slice(1)} key={stage.stage}><div className="breakdown"><div><span>Opportunities</span><span></span><strong>{stage.count}</strong></div><div><span>Average probability</span><span></span><strong>{probability(stage.averageProbability)}</strong></div><div><span>TCV</span><span></span><strong>{money(stage.totalContractValue)}</strong></div><div><span>Weighted TCV</span><span></span><strong>{money(stage.weightedTcv)}</strong></div></div></Card>)}</div>
+    {archived && <div className="sync-error" role="status"><strong>Archived</strong> · {active.crm?.archiveReason || "—"}{active.crm?.archivedBy ? ` · ${active.crm.archivedBy}` : ""}{active.crm?.archivedAt ? ` · ${new Date(active.crm.archivedAt).toLocaleString()}` : ""}</div>}
     <Card title={`Opportunity · ${canonical.opportunity.projectName}`} className="opportunity-detail">
       <div className="opportunity-section"><h3>A. Customer</h3><div className="form-grid"><Field label="Customer ID" value={canonical.customer.customerId} onChange={(v) => update(["crm", "customerId"], v)} /><Field label="Municipality" value={canonical.customer.municipalityName} onChange={(v) => update(["customer", "name"], v)} /><Field label="Province" value={canonical.customer.province} onChange={(v) => update(["customer", "province"], v)} /><Field label="Region" value={canonical.customer.region} onChange={(v) => update(["customer", "region"], v)} /><Field label="Contact" value={canonical.contact.name} onChange={(v) => update(["customer", "contact"], v)} /><Field label="Agent" value={canonical.source.agentName} onChange={(v) => update(["crm", "agentName"], v)} /><Field label="Lead source" value={canonical.source.source} onChange={(v) => update(["crm", "source"], v)} /></div></div>
       <div className="opportunity-section"><h3>B. Pipeline</h3><div className="form-grid"><Field label="Opportunity ID" value={canonical.opportunity.opportunityId} onChange={(v) => update(["crm", "opportunityId"], v)} /><Field label="Stage" value={row.status} onChange={(v) => update(["crm", "status"], v)}><option value="lead">Lead</option><option value="qualified">Qualified</option><option value="proposal">Proposal</option><option value="negotiation">Negotiation</option><option value="closing">Closing</option><option value="won">Won</option><option value="lost">Lost</option></Field><Field label="Probability (%)" value={row.probability} onChange={(v) => update(["crm", "closingProbability"], v)} /><Field label="Expected close" type="date" value={canonical.opportunity.expectedCloseDate} onChange={(v) => update(["crm", "expectedCloseDate"], v)} /><Field label="GO status" value={canonical.opportunity.goStatus} onChange={(v) => update(["crm", "goStatus"], v)}><option value="">Not calculated</option><option value="GO">GO</option><option value="REVIEW">REVIEW</option><option value="NO_GO">NO-GO</option></Field><Field label="Notes" value={canonical.opportunity.notes} onChange={(v) => update(["crm", "notes"], v)} /></div></div>
       <div className="opportunity-section"><h3>C. Preliminary Project Data</h3><div className="detail-grid"><span>Luminaires<strong>{canonical.assumptions.totalLuminaires}</strong></span><span>Existing technology<strong>{canonical.assumptions.existingTechnology || "—"}</strong></span><span>Average watt<strong>{canonical.assumptions.averageExistingWatt.toFixed(1)} W</strong></span><span>Annual hours<strong>{canonical.assumptions.annualOperatingHours}</strong></span><span>Energy price<strong>{canonical.assumptions.energyPrice}</strong></span><span>Dimming<strong>{canonical.assumptions.existingDimmingProfile} · {canonical.assumptions.existingDimmingPct}%</strong></span><span>Smart / CMS / PowerAiD<strong>{canonical.assumptions.smartLightingEnabled ? "Yes" : "No"} / {canonical.assumptions.cmsEnabled ? "Yes" : "No"} / {canonical.assumptions.powerAidEnabled ? "Yes" : "No"}</strong></span></div></div>
       <div className="opportunity-section"><h3>D. Commercial Structure</h3><div className="detail-grid"><span>Model<strong>{canonical.commercial.financingModel}</strong></span><span>Financing Period<strong>{canonical.commercial.financingPeriodYears} years</strong></span><span>Service Agreement Period<strong>{canonical.commercial.serviceAgreementPeriodYears} years</strong></span><span>Analysis Period<strong>{canonical.commercial.analysisPeriodYears} years</strong></span></div></div>
       <div className="opportunity-section"><h3>E. Preliminary Business Case</h3><p className="muted">{bc.calculatedAt ? `Business Case updated: ${new Date(bc.calculatedAt).toLocaleString()}` : "Business Case has not yet been calculated."}</p><div className="detail-grid"><span>CAPEX<strong>{money(bc.capex || 0)}</strong></span><span>Annual OPEX<strong>{money(bc.annualOpex || 0)}</strong></span><span>Customer payment annual / monthly<strong>{money(bc.annualCustomerPayment || 0)} / {money(bc.monthlyCustomerPayment || 0)}</strong></span><span>TCV<strong>{money(bc.tcv || 0)}</strong></span><span>ARR / MRR<strong>{money(bc.arr || 0)} / {money(bc.mrr || 0)}</strong></span><span>Annual net benefit<strong>{money(bc.annualCustomerNetBenefit || 0)}</strong></span><span>Payback<strong>{bc.paybackYears == null ? "—" : `${Number(bc.paybackYears).toFixed(1)} years`}</strong></span><span>NPV / lifecycle<strong>{money(bc.npv || 0)} / {money(bc.lifecycleResult || 0)}</strong></span><span>Energy / CO₂<strong>{Number(bc.energyReductionPct || 0).toFixed(1)}% / {Number(bc.co2ReductionTons || 0).toFixed(1)} t</strong></span><span>Smart nodes<strong>{bc.smartNodeCount || 0}</strong></span><span>DATEK ARR / contract value<strong>{money(bc.datekArr || 0)} / {money(bc.datekContractValue || 0)}</strong></span><span>PowerAiD fee / supplier / margin<strong>{money(bc.powerAidCustomerFee || 0)} / {money(bc.powerAidSupplierCost || 0)} / {money(bc.powerAidVimaluxMargin || 0)}</strong></span></div></div>
-      <div className="opportunity-section"><h3>F. Actions</h3>{businessCaseError && <div className="sync-error" role="alert">{businessCaseError}</div>}<div className="crm-toolbar"><button onClick={() => setView("customer")}>Edit Opportunity</button><button className="primary" onClick={openBusinessCase} disabled={businessCaseBusy}>{businessCaseBusy ? "…" : businessCaseActionLabel(Boolean(linkedCaseId), active.language)}</button><button onClick={() => setView("report")} disabled={!bc.calculatedAt}>Generate Report</button><button disabled={!plannerReady} title={!plannerReady ? "Requires GO and a calculated Preliminary Business Case" : "Ready for Planner handoff"} onClick={() => update(["crm", "plannerHandoff"], buildPlannerHandoff(active))}>Create Planner Project</button></div></div>
+      <div className="opportunity-section"><h3>F. Actions</h3>{businessCaseError && <div className="sync-error" role="alert">{businessCaseError}</div>}<div className="crm-toolbar"><button onClick={() => setView("customer")}>Edit Opportunity</button><button className="primary" onClick={openBusinessCase} disabled={businessCaseBusy}>{businessCaseBusy ? "…" : businessCaseActionLabel(Boolean(linkedCaseId), active.language)}</button><button onClick={() => setView("report")} disabled={!bc.calculatedAt}>Generate Report</button><button disabled={!plannerReady || archived} title={archived ? "Archived opportunities cannot be handed off to Planner" : !plannerReady ? "Requires GO and a calculated Preliminary Business Case" : "Ready for Planner handoff"} onClick={() => update(["crm", "plannerHandoff"], buildPlannerHandoff(active))}>Create Planner Project</button>{!archived && <button className="danger" onClick={() => setArchiveOpen(true)}>Archivia / Archive</button>}</div></div>
     </Card>
     <Card title="Import History / Audit"><div className="preview-table"><table><thead><tr><th>Timestamp</th><th>File</th><th>Source</th><th>Imported by</th><th>Created</th><th>Updated</th><th>Skipped</th><th>Errors</th></tr></thead><tbody>{history.length ? history.map((item) => <tr key={item.id}><td>{new Date(item.timestamp).toLocaleString()}</td><td>{item.fileName}</td><td>{item.sourceFormat} · {item.templateVersion}</td><td>{item.importedBy || "—"}</td><td>{item.created}</td><td>{item.updated}</td><td>{item.skipped}</td><td>{item.errors}</td></tr>) : <tr><td colSpan="8">No imports recorded yet.</td></tr>}</tbody></table></div></Card>
     {importOpen && <ImportModal close={() => setImportOpen(false)} currentUser={currentUser} apply={(parsed, meta) => { onImport(parsed, meta); setImportOpen(false); }} />}
+    {archiveOpen && <ArchiveModal close={() => setArchiveOpen(false)} projectName={canonical.opportunity.projectName} apply={archiveOpportunity} />}
   </>;
 }
