@@ -26,18 +26,32 @@ test("procurement groups selected LED, smart hardware and project costs without 
   assert.deepEqual(project, before);
 });
 
-test("project supplier assignment overrides catalogue supplier only inside procurement", () => {
+test("catalogue supplier remains authoritative even if legacy project assignments exist", () => {
   const project = {
     language: "it",
     groups: [{ quantity: 2, proposedProductId: "led-1", upgradeSelected: true }],
     catalogue: { led: [{ id: "led-1", supplier: "Default Supplier", model: "Lamp", costPrice: 10 }], smart: [] },
     solution: { smartEnabled: false },
-    procurement: { assignments: { "led:led-1:0": "Project Supplier" } },
+    procurement: { assignments: { "led:led-1:0": "Legacy Project Supplier" } },
   };
   const groups = groupProcurementBySupplier(project);
   assert.equal(groups.length, 1);
-  assert.equal(groups[0].supplier, "Project Supplier");
+  assert.equal(groups[0].supplier, "Default Supplier");
   assert.equal(groups[0].totalCost, 20);
+});
+
+test("smart supplier is inherited directly from the master catalogue", () => {
+  const project = {
+    language: "it",
+    groups: [{ quantity: 12, proposedProductId: "led-1", upgradeSelected: true }],
+    catalogue: {
+      led: [{ id: "led-1", supplier: "LampCo", model: "Lamp", costPrice: 10 }],
+      smart: [{ id: "lcu", supplier: "DATEK", name: "LCU", costPrice: 2 }],
+    },
+    solution: { smartEnabled: true, lcuProductId: "lcu" },
+  };
+  const rows = buildProcurementRows(project);
+  assert.equal(rows.find((row) => row.source === "LCU")?.supplier, "DATEK");
 });
 
 test("unassigned supplier remains visible instead of deleting procurement rows", () => {

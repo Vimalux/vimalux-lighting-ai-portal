@@ -10,17 +10,15 @@ export function buildProcurementRows(project = {}) {
   const rows = [];
   const ledById = new Map((project.catalogue?.led || []).map((item) => [String(item.id), item]));
   const smartById = new Map((project.catalogue?.smart || []).map((item) => [String(item.id), item]));
-  const assignments = project.procurement?.assignments || {};
 
   const push = (row) => {
     const quantity = numberValue(row.quantity);
     if (!(quantity > 0)) return;
     const key = String(row.key);
-    const supplier = text(assignments[key]) || text(row.supplier);
     rows.push({
       ...row,
       key,
-      supplier,
+      supplier: text(row.supplier),
       quantity,
       unitCost: numberValue(row.unitCost),
       totalCost: quantity * numberValue(row.unitCost),
