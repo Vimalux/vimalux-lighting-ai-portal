@@ -1,0 +1,39 @@
+name: Patch internal report freight presentation
+
+on:
+  push:
+    branches:
+      - fix/internal-report-freight-formatting
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/internal-report-freight-formatting
+      - name: Apply narrow source patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/App.jsx')
+          text = path.read_text()
+          old = 'const costs = [[it ? "Costo prodotti e implementazione" : "Products and implementation",r.capexDirectCost],[it ? "OPEX del contratto" : "Contract OPEX",r.contractOpexCost]'
+          new = 'const costs = [[it ? "Costo prodotti e implementazione" : "Products and implementation",Math.max(0,r.capexDirectCost-r.freightCost)],[it ? "Trasporto / logistica" : "Freight / logistics",r.freightCost],[it ? "OPEX del contratto" : "Contract OPEX",r.contractOpexCost]'
+          if old not in text:
+              raise SystemExit('Expected InternalReport cost sequence not found')
+          text = text.replace(old, new, 1)
+          path.write_text(text)
+          PY
+          rm .github/workflows/patch-internal-report-freight.yml
+      - name: Commit source-only result
+        run: |
+          git config user.name "VIMALUX automation"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          git add src/App.jsx .github/workflows/patch-internal-report-freight.yml
+          git commit -m "Show freight separately in internal project P&L"
+          git push origin HEAD:fix/internal-report-freight-formatting
