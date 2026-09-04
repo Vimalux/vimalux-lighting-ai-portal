@@ -12,6 +12,7 @@ function generateSupplierOrderPdf(group, p, it) {
   const businessCase = p.project?.businessCaseId || p.project?.business_case_id || "";
   const locale = it ? "it-IT" : "en-GB";
   const money = new Intl.NumberFormat(locale, { style: "currency", currency, minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const quantity = new Intl.NumberFormat(locale, { useGrouping: true, minimumFractionDigits: 0, maximumFractionDigits: 2 });
   const date = new Intl.DateTimeFormat(locale, { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
   doc.setFont("helvetica", "bold");
@@ -40,7 +41,7 @@ function generateSupplierOrderPdf(group, p, it) {
     body: group.items.map((item) => [
       item.description,
       item.supplierSku || "-",
-      String(item.quantity),
+      quantity.format(item.quantity),
       item.unit || "pz",
       money.format(item.unitCost),
       money.format(item.totalCost),
@@ -99,7 +100,9 @@ function ProcurementPanelContent({ p }) {
   const it = p.language === "it";
   const groups = useMemo(() => groupProcurementBySupplier(p), [p]);
   const currency = p.project?.currency || "EUR";
-  const money = new Intl.NumberFormat(it ? "it-IT" : "en-GB", { style: "currency", currency, maximumFractionDigits: 2 });
+  const locale = it ? "it-IT" : "en-GB";
+  const money = new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 2 });
+  const quantity = new Intl.NumberFormat(locale, { useGrouping: true, minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
   return <section className="card" style={{ marginTop: 20 }}>
     <div className="catalogue-title-row">
@@ -112,13 +115,13 @@ function ProcurementPanelContent({ p }) {
     </div>
     {!groups.length ? <p className="hint">{it ? "Nessuna voce di acquisto rilevata nel progetto attivo." : "No procurement items detected in the active project."}</p> : groups.map((group) => <div key={group.supplier} style={{ border: "1px solid var(--border, #d8e0ea)", borderRadius: 10, padding: 14, marginTop: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 10 }}>
-        <div><strong>{group.supplier}</strong><div className="hint">{group.items.length} {it ? "voci" : "items"} · {money.format(group.totalCost)}</div></div>
+        <div><strong>{group.supplier}</strong><div className="hint">{quantity.format(group.items.length)} {it ? "voci" : "items"} · {money.format(group.totalCost)}</div></div>
         {group.assigned && <button type="button" className="secondary" onClick={() => generateSupplierOrderPdf(group, p, it)}>{it ? "Genera ordine PDF" : "Generate PDF order"}</button>}
       </div>
       <div className="table-scroll"><table><thead><tr>
         <th>{it ? "Fonte" : "Source"}</th><th>Brand</th><th>{it ? "Prodotto / lavoro" : "Product / work"}</th><th>SKU</th><th>{it ? "Quantità" : "Quantity"}</th><th>{it ? "Unità" : "Unit"}</th><th>{it ? "Costo unitario" : "Unit cost"}</th><th>{it ? "Totale" : "Total"}</th><th>{it ? "Fornitore" : "Supplier"}</th>
       </tr></thead><tbody>{group.items.map((item) => <tr key={item.key}>
-        <td>{item.source}</td><td>{item.brand || "—"}</td><td>{item.description}</td><td>{item.supplierSku || "—"}</td><td>{item.quantity}</td><td>{item.unit}</td><td>{money.format(item.unitCost)}</td><td>{money.format(item.totalCost)}</td><td>{item.supplier || (it ? "Non assegnato" : "Unassigned")}</td>
+        <td>{item.source}</td><td>{item.brand || "—"}</td><td>{item.description}</td><td>{item.supplierSku || "—"}</td><td>{quantity.format(item.quantity)}</td><td>{item.unit}</td><td>{money.format(item.unitCost)}</td><td>{money.format(item.totalCost)}</td><td>{item.supplier || (it ? "Non assegnato" : "Unassigned")}</td>
       </tr>)}</tbody></table></div>
     </div>)}
   </section>;
