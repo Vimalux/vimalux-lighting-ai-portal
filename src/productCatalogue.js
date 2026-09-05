@@ -54,6 +54,7 @@ export function normalizeCatalogueProduct(product = {}) {
   const replacementStrategies = asArray(product.replacementStrategies || product.replacementStrategy)
     .map(normalizeReplacementStrategy)
     .filter((value, index, all) => value && value !== "UNKNOWN" && all.indexOf(value) === index);
+  const hybrid = Boolean(product.hybrid);
   return {
     ...product,
     model: product.model || product.name || "",
@@ -72,7 +73,7 @@ export function normalizeCatalogueProduct(product = {}) {
     d4iDriver: Boolean(product.d4iDriver),
     photometryUrl: product.photometryUrl || "",
     techSheetUrl: product.techSheetUrl || product.certsTechSheetUrl || "",
-    hybrid: Boolean(product.hybrid),
+    hybrid,
     pvWp: Math.max(0, numeric(product.pvWp)),
     batteryWh: Math.max(0, numeric(product.batteryWh)),
     usableBatteryWh: Math.max(0, numeric(product.usableBatteryWh)),
@@ -80,7 +81,7 @@ export function normalizeCatalogueProduct(product = {}) {
     weightKg: Math.max(0, numeric(product.weightKg)),
     pvEfficiencyPercent: Math.max(0, numeric(product.pvEfficiencyPercent)),
     batteryRoundtripEfficiencyPercent: Math.max(0, numeric(product.batteryRoundtripEfficiencyPercent || 90)),
-    mppt: Boolean(product.mppt),
+    mppt: hybrid ? true : Boolean(product.mppt),
   };
 }
 
