@@ -4,6 +4,7 @@ import { normalizeCatalogueProduct } from "./productCatalogue.js";
 import { catalogueWarranty } from "./warranty.js";
 import { mergeCatalogueProducts, readProductCatalogueWorkbook } from "./catalogueImport.js";
 import ProcurementPanel from "./ProcurementPanel.jsx";
+import HybridSummary from "./HybridSummary.jsx";
 
 const CATEGORIES = ["STREET", "URBAN", "GLOBO", "FLOODLIGHT", "UPLIGHT", "LANTERN", "RETROFIT_KIT", "OTHER"];
 const STRATEGIES = ["REPLACE", "RETROFIT", "EITHER"];
@@ -30,6 +31,18 @@ function TechnicalDetails({ product, index, update, it }) {
     <label className="catalogue-checkbox"><span>{it ? "Compatibile D4i" : "D4i capable"}</span><input type="checkbox" checked={yesNo(product.d4iDriver)} onChange={(e) => set("d4iDriver", e.target.checked)} /></label>
     <label className="catalogue-url"><span>{it ? "Riferimento fotometria / Planner" : "Photometry / Planner reference"}</span><input value={product.photometryUrl || ""} onChange={(e) => set("photometryUrl", e.target.value)} /></label>
     <label className="catalogue-url"><span>{it ? "Scheda tecnica / certificati URL" : "Tech sheet / certs URL"}</span><input value={product.techSheetUrl || ""} onChange={(e) => set("techSheetUrl", e.target.value)} /></label>
+    <label className="catalogue-checkbox"><span>{it ? "Apparecchio ibrido" : "Hybrid luminaire"}</span><input type="checkbox" checked={yesNo(product.hybrid)} onChange={(e) => set("hybrid", e.target.checked)} /></label>
+    {product.hybrid && <>
+      <label><span>PV (Wp)</span><NumericField value={product.pvWp || 0} onChange={(v) => set("pvWp", v)} /></label>
+      <label><span>{it ? "Batteria (Wh)" : "Battery (Wh)"}</span><NumericField value={product.batteryWh || 0} onChange={(v) => set("batteryWh", v)} /></label>
+      <label><span>{it ? "Batteria utilizzabile (Wh)" : "Usable battery (Wh)"}</span><NumericField value={product.usableBatteryWh || 0} onChange={(v) => set("usableBatteryWh", v)} /></label>
+      <label><span>{it ? "Potenza modalità solare (W)" : "Solar mode power (W)"}</span><NumericField value={product.solarModeW || 0} onChange={(v) => set("solarModeW", v)} /></label>
+      <label><span>{it ? "Peso installato (kg)" : "Installed weight (kg)"}</span><NumericField value={product.weightKg || 0} onChange={(v) => set("weightKg", v)} /></label>
+      <label><span>{it ? "Efficienza pannello (%)" : "Panel efficiency (%)"}</span><NumericField value={product.pvEfficiencyPercent || 0} onChange={(v) => set("pvEfficiencyPercent", v)} /></label>
+      <label><span>{it ? "Efficienza ciclo batteria (%)" : "Battery roundtrip efficiency (%)"}</span><NumericField value={product.batteryRoundtripEfficiencyPercent || 90} onChange={(v) => set("batteryRoundtripEfficiencyPercent", v)} /></label>
+      <label className="catalogue-checkbox"><span>MPPT</span><input type="checkbox" checked={yesNo(product.mppt)} onChange={(e) => set("mppt", e.target.checked)} /></label>
+      <div className="hint">{product.weightKg > 18 ? (it ? "Peso >18 kg: NON OK per la regola VIMALUX." : "Weight >18 kg: NOT OK under VIMALUX rule.") : product.weightKg === 18 ? (it ? "18 kg: limite massimo; verifica palo consigliata." : "18 kg: maximum limit; pole check recommended.") : product.weightKg > 0 ? (it ? "Peso entro il limite VIMALUX di 18 kg." : "Weight within the VIMALUX 18 kg limit.") : (it ? "Inserire il peso installato totale." : "Enter total installed weight.")}</div>
+    </>}
   </div>;
 }
 
@@ -85,6 +98,15 @@ export default function CatalogueExtended({ p, update }) {
       d4iDriver: false,
       photometryUrl: "",
       techSheetUrl: "",
+      hybrid: false,
+      pvWp: 0,
+      batteryWh: 0,
+      usableBatteryWh: 0,
+      solarModeW: 0,
+      weightKg: 0,
+      pvEfficiencyPercent: 0,
+      batteryRoundtripEfficiencyPercent: 90,
+      mppt: false,
       costPrice: 0,
       salesPrice: 0,
       active: true,
@@ -174,6 +196,7 @@ export default function CatalogueExtended({ p, update }) {
       <div className="table-scroll"><table><thead><tr>{["Brand", it ? "Fornitore" : "Supplier", "Supplier SKU", it ? "Prodotto" : "Product", it ? "Tipo" : "Type", it ? "Costo" : "Cost", it ? "Prezzo standard" : "Standard sales", it ? "Costo implementazione" : "Implementation cost", it ? "Prezzo implementazione" : "Implementation sales", it ? "Costo annuo" : "Annual cost", it ? "Prezzo annuo cliente" : "Annual customer sales", it ? "Attivo" : "Active", ""].map((x) => <th key={x}>{x}</th>)}</tr></thead><tbody>{(p.catalogue?.smart || []).map((x, i) => <tr key={x.id}><td><input value={x.brand || ""} onChange={(e) => update(["catalogue", "smart", i, "brand"], e.target.value)} /></td><td><input value={x.supplier || ""} onChange={(e) => update(["catalogue", "smart", i, "supplier"], e.target.value)} /></td><td><input value={x.supplierSku || ""} onChange={(e) => update(["catalogue", "smart", i, "supplierSku"], e.target.value)} /></td><td><input value={x.name || ""} onChange={(e) => update(["catalogue", "smart", i, "name"], e.target.value)} /></td><td><select value={x.type} onChange={(e) => update(["catalogue", "smart", i, "type"], e.target.value)}>{["LCU", "Gateway", "Antenna", "Energy Meter", "Other"].map((type) => <option key={type} value={type}>{type}</option>)}</select></td><td><NumericField value={x.costPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "costPrice"], v)} /></td><td><NumericField value={x.salesPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "salesPrice"], v)} /></td><td><NumericField value={x.implementationCost || 0} onChange={(v) => update(["catalogue", "smart", i, "implementationCost"], v)} /></td><td><NumericField value={x.implementationSalesPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "implementationSalesPrice"], v)} /></td><td><NumericField value={x.annualCost || 0} onChange={(v) => update(["catalogue", "smart", i, "annualCost"], v)} /></td><td><NumericField value={x.annualSalesPrice || 0} onChange={(v) => update(["catalogue", "smart", i, "annualSalesPrice"], v)} /></td><td><input type="checkbox" checked={x.active !== false} onChange={(e) => update(["catalogue", "smart", i, "active"], e.target.checked)} /></td><td><button className="danger" onClick={() => remove("smart", i)}>{it ? "Elimina" : "Delete"}</button></td></tr>)}</tbody></table></div>
     </section>
 
+    <HybridSummary p={p} update={update} />
     <ProcurementPanel p={p} update={update} />
   </>;
 }
