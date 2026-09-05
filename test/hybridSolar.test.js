@@ -40,7 +40,24 @@ test("hybrid preview calculates PV production and usable solar separately", () =
   assert.equal(result.totalHybridUnits, 100);
   assert.equal(result.totalPvKwh, 6300);
   assert.equal(result.totalUsableSolarKwh, 5670);
+  assert.equal(result.rows[0].batteryAutonomyHours, 5.125);
   assert.equal(result.hasWeightFailure, false);
+});
+
+test("battery capacity constrains usable annual solar energy", () => {
+  const project = defaultProject({ applyStoredDefaults: false });
+  const selectedId = project.groups[0].proposedProductId;
+  const product = project.catalogue.led.find((item) => item.id === selectedId);
+  product.hybrid = true;
+  product.pvWp = 100;
+  product.batteryWh = 50;
+  product.usableBatteryWh = 50;
+  product.solarModeW = 20;
+  product.batteryRoundtripEfficiencyPercent = 100;
+  project.assumptions.hybridSolarYieldKwhPerKwp = 2000;
+
+  const result = calculateHybridSolar(project);
+  assert.equal(result.totalUsableSolarKwh, 1825);
 });
 
 test("18 kg is a warning boundary and above 18 kg fails", () => {
