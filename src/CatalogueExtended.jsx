@@ -3,6 +3,8 @@ import { uid } from "./model.js";
 import { normalizeCatalogueProduct } from "./productCatalogue.js";
 import { catalogueWarranty } from "./warranty.js";
 import { mergeCatalogueProducts, readProductCatalogueWorkbook } from "./catalogueImport.js";
+import { mergeGeneratedVariants } from "./catalogueVariants.js";
+import CatalogueVariantGenerator from "./CatalogueVariantGenerator.jsx";
 import ProcurementPanel from "./ProcurementPanel.jsx";
 import HybridSummary from "./HybridSummary.jsx";
 
@@ -19,7 +21,7 @@ function NumericField({ value, onChange }) {
   return <input inputMode="decimal" value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={() => onChange(draft === "" ? 0 : Number(String(draft).replace(",", ".")) || 0)} />;
 }
 
-function TechnicalDetails({ product, index, update, it }) {
+function TechnicalDetails({ product, index, update, it, allProducts, onGenerateVariants }) {
   const set = (field, value) => update(["catalogue", "led", index, field], value);
   return <div className="catalogue-tech-grid">
     <label><span>CCT/CRI Code</span><input value={product.cctCriCode || ""} onChange={(e) => set("cctCriCode", e.target.value.trim())} placeholder="730 / 740 / 830 / 840" /></label>
@@ -40,9 +42,17 @@ function TechnicalDetails({ product, index, update, it }) {
       <label><span>{it ? "Peso installato (kg)" : "Installed weight (kg)"}</span><NumericField value={product.weightKg || 0} onChange={(v) => set("weightKg", v)} /></label>
       <label><span>{it ? "Efficienza pannello (%)" : "Panel efficiency (%)"}</span><NumericField value={product.pvEfficiencyPercent || 0} onChange={(v) => set("pvEfficiencyPercent", v)} /></label>
       <label><span>{it ? "Efficienza ciclo batteria (%)" : "Battery roundtrip efficiency (%)"}</span><NumericField value={product.batteryRoundtripEfficiencyPercent || 90} onChange={(v) => set("batteryRoundtripEfficiencyPercent", v)} /></label>
-      <label className="catalogue-checkbox"><span>MPPT</span><input type="checkbox" checked={yesNo(product.mppt)} onChange={(e) => set("mppt", e.target.checked)} /></label>
+      <label className="catalogue-checkbox"><span>MPPT</span><input type="checkbox" checked={yesNo(product.mppt)} disabled /></label>
       <div className="hint">{product.weightKg > 18 ? (it ? "Peso >18 kg: NON OK per la regola VIMALUX." : "Weight >18 kg: NOT OK under VIMALUX rule.") : product.weightKg === 18 ? (it ? "18 kg: limite massimo; verifica palo consigliata." : "18 kg: maximum limit; pole check recommended.") : product.weightKg > 0 ? (it ? "Peso entro il limite VIMALUX di 18 kg." : "Weight within the VIMALUX 18 kg limit.") : (it ? "Inserire il peso installato totale." : "Enter total installed weight.")}</div>
     </>}
+    {!product.variantGenerated && <CatalogueVariantGenerator
+      product={product}
+      existingProducts={allProducts}
+      it={it}
+      makeId={() => `led-${uid()}`}
+      onApply={(config, variants) => onGenerateVariants(index, config, variants)}
+    />}
+    {product.variantGenerated && <div className="hint" style={{ gridColumn: "1 / -1" }}>{it ? "Variante generata dal prodotto master" : "Variant generated from master product"}: {product.variantBaseCode || product.variantParentId}</div>}
   </div>;
 }
 
@@ -64,9 +74,7 @@ export default function CatalogueExtended({ p, update }) {
         : `Catalogue import: ${result.imported} rows\nUpdated: ${result.updated}\nNew: ${result.added}\nExisting products retained: ${result.retained}\n\nProducts missing from the file will NOT be deleted. Continue?`;
       if (!confirm(summary)) return;
       update(["catalogue", "led"], result.products);
-      alert(it
-        ? `Catalogo aggiornato. ${result.updated} prodotti aggiornati, ${result.added} aggiunti.`
-        : `Catalogue updated. ${result.updated} products updated, ${result.added} added.`);
+      alert(it ? `Catalogo aggiornato. ${result.updated} prodotti aggiornati, ${result.added} aggiunti.` : `Catalogue updated. ${result.updated} products updated, ${result.added} added.`);
     } catch (error) {
       alert(`${it ? "Import catalogo non riuscito" : "Catalogue import failed"}:\n${error.message}`);
     } finally {
@@ -74,44 +82,26 @@ export default function CatalogueExtended({ p, update }) {
     }
   };
 
-  const addLed = () => update(["catalogue", "led"], [
-    ...(p.catalogue?.led || []),
-    {
-      id: `led-${uid()}`,
-      brand: "",
-      supplier: "",
-      supplierSku: "",
-      name: it ? "Nuovo prodotto LED" : "New LED product",
-      model: it ? "Nuovo prodotto LED" : "New LED product",
-      productCategory: "STREET",
-      compatibleExistingCategories: ["STREET"],
-      replacementStrategies: ["REPLACE"],
-      wattage: 0,
-      lumen: 0,
-      efficiency: 0,
-      cctCriCode: "",
-      ip: "",
-      ik: "",
-      protectionClass: "",
-      lifetime: 0,
-      zhaga: false,
-      d4iDriver: false,
-      photometryUrl: "",
-      techSheetUrl: "",
-      hybrid: false,
-      pvWp: 0,
-      batteryWh: 0,
-      usableBatteryWh: 0,
-      solarModeW: 0,
-      weightKg: 0,
-      pvEfficiencyPercent: 0,
-      batteryRoundtripEfficiencyPercent: 90,
-      mppt: false,
-      costPrice: 0,
-      salesPrice: 0,
-      active: true,
-    },
-  ]);
+  const addLed = () => {
+    const id = `led-${uid()}`;
+    update(["catalogue", "led"], [
+      ...(p.catalogue?.led || []),
+      {
+        id,
+        brand: "", supplier: "", supplierSku: "",
+        name: it ? "Nuovo prodotto LED" : "New LED product",
+        model: it ? "Nuovo prodotto LED" : "New LED product",
+        productCategory: "STREET", compatibleExistingCategories: ["STREET"], replacementStrategies: ["REPLACE"],
+        wattage: 0, lumen: 0, efficiency: 0, cctCriCode: "", ip: "", ik: "", protectionClass: "", lifetime: 0,
+        zhaga: false, d4iDriver: false, photometryUrl: "", techSheetUrl: "",
+        hybrid: false, pvWp: 0, batteryWh: 0, usableBatteryWh: 0, solarModeW: 0, weightKg: 0, pvEfficiencyPercent: 0,
+        batteryRoundtripEfficiencyPercent: 90, mppt: false, variantConfig: {},
+        costPrice: 0, salesPrice: 0, active: true,
+      },
+    ]);
+    setExpanded((current) => ({ ...current, [id]: true }));
+    requestAnimationFrame(() => document.getElementById(`catalogue-product-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  };
 
   const addSmart = () => update(["catalogue", "smart"], [
     ...(p.catalogue?.smart || []),
@@ -126,6 +116,15 @@ export default function CatalogueExtended({ p, update }) {
 
   const setLed = (index, field, value) => update(["catalogue", "led", index, field], value);
   const setModel = (index, value) => update(["catalogue", "led", index], { ...p.catalogue.led[index], name: value, model: value });
+
+  const applyGeneratedVariants = (masterIndex, config, variants) => {
+    const current = p.catalogue?.led || [];
+    const master = { ...current[masterIndex], variantConfig: config, variantBaseCode: config.baseCode };
+    const withMaster = current.map((item, index) => index === masterIndex ? master : item);
+    const merged = mergeGeneratedVariants(withMaster, master, variants);
+    update(["catalogue", "led"], merged);
+    alert(it ? `${variants.length} varianti generate/aggiornate. Le vecchie varianti non più incluse restano archiviate come inattive.` : `${variants.length} variants generated/updated. Older variants no longer included are retained as inactive.`);
+  };
 
   return <>
     <section className="card catalogue-card">
@@ -150,26 +149,14 @@ export default function CatalogueExtended({ p, update }) {
         <small>{it ? "Default: 5 anni. La garanzia estesa applica la maggiorazione al prezzo standard LED; il Business Case salva uno snapshot della percentuale utilizzata." : "Default: 5 years. Extended warranty applies the uplift to standard LED sales prices; the Business Case saves a snapshot of the percentage used."}</small>
       </div>
       <div className="table-scroll catalogue-main-table"><table><thead><tr>{[
-        "Brand",
-        it ? "Fornitore" : "Supplier",
-        "Supplier SKU",
-        it ? "Prodotto / Modello" : "Product / Model",
-        it ? "Categoria" : "Category",
-        it ? "Compatibile con" : "Compatible with",
-        it ? "Strategia" : "Strategy",
-        "W",
-        "lm",
-        "lm/W",
-        it ? "Costo" : "Cost",
-        it ? "Prezzo standard" : "Standard sales",
-        it ? "Attivo" : "Active",
-        it ? "Tecnica" : "Technical",
-        "",
+        "Brand", it ? "Fornitore" : "Supplier", "Supplier SKU", it ? "Prodotto / Modello" : "Product / Model",
+        it ? "Categoria" : "Category", it ? "Compatibile con" : "Compatible with", it ? "Strategia" : "Strategy",
+        "W", "lm", "lm/W", it ? "Costo" : "Cost", it ? "Prezzo standard" : "Standard sales", it ? "Attivo" : "Active", it ? "Tecnica" : "Technical", "",
       ].map((label) => <th key={label}>{label}</th>)}</tr></thead><tbody>{products.map((product, index) => {
         const source = p.catalogue.led[index] || product;
         const efficiency = Number(product.efficiency || (Number(product.wattage) > 0 ? Number(product.lumen || 0) / Number(product.wattage) : 0));
         return <React.Fragment key={product.id || index}>
-          <tr>
+          <tr id={`catalogue-product-${product.id || index}`}>
             <td><input value={source.brand || ""} onChange={(e) => setLed(index, "brand", e.target.value)} /></td>
             <td><input value={source.supplier || ""} onChange={(e) => setLed(index, "supplier", e.target.value)} placeholder={it ? "Fornitore" : "Supplier"} /></td>
             <td><input value={source.supplierSku || ""} onChange={(e) => setLed(index, "supplierSku", e.target.value)} /></td>
@@ -186,7 +173,7 @@ export default function CatalogueExtended({ p, update }) {
             <td><button className="secondary" onClick={() => setExpanded((current) => ({ ...current, [product.id || index]: !current[product.id || index] }))}>{expanded[product.id || index] ? (it ? "Chiudi" : "Close") : (it ? "Dettagli" : "Details")}</button></td>
             <td><button className="danger" onClick={() => remove("led", index)}>{it ? "Elimina" : "Delete"}</button></td>
           </tr>
-          {expanded[product.id || index] && <tr className="catalogue-tech-row"><td colSpan="15"><TechnicalDetails product={normalizeCatalogueProduct(source)} index={index} update={update} it={it} /></td></tr>}
+          {expanded[product.id || index] && <tr className="catalogue-tech-row"><td colSpan="15"><TechnicalDetails product={normalizeCatalogueProduct(source)} index={index} update={update} it={it} allProducts={p.catalogue?.led || []} onGenerateVariants={applyGeneratedVariants} /></td></tr>}
         </React.Fragment>;
       })}</tbody></table></div>
     </section>
