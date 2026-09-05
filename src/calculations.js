@@ -31,7 +31,7 @@ function addHybridToCashFlow(project, base, annualHybridBenefit) {
 
   const cashFlowRows = base.cashFlowRows.map((row, index) => {
     const solarBenefit = annualHybridBenefit * Math.pow(1 + energyEscalation, index);
-    const netCashFlow = positive(row.netCashFlow) + solarBenefit;
+    const netCashFlow = numberValue(row.netCashFlow) + solarBenefit;
     const grossBenefit = positive(row.grossBenefit) + solarBenefit;
     cumulative += netCashFlow;
     npv += netCashFlow / Math.pow(1 + discountRate, row.year);
