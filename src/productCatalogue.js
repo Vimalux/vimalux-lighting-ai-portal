@@ -9,6 +9,7 @@ const asArray = (value) => {
 
 const upper = (value) => String(value || "").trim().toUpperCase().replace(/[ -]+/g, "_");
 const hasToken = (identity, token) => identity === token || identity.startsWith(`${token}_`) || identity.endsWith(`_${token}`) || identity.includes(`_${token}_`);
+const numeric = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 
 export function normalizeProductCategory(value) {
   const code = upper(value);
@@ -71,6 +72,15 @@ export function normalizeCatalogueProduct(product = {}) {
     d4iDriver: Boolean(product.d4iDriver),
     photometryUrl: product.photometryUrl || "",
     techSheetUrl: product.techSheetUrl || product.certsTechSheetUrl || "",
+    hybrid: Boolean(product.hybrid),
+    pvWp: Math.max(0, numeric(product.pvWp)),
+    batteryWh: Math.max(0, numeric(product.batteryWh)),
+    usableBatteryWh: Math.max(0, numeric(product.usableBatteryWh)),
+    solarModeW: Math.max(0, numeric(product.solarModeW)),
+    weightKg: Math.max(0, numeric(product.weightKg)),
+    pvEfficiencyPercent: Math.max(0, numeric(product.pvEfficiencyPercent)),
+    batteryRoundtripEfficiencyPercent: Math.max(0, numeric(product.batteryRoundtripEfficiencyPercent || 90)),
+    mppt: Boolean(product.mppt),
   };
 }
 
