@@ -15,4 +15,5 @@ import "./servicePeriodsRuntime.js";
 import "./activeProjectContextRuntime.js";
 import "./intelligenceUiContinuityRuntime.js";
 import "./catalogueExpandedStateRuntime.js";
+import "./hybridEconomicAnalysisRuntime.js";
 ReactDOM.createRoot(document.getElementById("root")).render(<React.StrictMode><App/></React.StrictMode>);
