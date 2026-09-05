@@ -1,0 +1,1 @@
+Catalogue product details now preserve their open/closed UI state within the browser session and Business Case context. The runtime stores only product IDs in sessionStorage; catalogue data, permissions, CRM state and Business Case calculations are untouched.
