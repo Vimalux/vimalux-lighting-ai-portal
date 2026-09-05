@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { calculateBusinessCase } from "./calculations.js";
 import { calculateHybridSolar } from "./hybridSolar.js";
 import { resolveMunicipalitySolar, stripMunicipalityPrefix } from "./solarLocation.js";
 
@@ -13,6 +14,7 @@ export default function HybridSummary({ p, update }) {
   const it = p.language === "it";
   const locale = localeFor(p.language);
   const summary = useMemo(() => calculateHybridSolar(p), [p]);
+  const businessCase = useMemo(() => calculateBusinessCase(p), [p]);
   const storedLocation = p.assumptions?.hybridSolarLocation || {};
   const defaultMunicipality = storedLocation.query || stripMunicipalityPrefix(p.customer?.name || "");
   const [municipality, setMunicipality] = useState(defaultMunicipality);
@@ -29,6 +31,8 @@ export default function HybridSummary({ p, update }) {
   const money = new Intl.NumberFormat(locale, { style: "currency", currency: p.project?.currency || "EUR", maximumFractionDigits: 0 });
   const percent = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
   const yieldValue = summary.solarYieldKwhPerKwp || 0;
+  const hybridBenefit = Number(businessCase.hybridSolarSavingEUR || 0);
+  const hybridSavingKwh = Number(businessCase.hybridSolarSavingKwh || 0);
   const months = monthLabels[p.language] || monthLabels.it;
   const statusLabel = (status) => status === "fail"
     ? (it ? ">18 kg · NON OK" : ">18 kg · NOT OK")
@@ -56,10 +60,10 @@ export default function HybridSummary({ p, update }) {
   return <section className="card" style={{ marginTop: 20 }}>
     <div className="catalogue-title-row">
       <div>
-        <h2>Hybrid Solar Preview</h2>
+        <h2>{it ? "Hybrid Solar / Beneficio" : "Hybrid Solar / Benefit"}</h2>
         <p className="hint">{it
-          ? "Stima separata per apparecchi ibridi. Il calcolo da Comune usa il centro geografico del Comune e un profilo solare mensile; non modifica ancora il Business Case LED esistente."
-          : "Separate hybrid-luminaire estimate. Municipality mode uses the municipality centre and a monthly solar profile; it does not yet change the existing LED Business Case."}</p>
+          ? "Il contributo solare viene calcolato per gli apparecchi ibridi selezionati dopo LED, CLO e PowerAiD. Il beneficio utilizzabile è incluso nel Business Case, nel consumo di rete, nel risparmio energetico, nel payback, nel ROI e nel cash flow."
+          : "Solar contribution is calculated for selected hybrid luminaires after LED, CLO and PowerAiD. The usable benefit is included in the Business Case, grid consumption, energy savings, payback, ROI and cash flow."}</p>
       </div>
     </div>
 
@@ -85,10 +89,11 @@ export default function HybridSummary({ p, update }) {
       <div className="kpi"><span>{it ? "Produzione PV annua" : "Annual PV production"}</span><strong>{yieldValue ? `${number.format(summary.totalPvKwh)} kWh` : "—"}</strong></div>
       <div className="kpi"><span>{it ? "Solare utilizzabile" : "Usable solar"}</span><strong>{yieldValue ? `${number.format(summary.totalUsableSolarKwh)} kWh` : "—"}</strong></div>
       <div className="kpi"><span>{it ? "Contributo solare annuo" : "Annual solar contribution"}</span><strong>{yieldValue ? `${percent.format(summary.totalContributionPercent)}%` : "—"}</strong></div>
-      <div className="kpi"><span>{it ? "Riduzione costo rete" : "Grid cost reduction"}</span><strong>{yieldValue ? money.format(summary.totalGridSavingEur) : "—"}</strong></div>
+      <div className="kpi"><span>{it ? "Hybrid Benefit annuo · incluso BC" : "Annual Hybrid Benefit · included in BC"}</span><strong>{yieldValue ? money.format(hybridBenefit) : "—"}</strong></div>
     </div>
 
-    {!yieldValue && <p className="hint">{it ? "Calcolare dal Comune oppure inserire una resa solare annua manuale. I dati fisici di pannello, batteria e peso sono già validati." : "Calculate from municipality or enter a manual annual solar yield. Panel, battery and weight data are already validated."}</p>}
+    {yieldValue && <p className="hint"><strong>{it ? "Offset rete incluso nel Business Case" : "Grid offset included in Business Case"}:</strong> {number.format(hybridSavingKwh)} kWh/anno · {money.format(hybridBenefit)}/anno.</p>}
+    {!yieldValue && <p className="hint">{it ? "Calcolare dal Comune oppure inserire una resa solare annua manuale. Senza una resa solare il Hybrid Benefit resta a zero." : "Calculate from municipality or enter a manual annual solar yield. Without a solar yield, Hybrid Benefit remains zero."}</p>}
 
     {summary.hasMonthlyProfile && <div className="table-scroll" style={{ marginTop: 16 }}><table><thead><tr>
       <th>{it ? "Mese" : "Month"}</th><th>{it ? "Resa locale" : "Local yield"}</th><th>{it ? "Produzione PV" : "PV production"}</th><th>{it ? "Solare utile" : "Usable solar"}</th><th>{it ? "Carico ibrido" : "Hybrid load"}</th><th>{it ? "Contributo solare" : "Solar contribution"}</th><th>{it ? "Risparmio rete" : "Grid saving"}</th>
