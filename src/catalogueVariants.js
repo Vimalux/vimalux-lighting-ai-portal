@@ -96,6 +96,17 @@ export function generateCatalogueVariants(master = {}, config = {}, existingProd
 }
 
 export function mergeGeneratedVariants(products = [], master = {}, variants = []) {
-  const generatedIds = new Set(products.filter((item) => item?.variantParentId === master.id).map((item) => item.id));
-  return [...products.filter((item) => !generatedIds.has(item.id)), ...variants];
+  const newByKey = new Map(variants.map((item) => [item.variantKey, item]));
+  const untouched = [];
+  const retainedHistorical = [];
+
+  products.forEach((item) => {
+    if (item?.variantParentId !== master.id) {
+      untouched.push(item);
+      return;
+    }
+    if (!newByKey.has(item.variantKey)) retainedHistorical.push({ ...item, active: false, variantRetired: true });
+  });
+
+  return [...untouched, ...retainedHistorical, ...variants];
 }
