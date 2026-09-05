@@ -34,8 +34,10 @@ export function calculateHybridSolar(project = {}) {
     const roundtrip = Math.min(1, Math.max(0, positive(product?.batteryRoundtripEfficiencyPercent || 90) / 100));
     const annualPvKwh = solarYieldKwhPerKwp > 0 ? quantity * (pvWp / 1000) * solarYieldKwhPerKwp : 0;
     const annualSolarLoadKwh = quantity * solarModeW * operatingHours / 1000;
-    const usableSolarKwh = Math.min(annualSolarLoadKwh, annualPvKwh * roundtrip);
+    const annualBatteryThroughputKwh = quantity * (usableBatteryWh / 1000) * 365;
+    const usableSolarKwh = Math.min(annualSolarLoadKwh, annualPvKwh * roundtrip, annualBatteryThroughputKwh);
     const annualGridSavingEur = usableSolarKwh * energyPrice;
+    const batteryAutonomyHours = solarModeW > 0 ? usableBatteryWh / solarModeW : 0;
 
     return [{
       groupId: group.id,
@@ -48,6 +50,8 @@ export function calculateHybridSolar(project = {}) {
       batteryWh,
       usableBatteryWh,
       solarModeW,
+      batteryAutonomyHours,
+      annualBatteryThroughputKwh,
       weightKg: positive(product.weightKg),
       weightStatus: hybridWeightStatus(product.weightKg),
       annualPvKwh,
