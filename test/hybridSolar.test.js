@@ -1,12 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { calculateBusinessCase } from "../src/calculations.js";
+import { calculateBusinessCase as calculateBaseBusinessCase } from "../src/calculationsBase.js";
 import { defaultProject } from "../src/model.js";
 import { calculateHybridSolar, hybridWeightStatus } from "../src/hybridSolar.js";
 
-test("hybrid metadata does not change the existing LED Business Case engine", () => {
+test("hybrid metadata changes only energy/customer benefit, not commercial project costs", () => {
   const base = defaultProject({ applyStoredDefaults: false });
-  const before = calculateBusinessCase(base);
+  const before = calculateBaseBusinessCase(base);
   const selectedId = base.groups[0].proposedProductId;
   const product = base.catalogue.led.find((item) => item.id === selectedId);
   product.hybrid = true;
@@ -17,9 +18,13 @@ test("hybrid metadata does not change the existing LED Business Case engine", ()
   base.assumptions.hybridSolarYieldKwhPerKwp = 1400;
   const after = calculateBusinessCase(base);
 
-  for (const key of ["totalCapex", "finalKwh", "energySaving", "totalDirectCosts", "netProjectProfit", "netProjectMarginPercent"]) {
-    assert.equal(after[key], before[key], `${key} must remain unchanged until hybrid savings are explicitly integrated`);
+  for (const key of ["totalCapex", "totalDirectCosts", "netProjectProfit", "netProjectMarginPercent"]) {
+    assert.equal(after[key], before[key], `${key} must remain commercially unchanged by solar energy contribution`);
   }
+  assert.ok(after.finalKwh < before.finalKwh);
+  assert.ok(after.energySaving > before.energySaving);
+  assert.ok(after.hybridSolarSavingKwh > 0);
+  assert.ok(after.hybridSolarSavingEUR > 0);
 });
 
 test("hybrid preview calculates PV production and usable solar separately", () => {
