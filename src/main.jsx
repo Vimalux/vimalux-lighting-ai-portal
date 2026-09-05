@@ -14,4 +14,5 @@ import "./defaultAssumptionsRuntime.js";
 import "./servicePeriodsRuntime.js";
 import "./activeProjectContextRuntime.js";
 import "./intelligenceUiContinuityRuntime.js";
+import "./catalogueExpandedStateRuntime.js";
 ReactDOM.createRoot(document.getElementById("root")).render(<React.StrictMode><App/></React.StrictMode>);
