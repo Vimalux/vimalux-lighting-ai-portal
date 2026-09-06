@@ -1,4 +1,5 @@
 import { calculateBusinessCase } from "./calculations.js";
+import { getLiveBusinessCaseResult, LIVE_BUSINESS_CASE_EVENT } from "./liveBusinessCaseResult.js";
 
 const PROJECTS_KEY = "vimalux-intelligence-projects";
 const MARKER = "data-vimalux-hybrid-economic-ui";
@@ -8,21 +9,19 @@ export function resolveActiveProject(projects = [], search = "") {
   const businessCaseId = params.get("business_case_id");
   const opportunityId = params.get("opportunity_id");
   if (businessCaseId || opportunityId) {
-    const matched = projects.find((project) =>
+    return projects.find((project) =>
       project?.id === businessCaseId ||
       project?.crm?.businessCaseRecordId === businessCaseId ||
       project?.project?.businessCaseId === businessCaseId ||
       project?.crm?.opportunityId === opportunityId ||
       project?.crm?.uniqueProjectId === opportunityId
-    );
-    if (matched) return matched;
+    ) || null;
   }
   return projects[0] || null;
 }
 
-export function hybridEconomicDisplay(project) {
-  if (!project) return null;
-  const result = calculateBusinessCase(project);
+export function hybridEconomicDisplayFromResult(project, result) {
+  if (!project || !result) return null;
   const hybrid = result.hybridSolar || {};
   if (!hybrid.enabled) return null;
   return {
@@ -36,6 +35,11 @@ export function hybridEconomicDisplay(project) {
     contributionPercent: Number(hybrid.totalContributionPercent || 0),
     finalKwh: Number(result.finalKwh || 0),
   };
+}
+
+export function hybridEconomicDisplay(project) {
+  if (!project) return null;
+  return hybridEconomicDisplayFromResult(project, calculateBusinessCase(project));
 }
 
 function text(value) {
@@ -128,16 +132,24 @@ function makeHybridCard(display) {
   return card;
 }
 
-export function renderHybridEconomicAnalysis() {
-  document.querySelectorAll(`[${MARKER}]`).forEach((node) => node.remove());
+function fallbackDisplay() {
   let projects;
   try {
     projects = JSON.parse(localStorage.getItem(PROJECTS_KEY) || "[]");
   } catch {
-    return;
+    return null;
   }
   const project = resolveActiveProject(projects, window.location.search);
-  const display = hybridEconomicDisplay(project);
+  return hybridEconomicDisplay(project);
+}
+
+export function renderHybridEconomicAnalysis() {
+  document.querySelectorAll(`[${MARKER}]`).forEach((node) => node.remove());
+
+  const live = getLiveBusinessCaseResult(window.location.search);
+  const display = live
+    ? hybridEconomicDisplayFromResult(live.project, live.result)
+    : fallbackDisplay();
   if (!display) return;
 
   const waterfall = findCard(["cascata dei risparmi", "savings waterfall"]);
@@ -171,6 +183,7 @@ function scheduleRender() {
 }
 
 if (typeof window !== "undefined" && typeof document !== "undefined") {
+  window.addEventListener(LIVE_BUSINESS_CASE_EVENT, scheduleRender);
   window.addEventListener("focus", scheduleRender);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) scheduleRender(); });
   const observer = new MutationObserver(scheduleRender);

@@ -1,5 +1,6 @@
 import { calculateBusinessCase as calculateBaseBusinessCase, numberValue } from "./calculationsBase.js";
 import { calculateHybridSolar } from "./hybridSolar.js";
+import { publishLiveBusinessCaseResult } from "./liveBusinessCaseResult.js";
 
 export { numberValue };
 
@@ -75,14 +76,14 @@ export function calculateBusinessCase(project) {
   const base = calculateBaseBusinessCase(project);
   const hybrid = calculateHybridSolar(project);
   if (!hybrid.enabled || hybrid.totalUsableSolarKwh <= 0) {
-    return { ...base, hybridSolar: hybrid, hybridSolarSavingKwh: 0, hybridSolarSavingEUR: 0 };
+    return publishLiveBusinessCaseResult(project, { ...base, hybridSolar: hybrid, hybridSolarSavingKwh: 0, hybridSolarSavingEUR: 0 });
   }
 
   const hybridEligibleGridKwh = hybridGridBeforeSolar(project, base);
   const hybridSolarSavingKwh = Math.min(positive(hybrid.totalUsableSolarKwh), hybridEligibleGridKwh, positive(base.finalKwh));
   const hybridSolarSavingEUR = hybridSolarSavingKwh * positive(project?.assumptions?.energyPrice);
   if (hybridSolarSavingKwh <= 0) {
-    return { ...base, hybridSolar: hybrid, hybridSolarSavingKwh: 0, hybridSolarSavingEUR: 0 };
+    return publishLiveBusinessCaseResult(project, { ...base, hybridSolar: hybrid, hybridSolarSavingKwh: 0, hybridSolarSavingEUR: 0 });
   }
 
   const adjusted = addHybridToCashFlow(project, base, hybridSolarSavingEUR);
@@ -102,7 +103,7 @@ export function calculateBusinessCase(project) {
     ? "GO"
     : positive(base.netProjectMarginPercent) >= 20 && customerDecisionStatus !== "NO_GO" ? "REVIEW" : "NO_GO";
 
-  return {
+  return publishLiveBusinessCaseResult(project, {
     ...adjusted,
     hybridSolar: hybrid,
     hybridSolarSavingKwh,
@@ -121,5 +122,5 @@ export function calculateBusinessCase(project) {
     co2ReductionKg,
     customerDecisionStatus,
     decisionStatus,
-  };
+  });
 }
