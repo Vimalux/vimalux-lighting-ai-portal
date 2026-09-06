@@ -1,5 +1,5 @@
 import { calculateBusinessCase } from "./calculations.js";
-import { needsAutomaticHybridSolar, projectMunicipalityName } from "./hybridSolarAuto.js";
+import { needsAutomaticHybridSolar, projectMunicipalityCandidates } from "./hybridSolarAuto.js";
 import { getLiveBusinessCaseResult, LIVE_BUSINESS_CASE_EVENT, publishLiveBusinessCaseResult } from "./liveBusinessCaseResult.js";
 import { resolveMunicipalitySolar } from "./solarLocation.js";
 import { loadCurrentProfile, saveCloudState } from "./supabase.js";
@@ -7,13 +7,29 @@ import { loadCurrentProfile, saveCloudState } from "./supabase.js";
 const attempted = new Set();
 let scheduled = false;
 
+async function resolveMunicipalityFromCandidates(project) {
+  const candidates = projectMunicipalityCandidates(project);
+  let lastError = null;
+  for (const municipality of candidates) {
+    try {
+      return await resolveMunicipalitySolar(municipality, {
+        countryCode: String(project?.customer?.country || "Italia").toLowerCase().includes("ital") ? "IT" : "",
+        language: project?.language || "it",
+      });
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("No municipality candidate could be resolved.");
+}
+
 async function resolveForCurrentBusinessCase() {
   const live = getLiveBusinessCaseResult(window.location.search);
   if (!live || !needsAutomaticHybridSolar(live.project, live.result)) return;
 
   const project = live.project;
-  const municipality = projectMunicipalityName(project);
-  const key = `${project.id || project?.project?.businessCaseId || "project"}:${municipality.toLowerCase()}`;
+  const candidates = projectMunicipalityCandidates(project);
+  const key = `${project.id || project?.project?.businessCaseId || "project"}:${candidates.join("|").toLowerCase()}`;
   if (attempted.has(key)) return;
   attempted.add(key);
 
@@ -22,14 +38,10 @@ async function resolveForCurrentBusinessCase() {
     // Keep the existing fail-closed permission model: automatic project writes are admin-only.
     if (profile?.role !== "admin") return;
 
-    const location = await resolveMunicipalitySolar(municipality, {
-      countryCode: String(project?.customer?.country || "Italia").toLowerCase().includes("ital") ? "IT" : "",
-      language: project?.language || "it",
-    });
+    const location = await resolveMunicipalityFromCandidates(project);
 
-    // The live project is the same object currently held by Intelligence. Update only the
-    // solar assumptions, persist immediately, recalculate, then reload once from Supabase so
-    // React state and the persisted Business Case are guaranteed to converge.
+    // Update only the active Business Case solar assumptions. No CRM, catalogue,
+    // pricing, agent visibility or non-hybrid calculation fields are touched.
     project.assumptions = {
       ...(project.assumptions || {}),
       hybridSolarLocation: location,
@@ -47,7 +59,7 @@ async function resolveForCurrentBusinessCase() {
     }
   } catch (error) {
     attempted.delete(key);
-    console.warn("VIMALUX automatic municipality solar calculation failed", error);
+    console.warn("VIMALUX automatic municipality solar calculation failed", { candidates, error });
   }
 }
 
