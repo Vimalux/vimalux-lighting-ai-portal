@@ -1,24 +1,11 @@
 import { calculateBusinessCase } from "./calculations.js";
+import { needsAutomaticHybridSolar, projectMunicipalityName } from "./hybridSolarAuto.js";
 import { getLiveBusinessCaseResult, LIVE_BUSINESS_CASE_EVENT, publishLiveBusinessCaseResult } from "./liveBusinessCaseResult.js";
-import { resolveMunicipalitySolar, stripMunicipalityPrefix } from "./solarLocation.js";
+import { resolveMunicipalitySolar } from "./solarLocation.js";
 import { loadCurrentProfile, saveCloudState } from "./supabase.js";
 
 const attempted = new Set();
 let scheduled = false;
-
-export function projectMunicipalityName(project = {}) {
-  const stored = stripMunicipalityPrefix(project?.assumptions?.hybridSolarLocation?.query || "");
-  if (stored) return stored;
-  return stripMunicipalityPrefix(project?.customer?.name || "");
-}
-
-export function needsAutomaticHybridSolar(project, result) {
-  const hybrid = result?.hybridSolar || {};
-  if (!project || !hybrid.enabled || Number(hybrid.totalHybridUnits || 0) <= 0) return false;
-  if (Number(hybrid.solarYieldKwhPerKwp || 0) > 0) return false;
-  if (Number(project?.assumptions?.hybridSolarYieldKwhPerKwp || 0) > 0) return false;
-  return Boolean(projectMunicipalityName(project));
-}
 
 async function resolveForCurrentBusinessCase() {
   const live = getLiveBusinessCaseResult(window.location.search);
