@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { needsAutomaticHybridSolar, projectMunicipalityName } from "../src/hybridSolarAutoRuntime.js";
+import { needsAutomaticHybridSolar, projectMunicipalityName } from "../src/hybridSolarAuto.js";
 
 test("municipality is taken from stored solar query before customer name", () => {
   assert.equal(projectMunicipalityName({
