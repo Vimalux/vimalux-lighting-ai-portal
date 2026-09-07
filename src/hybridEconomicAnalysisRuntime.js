@@ -56,12 +56,21 @@ function findCard(titleFragments) {
 
 function formatNumber(value, language, digits = 0) {
   const locale = language === "da" ? "da-DK" : language === "en" ? "en-GB" : "it-IT";
-  return new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(Number(value || 0));
+  return new Intl.NumberFormat(locale, {
+    useGrouping: "always",
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(Number(value || 0));
 }
 
 function formatMoney(value, language, currency) {
   const locale = language === "da" ? "da-DK" : language === "en" ? "en-GB" : "it-IT";
-  return new Intl.NumberFormat(locale, { style: "currency", currency: currency || "EUR", maximumFractionDigits: 0 }).format(Number(value || 0));
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: currency || "EUR",
+    useGrouping: "always",
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
 }
 
 function makeBreakdownRow(label, value) {
