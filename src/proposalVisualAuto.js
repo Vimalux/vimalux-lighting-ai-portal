@@ -1,7 +1,6 @@
 import { jsPDF } from "jspdf";
 import { appendCapexProposalPage } from "./capexProposalPage.js";
-import { appendProposalVisualPages } from "./proposalVisualPages.js";
-import { repairCostEvolutionProposalPage } from "./proposalCostEvolutionPage.js";
+import { appendFinalProposalVisualPages } from "./proposalFinalVisualPages.js";
 import { appendHybridProposalPage } from "./hybridProposalPage.js";
 
 function businessCaseCodeFromFilename(filename) {
@@ -91,9 +90,7 @@ if (!jsPDF.API.__vimaluxPreliminaryVisualsInstalled) {
         light: [248, 250, 252],
       };
       appendCapexProposalPage(this, project, visualOptions);
-      const costEvolutionPage = this.getNumberOfPages() + 1;
-      const calculated = appendProposalVisualPages(this, project, visualOptions);
-      repairCostEvolutionProposalPage(this, project, calculated, costEvolutionPage, visualOptions);
+      const calculated = appendFinalProposalVisualPages(this, project, visualOptions);
       appendHybridProposalPage(this, project, calculated, visualOptions);
       redrawFourPageFooters(this, project, filename);
     }
