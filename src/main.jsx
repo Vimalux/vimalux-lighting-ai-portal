@@ -5,6 +5,7 @@ import "./additional-costs.css";
 import "./solution-additional-costs.css";
 import "./catalogueExtended.css";
 import "./warranty.css";
+import "./dimming-nightly.css";
 import "./solutionAdditionalCosts.js";
 import "./proposalCustomerVatTextRuntime.js";
 import "./preliminaryProposalV2.js";
