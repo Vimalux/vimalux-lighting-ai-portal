@@ -9,16 +9,13 @@ import {
 function currentProject() {
   try {
     const businessCaseRecordId = new URLSearchParams(window.location.search).get("business_case_id") || "";
+    if (!businessCaseRecordId) return null;
     const projects = JSON.parse(localStorage.getItem("vimalux-intelligence-projects") || "[]");
     if (!Array.isArray(projects) || !projects.length) return null;
-    if (businessCaseRecordId) {
-      const match = projects.find((project) => [
-        project?.id,
-        project?.crm?.businessCaseRecordId,
-      ].map((value) => String(value || "")).includes(businessCaseRecordId));
-      if (match) return match;
-    }
-    return projects[0] || null;
+    return projects.find((project) => [
+      project?.id,
+      project?.crm?.businessCaseRecordId,
+    ].map((value) => String(value || "")).includes(businessCaseRecordId)) || null;
   } catch {
     return null;
   }
