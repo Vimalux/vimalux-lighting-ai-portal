@@ -42,12 +42,9 @@ test("generic VAT disclaimer is replaced before PDF text is written", () => {
   assert.match(transformed, /IVA recuperabile dal cliente \/ ESCO: 100%/);
 });
 
-test("proposal customer VAT runtime is installed and project matching fails closed", () => {
+test("obsolete proposal customer VAT runtime is not installed", () => {
   const main = fs.readFileSync(new URL("./main.jsx", import.meta.url), "utf8");
-  const runtime = fs.readFileSync(new URL("./proposalCustomerVatTextRuntime.js", import.meta.url), "utf8");
-  assert.match(main, /proposalCustomerVatTextRuntime\.js/);
-  assert.match(runtime, /if \(!businessCaseRecordId\) return null/);
-  assert.doesNotMatch(runtime, /projects\[0\]/);
+  assert.doesNotMatch(main, /proposalCustomerVatTextRuntime\.js/);
 });
 
 test("preliminary and final PDF generators render customer wording from the Business Case source", () => {
