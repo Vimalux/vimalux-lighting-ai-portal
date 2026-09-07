@@ -1,7 +1,8 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { supabase } from "./supabase.js";
-import { warrantyLabel } from "./warranty.js";
+import { applyWarrantyPricing, warrantyLabel } from "./warranty.js";
+import { calculateBusinessCase } from "./calculations.js";
 import { qualityGateMessage, validateProposalQuality } from "./proposalQuality.js";
 import {
   PDF_FONT,
@@ -56,9 +57,10 @@ function filename(code, version) {
   return `VIMALUX_PRE_${String(code || "BUSINESS_CASE").replace(/[^A-Z0-9_-]/gi, "_")}_v${version}.pdf`;
 }
 
-function solutionDescription(project, it) {
+function solutionDescription(project, it, hybridUnits = 0) {
   const solution = project?.solution || {};
   const parts = [it ? "upgrade a LED ad alta efficienza" : "high-efficiency LED upgrade"];
+  if (hybridUnits > 0) parts.push(it ? `integrazione Hybrid Solar su ${Math.round(hybridUnits)} apparecchi` : `Hybrid Solar integration on ${Math.round(hybridUnits)} luminaires`);
   if (solution.smartEnabled) parts.push(it ? "controllo Smart Lighting connesso" : "connected Smart Lighting control");
   if (solution.cmsEnabled) parts.push(it ? "monitoraggio CMS, allarmi e gestione remota" : "CMS monitoring, alarms and remote management");
   if (solution.powerAidEnabled) parts.push(it ? "ottimizzazione adattiva PowerAiD" : "PowerAiD adaptive optimization");
@@ -75,6 +77,14 @@ function maintenanceSaving(project) {
 function generatePdf(row, version) {
   const project = row.intelligence_data || {};
   const result = row.result_summary || {};
+  const calculated = calculateBusinessCase(applyWarrantyPricing(project));
+  const hybrid = calculated?.hybridSolar || {};
+  const hybridUnits = hybrid.enabled ? Math.max(0, Number(hybrid.totalHybridUnits) || 0) : 0;
+  const hybridInstalledPvKwp = hybrid.enabled
+    ? (Array.isArray(hybrid.rows) ? hybrid.rows : []).reduce((sum, item) => sum + Math.max(0, Number(item?.quantity) || 0) * Math.max(0, Number(item?.pvWp) || 0) / 1000, 0)
+    : 0;
+  const hybridGridOffsetKwh = hybrid.enabled ? Math.max(0, Number(calculated.hybridSolarSavingKwh) || 0) : 0;
+  const hybridBenefitEur = hybrid.enabled ? Math.max(0, Number(calculated.hybridSolarSavingEUR) || 0) : 0;
   const lang = project.language === "it" ? "it" : "en";
   const it = lang === "it";
   const lineage = pdfSafeText(row.project_lineage_id || project.crm?.projectLineageId || "-");
@@ -86,6 +96,7 @@ function generatePdf(row, version) {
   const contractYears = Math.round(Number(result.contractYears) || Number(project.assumptions?.serviceAgreementPeriod) || 0);
   const powerAidYears = project.solution?.powerAidEnabled ? Math.max(1, Math.min(contractYears, Math.round(Number(project.assumptions?.powerAidServicePeriod) || 10))) : 0;
   const escalation = Number(project.assumptions?.opexEscalation) || 0;
+  const energyEscalation = Number(project.assumptions?.energyEscalation) || 0;
   const annualFee = Number(result.annualCustomerPayment ?? result.annualOpex) || 0;
   const maintSaving = maintenanceSaving(project);
   const energySaving = Number(result.annualEnergySavingEUR) || 0;
@@ -119,8 +130,8 @@ function generatePdf(row, version) {
   section(it ? "Sintesi della proposta" : "Proposal Summary", 60);
   doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...navy);
   const intro = it
-    ? `VIMALUX presenta una proposta preliminare per ${projectName}, basata sul Business Case ${code}. La soluzione comprende ${solutionDescription(project, true)}. I valori economici sono preliminari; dimensionamento, ottiche e assegnazione definitiva dei prodotti saranno validati in VIMALUX Planner.`
-    : `VIMALUX presents a preliminary proposal for ${projectName}, based on Business Case ${code}. The solution includes ${solutionDescription(project, false)}. Commercial values are preliminary; sizing, optics and final product assignment will be validated in VIMALUX Planner.`;
+    ? `VIMALUX presenta una proposta preliminare per ${projectName}, basata sul Business Case ${code}. La soluzione comprende ${solutionDescription(project, true, hybridUnits)}. I valori economici sono preliminari; dimensionamento, ottiche e assegnazione definitiva dei prodotti saranno validati in VIMALUX Planner.`
+    : `VIMALUX presents a preliminary proposal for ${projectName}, based on Business Case ${code}. The solution includes ${solutionDescription(project, false, hybridUnits)}. Commercial values are preliminary; sizing, optics and final product assignment will be validated in VIMALUX Planner.`;
   doc.text(intro, 14, 68, { maxWidth: 182 });
 
   autoTable(doc, {
@@ -153,6 +164,7 @@ function generatePdf(row, version) {
       [it ? "Apparecchi esistenti" : "Existing luminaires", String(Math.round(Number(result.existingLuminaires) || 0))],
       [it ? "Apparecchi da aggiornare" : "Upgrade luminaires", String(Math.round(Number(result.upgradeLuminaires) || 0))],
       ["Smart connected", String(Math.round(Number(result.smartConnectedLuminaires) || 0))],
+      ...(hybridUnits > 0 ? [["Hybrid Solar", `${number(hybridUnits, 0, lang)} ${it ? "apparecchi" : "luminaires"} · ${number(hybridInstalledPvKwp, 2, lang)} kWp · ${number(hybridGridOffsetKwh, 0, lang)} kWh/${it ? "anno" : "yr"} ${it ? "offset rete" : "grid offset"}`]] : []),
     ],
     styles: { font: "helvetica", fontSize: 8.5, cellPadding: 1.2 },
     columnStyles: { 0: { fontStyle: "bold", cellWidth: 58, halign: "left" }, 1: { halign: "left" } },
@@ -167,6 +179,7 @@ function generatePdf(row, version) {
       [it ? "Canone annuale Smart Lighting / CMS" : "Annual Smart Lighting / CMS fee", money(annualFee, lang)],
       [it ? "Durata CMS" : "CMS service term", `${contractYears} ${it ? "anni" : "years"}`],
       ...(project.solution?.powerAidEnabled ? [[it ? "Durata PowerAiD" : "PowerAiD service term", `${powerAidYears} ${it ? "anni" : "years"}`]] : []),
+      ...(hybridBenefitEur > 0 ? [[it ? "Beneficio Hybrid Solar annuo (incluso nel risparmio energia)" : "Annual Hybrid Solar benefit (included in energy saving)", money(hybridBenefitEur, lang)]] : []),
       [it ? `TCV ${contractYears} anni, indicizzato` : `Indexed TCV ${contractYears} years`, money(result.tcv, lang)],
       [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],
     ],
@@ -178,13 +191,14 @@ function generatePdf(row, version) {
   section(it ? "Soluzione e ambito preliminare" : "Preliminary Solution & Scope", 20);
   doc.setFont("helvetica", "normal"); doc.setFontSize(8.8); doc.setTextColor(...navy);
   doc.text(it
-    ? `La configurazione preliminare prevede ${solutionDescription(project, true)}. La progettazione illuminotecnica definitiva resta soggetta a validazione in Planner.`
-    : `The preliminary configuration includes ${solutionDescription(project, false)}. Final lighting design remains subject to validation in Planner.`, 14, 28, { maxWidth: 182 });
+    ? `La configurazione preliminare prevede ${solutionDescription(project, true, hybridUnits)}. La progettazione illuminotecnica definitiva resta soggetta a validazione in Planner.`
+    : `The preliminary configuration includes ${solutionDescription(project, false, hybridUnits)}. Final lighting design remains subject to validation in Planner.`, 14, 28, { maxWidth: 182 });
 
   autoTable(doc, {
     startY: 39, theme: "grid", head: [[it ? "Ambito" : "Scope", it ? "Configurazione preliminare" : "Preliminary configuration"]],
     body: [
       [it ? "Upgrade LED" : "LED upgrade", `${Math.round(Number(result.upgradeLuminaires) || 0)} ${it ? "punti luce" : "lighting points"}`],
+      ...(hybridUnits > 0 ? [["Hybrid Solar", `${number(hybridUnits, 0, lang)} ${it ? "apparecchi" : "luminaires"} · ${number(hybridInstalledPvKwp, 2, lang)} kWp · ${number(hybridGridOffsetKwh, 0, lang)} kWh/${it ? "anno" : "yr"} ${it ? "offset rete" : "grid offset"}`]] : []),
       [it ? "Controllo connesso" : "Connected control", `${Math.round(Number(result.smartConnectedLuminaires) || 0)} ${it ? "punti luce Smart" : "Smart lighting points"}`],
       ["CMS", project.solution?.cmsEnabled ? (it ? "Monitoraggio, allarmi e gestione remota" : "Monitoring, alarms and remote management") : (it ? "Non incluso" : "Not included")],
       ["Adaptive Lighting", project.solution?.powerAidEnabled ? "PowerAiD" : (it ? "Predisposizione / da validare" : "Prepared / to be validated")],
@@ -199,6 +213,7 @@ function generatePdf(row, version) {
     startY: y + 4, theme: "grid", head: [[it ? "Componente" : "Component", it ? "Valore annuo" : "Annual value"]],
     body: [
       [it ? "Risparmio energia" : "Energy saving", money(energySaving, lang)],
+      ...(hybridBenefitEur > 0 ? [[it ? "di cui Hybrid Solar (già incluso)" : "of which Hybrid Solar (already included)", money(hybridBenefitEur, lang)]] : []),
       [it ? "Risparmio manutenzione" : "Maintenance saving", money(maintSaving, lang)],
       [it ? "Canone Smart Lighting / CMS" : "Smart Lighting / CMS fee", `(${money(annualFee, lang)})`],
       [it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit", money(netBenefit, lang)],
@@ -207,7 +222,7 @@ function generatePdf(row, version) {
     ...alignedTable({ 0: "left", 1: "right" }),
     didParseCell: mergeTableHooks(
       alignedTable({ 0: "left", 1: "right" }).didParseCell,
-      (data) => { if (data.section === "body" && data.row.index === 3) data.cell.styles.fontStyle = "bold"; },
+      (data) => { if (data.section === "body" && data.row.index === (hybridBenefitEur > 0 ? 4 : 3)) data.cell.styles.fontStyle = "bold"; },
     ),
   });
 
@@ -236,11 +251,12 @@ function generatePdf(row, version) {
   });
 
   y = doc.lastAutoTable.finalY + 7;
-  y = beginSection(it ? "Ipotesi principali" : "Key Assumptions", y, 48);
+  y = beginSection(it ? "Ipotesi principali" : "Key Assumptions", y, 52);
   autoTable(doc, {
     startY: y + 4, theme: "grid", head: [[it ? "Parametro" : "Parameter", it ? "Valore" : "Value"]],
     body: [
       [it ? "Prezzo energia" : "Energy price", `${number(project.assumptions?.energyPrice, 2, lang)} €/kWh`],
+      [it ? "Indicizzazione prezzo energia" : "Energy price escalation", `${number(energyEscalation, 1, lang)}% ${it ? "annuo" : "p.a."}`],
       [it ? "Ore di funzionamento annue" : "Annual operating hours", number(project.assumptions?.operatingHours, 0, lang)],
       [it ? "Periodo di analisi" : "Analysis period", `${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} ${it ? "anni" : "years"}`],
       [it ? "Durata CMS" : "CMS service term", `${contractYears} ${it ? "anni" : "years"}`],
@@ -324,4 +340,3 @@ const observer = new MutationObserver(ensureButton);
 observer.observe(document.getElementById("root") || document.body, { childList: true, subtree: true });
 window.addEventListener("load", ensureButton, { once: true });
 setTimeout(ensureButton, 500);
-
