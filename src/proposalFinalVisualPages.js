@@ -1,6 +1,5 @@
 import autoTable from "jspdf-autotable";
 import { calculateBusinessCase } from "./calculations.js";
-import { buildBusinessCaseSnapshot } from "./businessCaseSync.js";
 import { applyWarrantyPricing } from "./warranty.js";
 import { repairCostEvolutionProposalPage } from "./proposalCostEvolutionPage.js";
 import { transformProposalCustomerText } from "./proposalCustomerVatText.js";
