@@ -17,4 +17,5 @@ import "./intelligenceUiContinuityRuntime.js";
 import "./catalogueExpandedStateRuntime.js";
 import "./hybridEconomicAnalysisRuntime.js";
 import "./hybridSolarAutoRuntime.js";
+import "./reportHybridRuntime.js";
 ReactDOM.createRoot(document.getElementById("root")).render(<React.StrictMode><App/></React.StrictMode>);
