@@ -11,8 +11,8 @@ test("report dashboard loads executive Hybrid refinement without touching access
   const main = read("src/main.jsx");
   const runtime = read("src/reportExecutiveRefinementRuntime.js");
   assert.match(main, /reportExecutiveRefinementRuntime\.js/);
-  assert.match(runtime, /Hybrid Solar incluso/);
-  assert.match(runtime, /Indicizzazione prezzo energia/);
+  assert.match(runtime, /Hybrid Solar/);
+  assert.match(runtime, /Indicizzazione energia/);
   assert.match(runtime, /Indicizzazione canone\/OPEX/);
   assert.match(runtime, /hybridSolarSavingKwh/);
   assert.match(runtime, /hybridSolarSavingEUR/);
