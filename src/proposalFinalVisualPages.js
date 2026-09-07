@@ -1,7 +1,9 @@
 import autoTable from "jspdf-autotable";
 import { calculateBusinessCase } from "./calculations.js";
+import { buildBusinessCaseSnapshot } from "./businessCaseSync.js";
 import { applyWarrantyPricing } from "./warranty.js";
 import { repairCostEvolutionProposalPage } from "./proposalCostEvolutionPage.js";
+import { transformProposalCustomerText } from "./proposalCustomerVatText.js";
 import { alignedTable, reportMoney, reportNumber } from "./reportPresentation.js";
 
 const safe = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -73,9 +75,10 @@ function summaryCard(doc, x, y, w, label, value, colors) {
   doc.line(x + 4, y + 22.5, x + w - 4, y + 22.5);
 }
 
-function appendCashFlowPage(doc, calculated, options = {}) {
+function appendCashFlowPage(doc, project, calculated, options = {}) {
   const lang = options.lang === "it" ? "it" : "en";
   const it = lang === "it";
+  const customerText = (value) => transformProposalCustomerText(value, project, lang);
   const colors = {
     teal: options.teal || [15, 118, 110],
     navy: options.navy || [15, 23, 42],
@@ -103,9 +106,9 @@ function appendCashFlowPage(doc, calculated, options = {}) {
 
   let tableStartY;
   if (isCashDeal) {
-    doc.text(it
+    doc.text(customerText(it
       ? "Scenario acquisto diretto: il CAPEX iniziale è sostenuto dal Comune. La tabella mostra il recupero dell'investimento e il beneficio cumulativo anno per anno."
-      : "Direct-purchase scenario: the municipality funds the initial CAPEX. The table shows investment recovery and cumulative benefit year by year.",
+      : "Direct-purchase scenario: the municipality funds the initial CAPEX. The table shows investment recovery and cumulative benefit year by year."),
     14, 28, { maxWidth: 182 });
 
     const breakEven = calculated.payback == null
@@ -116,9 +119,9 @@ function appendCashFlowPage(doc, calculated, options = {}) {
     summaryCard(doc, 141, 38, 55, it ? "Break-even" : "Break-even", breakEven, colors);
     tableStartY = 76;
   } else {
-    doc.text(it
+    doc.text(customerText(it
       ? "Il grafico mostra il cash flow cumulativo del Comune includendo risparmi, servizi e pagamenti previsti dal modello finanziato selezionato."
-      : "The chart shows cumulative municipality cash flow including savings, services and payments under the selected financed model.",
+      : "The chart shows cumulative municipality cash flow including savings, services and payments under the selected financed model."),
     14, 28, { maxWidth: 182 });
     lineChart(doc, 14, 36, 182, 83, cashRows, colors);
     tableStartY = 136;
@@ -177,6 +180,6 @@ export function appendFinalProposalVisualPages(doc, project, options = {}) {
   const costPage = doc.getNumberOfPages();
   repairCostEvolutionProposalPage(doc, project, calculated, costPage, options);
 
-  appendCashFlowPage(doc, calculated, options);
+  appendCashFlowPage(doc, project, calculated, options);
   return calculated;
 }
