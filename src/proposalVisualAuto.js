@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
-import { appendProposalVisualPages } from "./proposalVisualPagesSimple.js";
+import { appendProposalVisualPages } from "./proposalVisualPages.js";
+import { appendHybridProposalPage } from "./hybridProposalPage.js";
 
 function businessCaseCodeFromFilename(filename) {
   return String(filename || "").match(/BC-[A-Z0-9]+/i)?.[0]?.toUpperCase() || "";
@@ -80,13 +81,15 @@ if (!jsPDF.API.__vimaluxPreliminaryVisualsInstalled) {
         throw new Error("Impossibile associare il PDF al Business Case attivo. Nessun dato viene generato da un progetto diverso.");
       }
       this.__vimaluxVisualPagesAdded = true;
-      appendProposalVisualPages(this, project, {
+      const visualOptions = {
         lang: project.language === "it" ? "it" : "en",
         teal: [15, 118, 110],
         navy: [15, 23, 42],
         muted: [71, 85, 105],
         light: [248, 250, 252],
-      });
+      };
+      const calculated = appendProposalVisualPages(this, project, visualOptions);
+      appendHybridProposalPage(this, project, calculated, visualOptions);
       redrawFourPageFooters(this, project, filename);
     }
     return downloadPdf(this, filename);
