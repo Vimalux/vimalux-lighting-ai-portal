@@ -10,7 +10,7 @@ test("municipality is taken from stored solar query before customer name", () =>
   }), "Serino");
 });
 
-test("test and pilot project labels expose the municipality before the full label", () => {
+test("project labels expose the municipality suffix before fallback labels", () => {
   assert.deepEqual(projectMunicipalityCandidates({
     customer: { name: "Test 1 - Poggiardo" },
     project: { name: "Poggiardo Upgrade Partner (Step 1 of 2)" },
@@ -19,6 +19,11 @@ test("test and pilot project labels expose the municipality before the full labe
   assert.equal(projectMunicipalityName({
     customer: { name: "Pilot: Serino" },
   }), "Serino");
+
+  assert.equal(projectMunicipalityName({
+    assumptions: { hybridSolarLocation: { query: "CiviSmart – Poggiardo" } },
+    customer: { name: "CiviSmart – Poggiardo" },
+  }), "Poggiardo");
 });
 
 test("customer municipality enables automatic solar only for hybrid projects without yield", () => {
