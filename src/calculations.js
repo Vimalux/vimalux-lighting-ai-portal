@@ -1,6 +1,7 @@
 import { calculateBusinessCase as calculateBaseBusinessCase, numberValue } from "./calculationsBase.js";
 import { calculateHybridSolar } from "./hybridSolar.js";
 import { publishLiveBusinessCaseResult } from "./liveBusinessCaseResult.js";
+import { normalizeNightlyDimmingProject } from "./existingDimming.js";
 
 export { numberValue };
 
@@ -73,20 +74,24 @@ function addHybridToCashFlow(project, base, annualHybridBenefit) {
 }
 
 export function calculateBusinessCase(project) {
-  const base = calculateBaseBusinessCase(project);
-  const hybrid = calculateHybridSolar(project);
+  // Business Cases store intuitive nightly dimming schedules (e.g. 6.5 h full + 5 h reduced).
+  // calculationsBase remains backward compatible with historic annual-hour profiles, so only a
+  // calculation copy is normalized. The stored project data is never rewritten here.
+  const calculationProject = normalizeNightlyDimmingProject(project);
+  const base = calculateBaseBusinessCase(calculationProject);
+  const hybrid = calculateHybridSolar(calculationProject);
   if (!hybrid.enabled || hybrid.totalUsableSolarKwh <= 0) {
     return publishLiveBusinessCaseResult(project, { ...base, hybridSolar: hybrid, hybridSolarSavingKwh: 0, hybridSolarSavingEUR: 0 });
   }
 
-  const hybridEligibleGridKwh = hybridGridBeforeSolar(project, base);
+  const hybridEligibleGridKwh = hybridGridBeforeSolar(calculationProject, base);
   const hybridSolarSavingKwh = Math.min(positive(hybrid.totalUsableSolarKwh), hybridEligibleGridKwh, positive(base.finalKwh));
-  const hybridSolarSavingEUR = hybridSolarSavingKwh * positive(project?.assumptions?.energyPrice);
+  const hybridSolarSavingEUR = hybridSolarSavingKwh * positive(calculationProject?.assumptions?.energyPrice);
   if (hybridSolarSavingKwh <= 0) {
     return publishLiveBusinessCaseResult(project, { ...base, hybridSolar: hybrid, hybridSolarSavingKwh: 0, hybridSolarSavingEUR: 0 });
   }
 
-  const adjusted = addHybridToCashFlow(project, base, hybridSolarSavingEUR);
+  const adjusted = addHybridToCashFlow(calculationProject, base, hybridSolarSavingEUR);
   const finalKwh = Math.max(0, positive(base.finalKwh) - hybridSolarSavingKwh);
   const upgradedFinalKwh = Math.max(0, positive(base.upgradedFinalKwh) - hybridSolarSavingKwh);
   const energySaving = positive(base.energySaving) + hybridSolarSavingEUR;
@@ -97,7 +102,7 @@ export function calculateBusinessCase(project) {
   const roiPercent = positive(base.totalCapex) > 0 ? annualOperationalBenefit / positive(base.totalCapex) * 100 : 0;
   const energyReductionPercent = positive(base.baselineKwh) ? (positive(base.baselineKwh) - finalKwh) / positive(base.baselineKwh) * 100 : 0;
   const upgradedEnergyReductionPercent = positive(base.upgradedBaselineKwh) ? (positive(base.upgradedBaselineKwh) - upgradedFinalKwh) / positive(base.upgradedBaselineKwh) * 100 : 0;
-  const co2ReductionKg = (positive(base.baselineKwh) - finalKwh) * positive(project?.assumptions?.co2KgPerKwh);
+  const co2ReductionKg = (positive(base.baselineKwh) - finalKwh) * positive(calculationProject?.assumptions?.co2KgPerKwh);
   const customerDecisionStatus = adjusted.npv > 0 && customerAnnualNetBenefit >= 0 ? "GO" : adjusted.npv > 0 || customerAnnualNetBenefit >= 0 ? "REVIEW" : "NO_GO";
   const decisionStatus = positive(base.netProjectMarginPercent) >= positive(base.minimumMarginPercent) && customerDecisionStatus === "GO"
     ? "GO"
