@@ -19,4 +19,5 @@ import "./hybridEconomicAnalysisRuntime.js";
 import "./hybridSolarAutoRuntime.js";
 import "./reportHybridRuntime.js";
 import "./reportExecutiveRefinementRuntime.js";
+import "./reportLayoutFinalizerRuntime.js";
 ReactDOM.createRoot(document.getElementById("root")).render(<React.StrictMode><App/></React.StrictMode>);
