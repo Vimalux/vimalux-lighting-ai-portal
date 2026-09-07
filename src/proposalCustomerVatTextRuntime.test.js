@@ -49,3 +49,20 @@ test("proposal customer VAT runtime is installed and project matching fails clos
   assert.match(runtime, /if \(!businessCaseRecordId\) return null/);
   assert.doesNotMatch(runtime, /projects\[0\]/);
 });
+
+test("preliminary and final PDF generators render customer wording from the Business Case source", () => {
+  const preliminary = fs.readFileSync(new URL("./preliminaryProposalV2.js", import.meta.url), "utf8");
+  const costPage = fs.readFileSync(new URL("./proposalCostEvolutionPage.js", import.meta.url), "utf8");
+  const finalPages = fs.readFileSync(new URL("./proposalFinalVisualPages.js", import.meta.url), "utf8");
+
+  assert.match(preliminary, /transformProposalCustomerText/);
+  assert.match(preliminary, /customerText\(it \? "Beneficio netto annuo Comune"/);
+  assert.match(preliminary, /customerText\(it \? "Cliente \/ Comune"/);
+  assert.match(preliminary, /customerText\(it[\s\S]*IVA esclusa salvo diversa indicazione/);
+
+  assert.match(costPage, /transformProposalCustomerText/);
+  assert.match(costPage, /customerText\(it \? "Beneficio netto annuo Comune"/);
+
+  assert.match(finalPages, /transformProposalCustomerText/);
+  assert.match(finalPages, /customerText\(it[\s\S]*CAPEX iniziale è sostenuto dal Comune/);
+});

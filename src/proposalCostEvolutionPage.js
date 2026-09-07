@@ -1,5 +1,6 @@
 import autoTable from "jspdf-autotable";
 import { buildYearOneCustomerValuePhases } from "./customerValuePhases.js";
+import { transformProposalCustomerText } from "./proposalCustomerVatText.js";
 import { alignedTable, pdfSafeText, reportMoney, reportNumber } from "./reportPresentation.js";
 
 const safe = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -150,6 +151,7 @@ export function repairCostEvolutionProposalPage(doc, project, calculated, pageNu
   if (!doc || !calculated || !pageNumber || pageNumber > doc.getNumberOfPages()) return false;
   const lang = options.lang === "it" ? "it" : "en";
   const it = lang === "it";
+  const customerText = (value) => transformProposalCustomerText(value, project, lang);
   const teal = options.teal || [15, 118, 110];
   const navy = options.navy || [15, 23, 42];
   const muted = options.muted || [71, 85, 105];
@@ -204,7 +206,7 @@ export function repairCostEvolutionProposalPage(doc, project, calculated, pageNu
     theme: "grid",
     head: [[it ? "Indicatore economico" : "Economic indicator", it ? "Valore" : "Value"]],
     body: [
-      [it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit", reportMoney(calculated.customerAnnualNetBenefit, lang)],
+      [customerText(it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit"), reportMoney(calculated.customerAnnualNetBenefit, lang)],
       ["Payback", calculated.payback == null ? "-" : `${reportNumber(calculated.payback, 1, lang)} ${it ? "anni" : "yrs"}`],
       [it ? "Investimento iniziale" : "Initial investment", reportMoney(calculated.totalCapex, lang)],
     ],
