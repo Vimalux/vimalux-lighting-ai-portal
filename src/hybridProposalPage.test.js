@@ -40,9 +40,9 @@ test("Hybrid monthly report reconciles monthly grid offset to Business Case annu
   assert.ok(report.monthly.every((row) => row.gridOffsetKwh <= row.usableSolarKwh));
 });
 
-test("preliminary proposal uses hybrid-aware visual pages and appends monthly Hybrid Solar detail", () => {
+test("preliminary proposal uses final hybrid-aware visual pages and appends monthly Hybrid Solar detail", () => {
   const source = fs.readFileSync(new URL("./proposalVisualAuto.js", import.meta.url), "utf8");
-  assert.match(source, /from "\.\/proposalVisualPages\.js"/);
+  assert.match(source, /from "\.\/proposalFinalVisualPages\.js"/);
   assert.doesNotMatch(source, /proposalVisualPagesSimple/);
   assert.match(source, /appendHybridProposalPage\(this, project, calculated, visualOptions\)/);
 });
