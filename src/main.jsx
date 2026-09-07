@@ -7,7 +7,6 @@ import "./catalogueExtended.css";
 import "./warranty.css";
 import "./dimming-nightly.css";
 import "./solutionAdditionalCosts.js";
-import "./proposalCustomerVatTextRuntime.js";
 import "./preliminaryProposalV2.js";
 import "./reimportConfirmGuard.js";
 import "./importedProductCategoryReconcile.js";
