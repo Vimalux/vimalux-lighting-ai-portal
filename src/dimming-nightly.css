@@ -1,0 +1,43 @@
+.dimming-card table thead th:nth-child(5),
+.dimming-card table thead th:nth-child(6),
+.dimming-card table thead th:nth-child(7),
+.dimming-card table thead th:nth-child(8) {
+  font-size: 0;
+  line-height: 1.15;
+}
+
+.dimming-card table thead th:nth-child(5)::after,
+.dimming-card table thead th:nth-child(6)::after,
+.dimming-card table thead th:nth-child(7)::after,
+.dimming-card table thead th:nth-child(8)::after {
+  display: inline-block;
+  font-size: 11px;
+  white-space: normal;
+}
+
+.dimming-card table thead th:nth-child(5)::after {
+  content: "Ore a piena potenza / notte · Full-power h/night";
+}
+
+.dimming-card table thead th:nth-child(6)::after {
+  content: "Ore ridotte / notte · Reduced h/night";
+}
+
+.dimming-card table thead th:nth-child(7)::after {
+  content: "Potenza residua % · 70 = riduzione 30%";
+}
+
+.dimming-card table thead th:nth-child(8)::after {
+  content: "Riduzione media annua effettiva %";
+}
+
+.dimming-card > .hint {
+  font-size: 0;
+}
+
+.dimming-card > .hint::after {
+  content: "Inserire le ore per notte. Esempio: 6,5 h a piena potenza + 5 h al 70% di potenza residua significa una riduzione del 30% nella fascia ridotta e circa il 13,0% di riduzione media annua. I vecchi profili salvati con ore annue restano compatibili. · Enter hours per night. Example: 6.5 h at full power + 5 h at 70% remaining power means 30% reduction during the reduced period and about 13.0% annual average reduction. Historic annual-hour profiles remain compatible.";
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+}
