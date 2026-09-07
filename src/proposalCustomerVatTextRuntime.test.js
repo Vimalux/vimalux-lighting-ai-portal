@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { transformProposalCustomerText } from "./proposalCustomerVatTextRuntime.js";
+import { transformProposalCustomerText } from "./proposalCustomerVatText.js";
 import { customerVatDisclosure, vatRecoverablePercent } from "./customerVatProfile.js";
 
 const esco = {
@@ -42,7 +42,10 @@ test("generic VAT disclaimer is replaced before PDF text is written", () => {
   assert.match(transformed, /IVA recuperabile dal cliente \/ ESCO: 100%/);
 });
 
-test("proposal customer VAT runtime is installed from the main application entry", () => {
+test("proposal customer VAT runtime is installed and project matching fails closed", () => {
   const main = fs.readFileSync(new URL("./main.jsx", import.meta.url), "utf8");
+  const runtime = fs.readFileSync(new URL("./proposalCustomerVatTextRuntime.js", import.meta.url), "utf8");
   assert.match(main, /proposalCustomerVatTextRuntime\.js/);
+  assert.match(runtime, /if \(!businessCaseRecordId\) return null/);
+  assert.doesNotMatch(runtime, /projects\[0\]/);
 });
