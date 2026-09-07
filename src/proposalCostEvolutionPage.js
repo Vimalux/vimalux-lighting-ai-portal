@@ -1,5 +1,6 @@
 import autoTable from "jspdf-autotable";
 import { buildYearOneCustomerValuePhases } from "./customerValuePhases.js";
+import { summarizeExistingDimming } from "./existingDimming.js";
 import { transformProposalCustomerText } from "./proposalCustomerVatText.js";
 import { alignedTable, pdfSafeText, reportMoney, reportNumber } from "./reportPresentation.js";
 
@@ -35,6 +36,29 @@ function phaseLabel(phase, calculated, lang) {
   if (display.cmsActive && display.powerAidActive) return "CMS + PowerAiD";
   if (display.cmsActive) return it ? "Solo CMS" : "CMS only";
   return it ? "Dopo il contratto Smart" : "After Smart contract";
+}
+
+function dimmingSummaryValue(project, calculated, lang) {
+  const it = lang === "it";
+  const summary = summarizeExistingDimming(project);
+  if (!summary.active) return it ? "Nessuna riduzione configurata" : "No reduction configured";
+  const representative = summary.profiles[0];
+  const weighted = safe(calculated.nominalSystemKwh) > 0
+    ? safe(calculated.existingDimmingSavingKwh) / safe(calculated.nominalSystemKwh) * 100
+    : safe(representative?.annualReductionPct);
+  if (representative?.method === "profile" && representative?.nightly) {
+    const reduction = reportNumber(representative.reductionDuringReducedPct, 0, lang);
+    const full = reportNumber(representative.fullPowerHoursPerNight, 1, lang);
+    const reduced = reportNumber(representative.reducedHoursPerNight, 1, lang);
+    const average = reportNumber(weighted, 1, lang);
+    const timing = representative.note ? ` · ${representative.note}` : "";
+    return it
+      ? `${reduction}% nella fascia ridotta${timing} · ${full} h + ${reduced} h/notte · media annua ${average}%`
+      : `${reduction}% during reduced period${timing} · ${full} h + ${reduced} h/night · annual average ${average}%`;
+  }
+  return it
+    ? `Riduzione media annua ${reportNumber(weighted, 1, lang)}%`
+    : `Annual average reduction ${reportNumber(weighted, 1, lang)}%`;
 }
 
 function drawCostChart(doc, calculated, x, y, w, h, lang, colors) {
@@ -204,16 +228,17 @@ export function repairCostEvolutionProposalPage(doc, project, calculated, pageNu
   autoTable(doc, {
     startY: 228,
     theme: "grid",
-    head: [[it ? "Indicatore economico" : "Economic indicator", it ? "Valore" : "Value"]],
+    head: [[it ? "Indicatore economico / baseline" : "Economic / baseline indicator", it ? "Valore" : "Value"]],
     body: [
       [customerText(it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit"), reportMoney(calculated.customerAnnualNetBenefit, lang)],
+      [it ? "Profilo dimmer esistente" : "Existing dimming profile", dimmingSummaryValue(project, calculated, lang)],
       ["Payback", calculated.payback == null ? "-" : `${reportNumber(calculated.payback, 1, lang)} ${it ? "anni" : "yrs"}`],
       [it ? "Investimento iniziale" : "Initial investment", reportMoney(calculated.totalCapex, lang)],
     ],
     headStyles: { fillColor: teal },
     alternateRowStyles: { fillColor: light },
-    styles: { font: "helvetica", fontSize: 7.1, cellPadding: 1.25 },
-    columnStyles: { 0: { halign: "left" }, 1: { halign: "right", cellWidth: 50 } },
+    styles: { font: "helvetica", fontSize: 6.7, cellPadding: 1.1, overflow: "linebreak" },
+    columnStyles: { 0: { halign: "left", cellWidth: 55 }, 1: { halign: "right" } },
     didParseCell: alignedTable({ 0: "left", 1: "right" }).didParseCell,
   });
 
@@ -223,6 +248,6 @@ export function repairCostEvolutionProposalPage(doc, project, calculated, pageNu
   doc.text(it
     ? "La visualizzazione usa la stessa logica economica del dashboard Intelligence e valori a prezzi costanti dell'anno 1; il cash flow mantiene invece le indicizzazioni annuali previste dal Business Case."
     : "The visualization uses the same economic logic as the Intelligence dashboard and constant year-1 prices; the cash flow continues to apply the annual escalations configured in the Business Case.",
-  14, 265, { maxWidth: 182 });
+  14, 267, { maxWidth: 182 });
   return true;
 }
