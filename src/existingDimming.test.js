@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { nightlyDimmingMetrics, normalizeNightlyDimmingProject, summarizeExistingDimming } from "./existingDimming.js";
 
 const group = {
@@ -45,4 +46,17 @@ test("summary exposes the client-facing nightly profile", () => {
   assert.equal(summary.profiles[0].fullPowerHoursPerNight, 6.5);
   assert.equal(summary.profiles[0].reducedHoursPerNight, 5);
   assert.equal(summary.profiles[0].reductionDuringReducedPct, 30);
+});
+
+test("nightly dimming is wired into calculation, UI labels and customer proposal", () => {
+  const calculations = fs.readFileSync(new URL("./calculations.js", import.meta.url), "utf8");
+  const main = fs.readFileSync(new URL("./main.jsx", import.meta.url), "utf8");
+  const css = fs.readFileSync(new URL("./dimming-nightly.css", import.meta.url), "utf8");
+  const proposal = fs.readFileSync(new URL("./proposalCostEvolutionPage.js", import.meta.url), "utf8");
+  assert.match(calculations, /normalizeNightlyDimmingProject/);
+  assert.match(main, /dimming-nightly\.css/);
+  assert.match(css, /Ore a piena potenza \/ notte/);
+  assert.match(css, /70 = riduzione 30%/);
+  assert.match(proposal, /Profilo dimmer esistente/);
+  assert.match(proposal, /summarizeExistingDimming/);
 });
