@@ -76,38 +76,22 @@ function renderExecutiveRefinement(report, project, result) {
     ));
   }
 
-  const section = document.createElement("section");
-  section.className = "card customer-summary-card report-model-assumptions";
-  section.setAttribute(MARKER, "model-card");
-  const title = document.createElement("h2");
-  title.textContent = it ? "Soluzione e parametri chiave" : "Solution and key parameters";
-  const hint = document.createElement("p");
-  hint.className = "hint";
+  const note = document.createElement("div");
+  note.setAttribute(MARKER, "model-note");
+  note.style.cssText = "margin-top:12px;padding:10px 12px;border:1px solid #dbe4ee;border-radius:8px;background:#f8fafc;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-size:12px;line-height:1.35;color:#475569";
+
   if (hybrid) {
-    hint.textContent = it
-      ? `Hybrid Solar incluso: ${formatNumber(hybrid.units, language)} apparecchi · ${formatNumber(hybrid.installedPvKwp, language, 2)} kWp · ${formatNumber(hybrid.gridOffsetKwh, language)} kWh/anno di offset rete. Il beneficio Hybrid è già incluso nel risparmio netto.`
-      : `Hybrid Solar included: ${formatNumber(hybrid.units, language)} luminaires · ${formatNumber(hybrid.installedPvKwp, language, 2)} kWp · ${formatNumber(hybrid.gridOffsetKwh, language)} kWh/year grid offset. Hybrid benefit is already included in net savings.`;
-  } else {
-    hint.textContent = it
-      ? "La sintesi usa gli stessi parametri economici del Business Case attivo."
-      : "The summary uses the same economic assumptions as the active Business Case.";
+    const hybridText = document.createElement("span");
+    hybridText.innerHTML = `<strong style=\"color:#0f766e\">Hybrid Solar</strong>: ${formatNumber(hybrid.units, language)} ${it ? "apparecchi" : "luminaires"} · ${formatNumber(hybrid.installedPvKwp, language, 2)} kWp · ${formatNumber(hybrid.gridOffsetKwh, language)} kWh/${it ? "anno" : "yr"} ${it ? "offset rete" : "grid offset"}`;
+    note.appendChild(hybridText);
   }
 
-  const values = document.createElement("div");
-  values.className = "kpis customer-summary-kpis";
-  values.appendChild(makeKpi(
-    it ? "Indicizzazione prezzo energia" : "Energy-price escalation",
-    `${formatNumber(energyEscalation, language, 1)}% ${it ? "annuo" : "p.a."}`,
-    "energy-escalation",
-  ));
-  values.appendChild(makeKpi(
-    it ? "Indicizzazione canone/OPEX" : "Service/OPEX escalation",
-    `${formatNumber(opexEscalation, language, 1)}% ${it ? "annuo" : "p.a."}`,
-    "opex-escalation",
-  ));
-
-  section.append(title, hint, values);
-  summary.insertAdjacentElement("afterend", section);
+  const energyText = document.createElement("span");
+  energyText.innerHTML = `<strong>${it ? "Indicizzazione energia" : "Energy escalation"}</strong>: ${formatNumber(energyEscalation, language, 1)}% ${it ? "annuo" : "p.a."}`;
+  const opexText = document.createElement("span");
+  opexText.innerHTML = `<strong>${it ? "Indicizzazione canone/OPEX" : "Service/OPEX escalation"}</strong>: ${formatNumber(opexEscalation, language, 1)}% ${it ? "annuo" : "p.a."}`;
+  note.append(energyText, opexText);
+  summary.appendChild(note);
 }
 
 export function renderReportExecutiveRefinement() {
