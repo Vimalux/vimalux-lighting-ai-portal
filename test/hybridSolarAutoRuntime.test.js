@@ -34,13 +34,17 @@ test("customer municipality enables automatic solar only for hybrid projects wit
   }), false);
 });
 
-test("automatic runtime remains admin-only and retries municipality candidates", () => {
+test("automatic runtime uses the same VIMALUX write roles as cloud persistence and exposes diagnostics", () => {
   const runtime = fs.readFileSync(new URL("../src/hybridSolarAutoRuntime.js", import.meta.url), "utf8");
+  const economic = fs.readFileSync(new URL("../src/hybridEconomicAnalysisRuntime.js", import.meta.url), "utf8");
   const main = fs.readFileSync(new URL("../src/main.jsx", import.meta.url), "utf8");
-  assert.match(runtime, /profile\?\.role !== "admin"/);
+  assert.match(runtime, /\["admin", "vimalux", "sales_manager"\]/);
+  assert.match(runtime, /publishHybridSolarAutoStatus/);
   assert.match(runtime, /saveCloudState\(\[project\]\)/);
   assert.match(runtime, /projectMunicipalityCandidates/);
   assert.match(runtime, /for \(const municipality of candidates\)/);
   assert.match(runtime, /resolveMunicipalitySolar/);
+  assert.match(economic, /HYBRID_SOLAR_AUTO_STATUS_EVENT/);
+  assert.match(economic, /getHybridSolarAutoStatus/);
   assert.match(main, /hybridSolarAutoRuntime\.js/);
 });

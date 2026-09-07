@@ -1,5 +1,6 @@
 import { calculateBusinessCase } from "./calculations.js";
 import { getLiveBusinessCaseResult, LIVE_BUSINESS_CASE_EVENT } from "./liveBusinessCaseResult.js";
+import { getHybridSolarAutoStatus, HYBRID_SOLAR_AUTO_STATUS_EVENT } from "./hybridSolarAutoStatus.js";
 
 const PROJECTS_KEY = "vimalux-intelligence-projects";
 const MARKER = "data-vimalux-hybrid-economic-ui";
@@ -109,6 +110,20 @@ function makeHybridCard(display) {
   hint.textContent = display.savingKwh > 0
     ? (it ? "Il contributo solare è applicato dopo LED, CLO e PowerAiD e riduce esclusivamente il consumo degli apparecchi ibridi." : "Solar contribution is applied after LED, CLO and PowerAiD and only offsets the load of hybrid luminaires.")
     : (it ? "Apparecchi ibridi rilevati. Il beneficio resta a zero finché non è disponibile una resa solare dal Comune o inserita manualmente." : "Hybrid luminaires detected. Benefit remains zero until a municipality solar yield or manual yield is available.");
+
+  const autoStatus = getHybridSolarAutoStatus();
+  const status = document.createElement("p");
+  status.className = "hint";
+  if (autoStatus?.state) {
+    const labels = it
+      ? { resolving: "Calcolo automatico", ready: "Calcolo automatico completato", blocked: "Calcolo automatico bloccato", error: "Errore calcolo automatico" }
+      : { resolving: "Automatic calculation", ready: "Automatic calculation completed", blocked: "Automatic calculation blocked", error: "Automatic calculation error" };
+    status.textContent = `${labels[autoStatus.state] || "Hybrid auto"}: ${autoStatus.message || "—"}`;
+    if (autoStatus.state === "error" || autoStatus.state === "blocked") status.style.color = "#b42318";
+  } else if (display.savingKwh <= 0) {
+    status.textContent = it ? "Stato calcolo automatico: in attesa di avvio." : "Automatic calculation status: waiting to start.";
+  }
+
   const kpis = document.createElement("div");
   kpis.className = "kpis";
   const items = [
@@ -128,7 +143,9 @@ function makeHybridCard(display) {
     item.append(span, strong);
     kpis.appendChild(item);
   }
-  card.append(title, hint, kpis);
+  card.append(title, hint);
+  if (status.textContent) card.append(status);
+  card.append(kpis);
   return card;
 }
 
@@ -184,6 +201,7 @@ function scheduleRender() {
 
 if (typeof window !== "undefined" && typeof document !== "undefined") {
   window.addEventListener(LIVE_BUSINESS_CASE_EVENT, scheduleRender);
+  window.addEventListener(HYBRID_SOLAR_AUTO_STATUS_EVENT, scheduleRender);
   window.addEventListener("focus", scheduleRender);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) scheduleRender(); });
   const observer = new MutationObserver(scheduleRender);
