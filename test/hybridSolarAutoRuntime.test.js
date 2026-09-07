@@ -10,11 +10,11 @@ test("municipality is taken from stored solar query before customer name", () =>
   }), "Serino");
 });
 
-test("project labels expose the municipality suffix before the full label", () => {
+test("project labels expose the municipality suffix before fallback labels", () => {
   assert.deepEqual(projectMunicipalityCandidates({
     customer: { name: "Test 1 - Poggiardo" },
     project: { name: "Poggiardo Upgrade Partner (Step 1 of 2)" },
-  }).slice(0, 2), ["Poggiardo", "Test 1 - Poggiardo"]);
+  }).slice(0, 2), ["Poggiardo", "Poggiardo Upgrade Partner (Step 1 of 2)"]);
 
   assert.equal(projectMunicipalityName({
     customer: { name: "Pilot: Serino" },
