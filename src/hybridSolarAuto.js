@@ -18,9 +18,16 @@ function municipalitySuffix(value) {
   const clean = stripMunicipalityPrefix(value);
   const parts = clean.split(/\s+[-–—:]\s+/).map((part) => part.trim()).filter(Boolean);
   if (parts.length < 2) return "";
-  const first = parts[0];
-  if (!/^(?:test|pilot|progetto|project)\b/i.test(first)) return "";
-  return normalizeCandidate(parts.at(-1));
+
+  // In project/customer labels the right-most segment is normally the municipality,
+  // e.g. "CiviSmart – Poggiardo", "Test 1 - Poggiardo" or "Pilot: Serino".
+  // Try this suffix first, but keep the full label as a later fallback candidate.
+  const suffix = normalizeCandidate(parts.at(-1));
+  if (!suffix) return "";
+
+  // Avoid treating obvious non-location workflow/status suffixes as municipalities.
+  if (/^(?:step\s*\d|fase\s*\d|phase\s*\d|upgrade|partner|test|pilot)$/i.test(suffix)) return "";
+  return suffix;
 }
 
 export function projectMunicipalityCandidates(project = {}) {
