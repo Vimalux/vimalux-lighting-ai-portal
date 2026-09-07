@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import { appendCapexProposalPage } from "./capexProposalPage.js";
 import { appendProposalVisualPages } from "./proposalVisualPages.js";
 import { appendHybridProposalPage } from "./hybridProposalPage.js";
 
@@ -88,6 +89,7 @@ if (!jsPDF.API.__vimaluxPreliminaryVisualsInstalled) {
         muted: [71, 85, 105],
         light: [248, 250, 252],
       };
+      appendCapexProposalPage(this, project, visualOptions);
       const calculated = appendProposalVisualPages(this, project, visualOptions);
       appendHybridProposalPage(this, project, calculated, visualOptions);
       redrawFourPageFooters(this, project, filename);
