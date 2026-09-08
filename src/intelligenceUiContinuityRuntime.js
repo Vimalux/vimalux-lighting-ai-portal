@@ -58,11 +58,20 @@ function isActiveCandidate(element) {
   );
 }
 
+function activeNavCandidate() {
+  return navCandidates().find(isActiveCandidate) || null;
+}
+
 function rememberFromElement(element) {
   const label = norm(element?.textContent);
   const view = VIEW_LABELS.get(label);
   if (!view) return;
   try { localStorage.setItem(storageKey(), JSON.stringify({ view, label })); } catch (_) {}
+}
+
+function rememberActiveView() {
+  const active = activeNavCandidate();
+  if (active) rememberFromElement(active);
 }
 
 function storedView() {
@@ -94,7 +103,7 @@ function restoreView() {
   const target = candidates.find((el) => VIEW_LABELS.get(norm(el.textContent)) === saved.view);
   if (!target) return; // Permission-safe: unavailable admin views are never forced for agents.
 
-  const activeCandidate = candidates.find(isActiveCandidate);
+  const activeCandidate = activeNavCandidate();
   const activeView = activeCandidate
     ? VIEW_LABELS.get(norm(activeCandidate.textContent)) || ""
     : "";
@@ -216,10 +225,24 @@ if (typeof document !== "undefined") {
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      lastRestoreSignature = "";
-      scheduleRestore(120);
+    if (document.hidden) {
+      // Capture the view that is actually active at the instant the user leaves
+      // the browser. This prevents an older persisted admin/global view (for
+      // example CMS Partners) from overwriting the current project view.
+      rememberActiveView();
+      clearTimeout(restoreTimer);
+      return;
     }
+    lastRestoreSignature = "";
+    scheduleRestore(120);
+  });
+  window.addEventListener("pagehide", () => {
+    rememberActiveView();
+    clearTimeout(restoreTimer);
+  });
+  window.addEventListener("blur", () => {
+    rememberActiveView();
+    clearTimeout(restoreTimer);
   });
   window.addEventListener("pageshow", () => {
     lastRestoreSignature = "";
