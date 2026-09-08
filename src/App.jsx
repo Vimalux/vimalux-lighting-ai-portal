@@ -128,6 +128,18 @@ const numeric = new Set([
   "totalContractValue",
 ]);
 
+export function sameBusinessCaseIdentity(currentProject, activeId, candidate, requestedId = "") {
+  const normalizeId = (value) => String(value || "").trim().toLowerCase();
+  const idsFor = (item) => [
+    item?.id,
+    item?.crm?.businessCaseRecordId,
+    item?.project?.businessCaseId,
+  ].map(normalizeId).filter(Boolean);
+  const currentIds = new Set([normalizeId(activeId), ...idsFor(currentProject)].filter(Boolean));
+  const candidateIds = new Set([normalizeId(requestedId), ...idsFor(candidate)].filter(Boolean));
+  return [...currentIds].some((id) => candidateIds.has(id));
+}
+
 export default function App() {
   const hadStoredProjects = useMemo(
     () => Boolean(localStorage.getItem("vimalux-intelligence-projects")),
@@ -205,7 +217,6 @@ export default function App() {
         if (!active) return;
         const migrated = rows.map(migrateProject);
         setCurrentProfile(profile);
-        if (profile?.role === "agent") setView("customer");
         setProjects(migrated);
         setActiveId((current) =>
           migrated.some((p) => p.id === current)
@@ -264,7 +275,13 @@ export default function App() {
         item.crm?.uniqueProjectId === opportunityId ||
         item.project?.businessCaseId === businessCaseId,
     );
-    if (match) { setActiveId(match.id); setView("customer"); return; }
+    if (match) {
+    const preserveCurrentView = workflow.some(([id]) => id === view)
+      && sameBusinessCaseIdentity(project, activeId, match, businessCaseId);
+    setActiveId(match.id);
+    if (!preserveCurrentView) setView("customer");
+    return;
+  }
     if (isStableBusinessCaseLink(params) && session) {
       let active = true;
       loadBusinessCase(businessCaseId)
@@ -276,8 +293,10 @@ export default function App() {
               ? current
               : [...current, migrated],
           );
-          setActiveId(migrated.id);
-          setView("customer");
+          const preserveCurrentView = workflow.some(([id]) => id === view)
+          && sameBusinessCaseIdentity(project, activeId, migrated, businessCaseId);
+        setActiveId(migrated.id);
+        if (!preserveCurrentView) setView("customer");
         })
         .catch((error) => {
           if (!active) return;
