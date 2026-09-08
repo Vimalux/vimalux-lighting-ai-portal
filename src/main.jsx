@@ -15,6 +15,7 @@ import "./defaultAssumptionsRuntime.js";
 import "./servicePeriodsRuntime.js";
 import "./activeProjectContextRuntime.js";
 import "./intelligenceUiContinuityRuntime.js";
+import "./businessCaseViewAuthorityRuntime.js";
 import "./catalogueExpandedStateRuntime.js";
 import "./hybridEconomicAnalysisRuntime.js";
 import "./hybridSolarAutoRuntime.js";
