@@ -10,30 +10,49 @@ test("continuity signature changes when the active menu drifts away from the sav
   assert.notEqual(saved, drifted);
 });
 
-test("Intelligence continuity restores on browser return without locking manual navigation", () => {
+test("manual Intelligence navigation is authoritative and programmatic restore cannot overwrite it", () => {
   const source = fs.readFileSync(
     new URL("../src/intelligenceUiContinuityRuntime.js", import.meta.url),
     "utf8",
   );
-  assert.match(source, /\["cms partners", "datek"\]/);
-  assert.match(source, /window\.addEventListener\("focus"/);
-  assert.match(source, /document\.addEventListener\("visibilitychange"/);
-  assert.match(source, /lastUserNavigationAt = Date\.now\(\)/);
-  assert.match(source, /clearTimeout\(restoreTimer\)/);
-  assert.match(source, /if \(!restoringView\)/);
-  assert.match(source, /const observer = new MutationObserver\(refresh\)/);
-  assert.match(source, /const refresh = \(\) => \{\s*enforceAllMppt\(\);\s*\};/);
-  assert.doesNotMatch(source, /const refresh = \(\) => \{[\s\S]*?scheduleRestore\(\);[\s\S]*?\};/);
+  assert.match(source, /let lastExplicitView = ""/);
+  assert.match(source, /let lastExplicitRef = ""/);
+  assert.match(source, /function rememberManualView\(element\)/);
+  assert.match(source, /&& !restoringView\) \{/);
+  assert.match(source, /rememberManualView\(nav\)/);
+  assert.doesNotMatch(source, /if \(!restoringView\)[\s\S]*?rememberFromElement\(nav\)/);
 });
 
-test("Intelligence captures the actually active view before browser leave", () => {
+test("browser return restores the saved view after the async Supabase refresh window", () => {
   const source = fs.readFileSync(
     new URL("../src/intelligenceUiContinuityRuntime.js", import.meta.url),
     "utf8",
   );
-  assert.match(source, /function rememberActiveView\(\)/);
-  assert.match(source, /const active = activeNavCandidate\(\)/);
-  assert.match(source, /if \(document\.hidden\) \{[\s\S]*?rememberActiveView\(\)/);
-  assert.match(source, /window\.addEventListener\("blur", \(\) => \{[\s\S]*?rememberActiveView\(\)/);
-  assert.match(source, /window\.addEventListener\("pagehide", \(\) => \{[\s\S]*?rememberActiveView\(\)/);
+  assert.match(source, /\[140, 850, 1700\]\.forEach/);
+  assert.match(source, /window\.addEventListener\("focus"/);
+  assert.match(source, /if \(hasLeftBrowser\) scheduleReturnRestore\(\)/);
+  assert.match(source, /document\.addEventListener\("visibilitychange"/);
+  assert.match(source, /rememberCurrentViewBeforeLeave\(\)/);
+});
+
+test("stale persisted CMS state cannot beat the latest explicit project view", () => {
+  const source = fs.readFileSync(
+    new URL("../src/intelligenceUiContinuityRuntime.js", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /if \(lastExplicitView && lastExplicitRef === ref\) \{\s*return \{ view: lastExplicitView, label: "" \};/);
+  assert.match(source, /if \(lastExplicitView && lastExplicitRef === ref\) \{\s*writeStoredView\(ref, lastExplicitView\)/);
+  assert.match(source, /element\.classList\.contains\("active"\)/);
+  assert.doesNotMatch(source, /parentElement\?\.classList\.contains\("active"\)/);
+});
+
+test("continuity uses the real App view id for price administration and does not restore on initial load", () => {
+  const source = fs.readFileSync(
+    new URL("../src/intelligenceUiContinuityRuntime.js", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /\["amministrazione prezzi", "admin"\]/);
+  assert.match(source, /\["price administration", "admin"\]/);
+  assert.doesNotMatch(source, /scheduleRestore\(450\)/);
+  assert.match(source, /event\.persisted && hasLeftBrowser/);
 });
