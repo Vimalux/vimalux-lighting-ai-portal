@@ -25,3 +25,15 @@ test("Intelligence continuity restores on browser return without locking manual 
   assert.match(source, /const refresh = \(\) => \{\s*enforceAllMppt\(\);\s*\};/);
   assert.doesNotMatch(source, /const refresh = \(\) => \{[\s\S]*?scheduleRestore\(\);[\s\S]*?\};/);
 });
+
+test("Intelligence captures the actually active view before browser leave", () => {
+  const source = fs.readFileSync(
+    new URL("../src/intelligenceUiContinuityRuntime.js", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /function rememberActiveView\(\)/);
+  assert.match(source, /const active = activeNavCandidate\(\)/);
+  assert.match(source, /if \(document\.hidden\) \{[\s\S]*?rememberActiveView\(\)/);
+  assert.match(source, /window\.addEventListener\("blur", \(\) => \{[\s\S]*?rememberActiveView\(\)/);
+  assert.match(source, /window\.addEventListener\("pagehide", \(\) => \{[\s\S]*?rememberActiveView\(\)/);
+});
