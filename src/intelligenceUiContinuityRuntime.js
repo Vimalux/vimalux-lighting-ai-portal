@@ -53,8 +53,8 @@ function isActiveCandidate(element) {
   );
 }
 
-function activeSidebarCandidate() {
-  return sidebarCandidates().find(isActiveCandidate) || null;
+function activeProjectCandidate() {
+  return projectNavCandidates().find(isActiveCandidate) || null;
 }
 
 function writeStoredView(ref, view, label = "") {
@@ -118,20 +118,25 @@ function rememberManualProjectView(element) {
 
 function captureProjectViewBeforeLeave() {
   const ref = currentBusinessCaseRef();
-  const activeSidebar = activeSidebarCandidate();
-  const activeLabel = norm(activeSidebar?.textContent);
+  const activeProject = activeProjectCandidate();
+  const activeLabel = norm(activeProject?.textContent);
   let activeProjectView = PROJECT_VIEW_LABELS.get(activeLabel);
 
-  // During blur/pagehide React can briefly have no active element while rerendering.
-  // In that narrow case, fall back to the last explicit project click for the same case.
-  if (!activeSidebar && lastExplicitRef === ref && PROJECT_VIEW_IDS.has(lastExplicitView)) {
+  // Blur/pagehide can occur while an unrelated global nav item also carries an
+  // active marker, or while React is temporarily rerendering the project menu.
+  // Only a Business Case nav item may be used as DOM evidence here. If none is
+  // active, preserve the latest explicit project click for the same case.
+  if (!activeProjectView && lastExplicitRef === ref && PROJECT_VIEW_IDS.has(lastExplicitView)) {
     activeProjectView = lastExplicitView;
   }
 
-  // If a global/admin area is active, do not restore any Business Case view.
-  // This prevents CMS Partners/CRM/etc. from being persisted under a project.
+  // Lack of an active Business Case item during blur is not evidence that the
+  // user navigated to a global/admin area. Explicit global/admin clicks are the
+  // only events allowed to clear project continuity (see click handler below).
   if (!activeProjectView) {
-    disableProjectRestore();
+    restoreOnReturn = false;
+    restoreUntil = 0;
+    clearRestoreTimers();
     return;
   }
 
