@@ -24,8 +24,8 @@ const VIEW_LABELS = new Map([
   ["projects", "projects"],
   ["catalogo prodotti", "catalogue"],
   ["product catalogue", "catalogue"],
-  ["amministrazione prezzi", "priceAdmin"],
-  ["price administration", "priceAdmin"],
+  ["amministrazione prezzi", "admin"],
+  ["price administration", "admin"],
   ["impostazioni default", "defaults"],
   ["default settings", "defaults"],
   ["rapporto interno", "internalReport"],
@@ -40,8 +40,8 @@ function currentBusinessCaseRef() {
   return new URLSearchParams(window.location.search).get("business_case_id") || "global";
 }
 
-function storageKey() {
-  return `${VIEW_STORAGE_PREFIX}:${currentBusinessCaseRef()}`;
+function storageKey(ref = currentBusinessCaseRef()) {
+  return `${VIEW_STORAGE_PREFIX}:${ref}`;
 }
 
 function navCandidates() {
@@ -53,8 +53,7 @@ function isActiveCandidate(element) {
   return Boolean(
     element
       && (element.classList.contains("active")
-        || element.getAttribute("aria-current") === "page"
-        || element.parentElement?.classList.contains("active")),
+        || element.getAttribute("aria-current") === "page"),
   );
 }
 
@@ -62,21 +61,14 @@ function activeNavCandidate() {
   return navCandidates().find(isActiveCandidate) || null;
 }
 
-function rememberFromElement(element) {
-  const label = norm(element?.textContent);
-  const view = VIEW_LABELS.get(label);
+function writeStoredView(ref, view, label = "") {
   if (!view) return;
-  try { localStorage.setItem(storageKey(), JSON.stringify({ view, label })); } catch (_) {}
+  try { localStorage.setItem(storageKey(ref), JSON.stringify({ view, label })); } catch (_) {}
 }
 
-function rememberActiveView() {
-  const active = activeNavCandidate();
-  if (active) rememberFromElement(active);
-}
-
-function storedView() {
+function storedView(ref = currentBusinessCaseRef()) {
   try {
-    const parsed = JSON.parse(localStorage.getItem(storageKey()) || "null");
+    const parsed = JSON.parse(localStorage.getItem(storageKey(ref)) || "null");
     return parsed && typeof parsed === "object" ? parsed : null;
   } catch (_) {
     return null;
@@ -87,35 +79,64 @@ export function continuityRestoreSignature(ref, savedView, activeView) {
   return `${String(ref || "global")}|${String(savedView || "")}|${String(activeView || "")}`;
 }
 
-let lastRestoreSignature = "";
-let restoreTimer = null;
+let restoreTimers = [];
 let lastUserNavigationAt = 0;
 let restoringView = false;
-const USER_NAVIGATION_GRACE_MS = 600;
+let lastExplicitView = "";
+let lastExplicitRef = "";
+let hasLeftBrowser = false;
+const USER_NAVIGATION_GRACE_MS = 700;
+
+function clearRestoreTimers() {
+  restoreTimers.forEach((timer) => clearTimeout(timer));
+  restoreTimers = [];
+}
+
+function rememberManualView(element) {
+  const label = norm(element?.textContent);
+  const view = VIEW_LABELS.get(label);
+  if (!view) return;
+  const ref = currentBusinessCaseRef();
+  lastExplicitView = view;
+  lastExplicitRef = ref;
+  writeStoredView(ref, view, label);
+}
+
+function rememberCurrentViewBeforeLeave() {
+  const ref = currentBusinessCaseRef();
+  if (lastExplicitView && lastExplicitRef === ref) {
+    writeStoredView(ref, lastExplicitView);
+    return;
+  }
+  const active = activeNavCandidate();
+  if (!active) return;
+  const label = norm(active.textContent);
+  const view = VIEW_LABELS.get(label);
+  if (!view) return;
+  lastExplicitView = view;
+  lastExplicitRef = ref;
+  writeStoredView(ref, view, label);
+}
+
+function preferredSavedView() {
+  const ref = currentBusinessCaseRef();
+  if (lastExplicitView && lastExplicitRef === ref) {
+    return { view: lastExplicitView, label: "" };
+  }
+  return storedView(ref);
+}
 
 function restoreView() {
   if (document.hidden) return;
   if (Date.now() - lastUserNavigationAt < USER_NAVIGATION_GRACE_MS) return;
 
-  const saved = storedView();
+  const saved = preferredSavedView();
   if (!saved?.view) return;
   const candidates = navCandidates();
   const target = candidates.find((el) => VIEW_LABELS.get(norm(el.textContent)) === saved.view);
   if (!target) return; // Permission-safe: unavailable admin views are never forced for agents.
+  if (isActiveCandidate(target)) return;
 
-  const activeCandidate = activeNavCandidate();
-  const activeView = activeCandidate
-    ? VIEW_LABELS.get(norm(activeCandidate.textContent)) || ""
-    : "";
-  const signature = continuityRestoreSignature(currentBusinessCaseRef(), saved.view, activeView);
-
-  if (isActiveCandidate(target)) {
-    lastRestoreSignature = signature;
-    return;
-  }
-  if (lastRestoreSignature === signature) return;
-
-  lastRestoreSignature = signature;
   restoringView = true;
   try {
     target.click();
@@ -124,13 +145,18 @@ function restoreView() {
   }
 }
 
-function scheduleRestore(delay = 80) {
-  clearTimeout(restoreTimer);
-  const scheduledAt = Date.now();
-  restoreTimer = setTimeout(() => {
-    if (lastUserNavigationAt > scheduledAt) return;
-    restoreView();
-  }, delay);
+function scheduleReturnRestore() {
+  clearRestoreTimers();
+  // Supabase can refresh the session after focus and re-run Business Case link
+  // hydration. Restore once immediately and again after that async refresh window.
+  [140, 850, 1700].forEach((delay) => {
+    const scheduledAt = Date.now();
+    const timer = setTimeout(() => {
+      if (lastUserNavigationAt > scheduledAt) return;
+      restoreView();
+    }, delay);
+    restoreTimers.push(timer);
+  });
 }
 
 function detailsGridForHybridCheckbox(box) {
@@ -188,13 +214,10 @@ function isNewLedButton(element) {
 if (typeof document !== "undefined") {
   document.addEventListener("click", (event) => {
     const nav = event.target?.closest?.("aside button, aside a, nav button, nav a");
-    if (nav && VIEW_LABELS.has(norm(nav.textContent))) {
-      if (!restoringView) {
-        lastUserNavigationAt = Date.now();
-        clearTimeout(restoreTimer);
-        lastRestoreSignature = "";
-      }
-      rememberFromElement(nav);
+    if (nav && VIEW_LABELS.has(norm(nav.textContent)) && !restoringView) {
+      lastUserNavigationAt = Date.now();
+      clearRestoreTimers();
+      rememberManualView(nav);
     }
     if (isNewLedButton(event.target)) setTimeout(focusNewestLedProduct, 180);
   }, true);
@@ -210,46 +233,37 @@ if (typeof document !== "undefined") {
     enforceAllMppt();
   };
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
-      refresh();
-      scheduleRestore(450);
-    }, { once: true });
+    document.addEventListener("DOMContentLoaded", refresh, { once: true });
   } else {
     refresh();
-    scheduleRestore(450);
   }
 
-  // DOM mutations may update catalogue controls, but they must never force a
-  // navigation restore while the user is actively working in Intelligence.
   const observer = new MutationObserver(refresh);
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
-      // Capture the view that is actually active at the instant the user leaves
-      // the browser. This prevents an older persisted admin/global view (for
-      // example CMS Partners) from overwriting the current project view.
-      rememberActiveView();
-      clearTimeout(restoreTimer);
+      hasLeftBrowser = true;
+      rememberCurrentViewBeforeLeave();
+      clearRestoreTimers();
       return;
     }
-    lastRestoreSignature = "";
-    scheduleRestore(120);
+    if (hasLeftBrowser) scheduleReturnRestore();
   });
   window.addEventListener("pagehide", () => {
-    rememberActiveView();
-    clearTimeout(restoreTimer);
+    hasLeftBrowser = true;
+    rememberCurrentViewBeforeLeave();
+    clearRestoreTimers();
   });
   window.addEventListener("blur", () => {
-    rememberActiveView();
-    clearTimeout(restoreTimer);
+    hasLeftBrowser = true;
+    rememberCurrentViewBeforeLeave();
+    clearRestoreTimers();
   });
-  window.addEventListener("pageshow", () => {
-    lastRestoreSignature = "";
-    scheduleRestore(120);
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted && hasLeftBrowser) scheduleReturnRestore();
   });
   window.addEventListener("focus", () => {
-    lastRestoreSignature = "";
-    scheduleRestore(120);
+    if (hasLeftBrowser) scheduleReturnRestore();
   });
 }
