@@ -22,6 +22,8 @@ const PROJECT_VIEW_LABELS = new Map([
 ]);
 
 const PROJECT_VIEW_IDS = new Set(PROJECT_VIEW_LABELS.values());
+const USER_NAVIGATION_GRACE_MS = 700;
+const RETURN_RESTORE_WINDOW_MS = 10000;
 
 function norm(value) {
   return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
@@ -84,7 +86,7 @@ let restoringView = false;
 let lastExplicitView = "";
 let lastExplicitRef = "";
 let restoreOnReturn = false;
-const USER_NAVIGATION_GRACE_MS = 700;
+let restoreUntil = 0;
 
 function clearRestoreTimers() {
   restoreTimers.forEach((timer) => clearTimeout(timer));
@@ -94,6 +96,13 @@ function clearRestoreTimers() {
 function clearExplicitView() {
   lastExplicitView = "";
   lastExplicitRef = "";
+}
+
+function disableProjectRestore() {
+  restoreOnReturn = false;
+  restoreUntil = 0;
+  clearExplicitView();
+  clearRestoreTimers();
 }
 
 function rememberManualProjectView(element) {
@@ -111,14 +120,18 @@ function captureProjectViewBeforeLeave() {
   const ref = currentBusinessCaseRef();
   const activeSidebar = activeSidebarCandidate();
   const activeLabel = norm(activeSidebar?.textContent);
-  const activeProjectView = PROJECT_VIEW_LABELS.get(activeLabel);
+  let activeProjectView = PROJECT_VIEW_LABELS.get(activeLabel);
+
+  // During blur/pagehide React can briefly have no active element while rerendering.
+  // In that narrow case, fall back to the last explicit project click for the same case.
+  if (!activeSidebar && lastExplicitRef === ref && PROJECT_VIEW_IDS.has(lastExplicitView)) {
+    activeProjectView = lastExplicitView;
+  }
 
   // If a global/admin area is active, do not restore any Business Case view.
   // This prevents CMS Partners/CRM/etc. from being persisted under a project.
   if (!activeProjectView) {
-    restoreOnReturn = false;
-    clearExplicitView();
-    clearRestoreTimers();
+    disableProjectRestore();
     return;
   }
 
@@ -138,6 +151,7 @@ function preferredSavedView() {
 
 function restoreView() {
   if (!restoreOnReturn || document.hidden) return;
+  if (restoreUntil && Date.now() > restoreUntil) return;
   if (Date.now() - lastUserNavigationAt < USER_NAVIGATION_GRACE_MS) return;
 
   const saved = preferredSavedView();
@@ -158,9 +172,11 @@ function restoreView() {
 function scheduleReturnRestore() {
   if (!restoreOnReturn) return;
   clearRestoreTimers();
-  // Supabase can refresh the session after focus and re-run Business Case link
-  // hydration. Restore the project-workflow view after that async window.
-  [140, 850, 1700].forEach((delay) => {
+  restoreUntil = Date.now() + RETURN_RESTORE_WINDOW_MS;
+  // Supabase/auth hydration can complete in more than one async wave after focus.
+  // Keep several bounded checks, and let the MutationObserver heal a late React reset
+  // during the same short return window.
+  [140, 850, 1700, 3500, 7000].forEach((delay) => {
     const scheduledAt = Date.now();
     const timer = setTimeout(() => {
       if (lastUserNavigationAt > scheduledAt) return;
@@ -232,8 +248,7 @@ if (typeof document !== "undefined") {
         rememberManualProjectView(nav);
       } else {
         // Explicit navigation to a global/admin area disables project restore.
-        restoreOnReturn = false;
-        clearExplicitView();
+        disableProjectRestore();
       }
     }
     if (isNewLedButton(event.target)) setTimeout(focusNewestLedProduct, 180);
@@ -248,6 +263,9 @@ if (typeof document !== "undefined") {
 
   const refresh = () => {
     enforceAllMppt();
+    if (restoreOnReturn && restoreUntil && Date.now() <= restoreUntil) {
+      queueMicrotask(restoreView);
+    }
   };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", refresh, { once: true });
@@ -256,7 +274,7 @@ if (typeof document !== "undefined") {
   }
 
   const observer = new MutationObserver(refresh);
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "aria-current"] });
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
