@@ -12,6 +12,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
+      - name: Install dependencies
+        run: npm ci
       - name: Remove hydration-driven view reset in App
         run: |
           python - <<'PY'
