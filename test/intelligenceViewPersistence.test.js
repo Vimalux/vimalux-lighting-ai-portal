@@ -39,32 +39,43 @@ test("leaving from a global or admin view disables Business Case restore", () =>
     new URL("../src/intelligenceUiContinuityRuntime.js", import.meta.url),
     "utf8",
   );
-  assert.match(source, /function captureProjectViewBeforeLeave\(\)/);
-  assert.match(source, /if \(!activeProjectView\) \{\s*restoreOnReturn = false;\s*clearExplicitView\(\)/);
+  assert.match(source, /function disableProjectRestore\(\)/);
+  assert.match(source, /restoreOnReturn = false;\s*restoreUntil = 0;\s*clearExplicitView\(\)/);
   assert.match(source, /Explicit navigation to a global\/admin area disables project restore/);
-  assert.match(source, /restoreOnReturn = false;\s*clearExplicitView\(\)/);
+  assert.match(source, /disableProjectRestore\(\)/);
 });
 
-test("project workflow view is restored after the Supabase refresh window", () => {
+test("project workflow view survives late Supabase hydration after browser return", () => {
   const source = fs.readFileSync(
     new URL("../src/intelligenceUiContinuityRuntime.js", import.meta.url),
     "utf8",
   );
-  assert.match(source, /\[140, 850, 1700\]\.forEach/);
+  assert.match(source, /const RETURN_RESTORE_WINDOW_MS = 10000/);
+  assert.match(source, /\[140, 850, 1700, 3500, 7000\]\.forEach/);
+  assert.match(source, /restoreUntil = Date\.now\(\) \+ RETURN_RESTORE_WINDOW_MS/);
+  assert.match(source, /queueMicrotask\(restoreView\)/);
+  assert.match(source, /attributeFilter: \["class", "aria-current"\]/);
   assert.match(source, /window\.addEventListener\("focus", scheduleReturnRestore\)/);
   assert.match(source, /document\.addEventListener\("visibilitychange"/);
   assert.match(source, /captureProjectViewBeforeLeave\(\)/);
-  assert.match(source, /if \(!restoreOnReturn\) return/);
 });
 
-test("manual project navigation stays authoritative and catalogue mutation observer does not navigate", () => {
+test("blur capture can fall back to the last explicit project view but never a global view", () => {
+  const source = fs.readFileSync(
+    new URL("../src/intelligenceUiContinuityRuntime.js", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /if \(!activeSidebar && lastExplicitRef === ref && PROJECT_VIEW_IDS\.has\(lastExplicitView\)\)/);
+  assert.match(source, /if \(!activeProjectView\) \{\s*disableProjectRestore\(\);\s*return;/);
+});
+
+test("manual project navigation remains authoritative during the bounded return window", () => {
   const source = fs.readFileSync(
     new URL("../src/intelligenceUiContinuityRuntime.js", import.meta.url),
     "utf8",
   );
   assert.match(source, /rememberManualProjectView\(nav\)/);
   assert.match(source, /if \(nav && !restoringView\)/);
-  assert.match(source, /const observer = new MutationObserver\(refresh\)/);
-  assert.doesNotMatch(source, /const observer = new MutationObserver\([^)]*scheduleReturnRestore/);
-  assert.doesNotMatch(source, /DOMContentLoaded[\s\S]{0,160}scheduleReturnRestore/);
+  assert.match(source, /lastUserNavigationAt = Date\.now\(\)/);
+  assert.match(source, /if \(Date\.now\(\) - lastUserNavigationAt < USER_NAVIGATION_GRACE_MS\) return/);
 });
