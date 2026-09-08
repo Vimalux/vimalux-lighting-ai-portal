@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { continuityRestoreSignature } from "../src/intelligenceUiContinuityRuntime.js";
+import {
+  continuityRestoreSignature,
+  isProjectContinuityView,
+} from "../src/intelligenceUiContinuityRuntime.js";
 
 test("continuity signature changes when the active menu drifts away from the saved view", () => {
   const ref = "ed7023d5-7b18-492c-9a82-2dbdf04ddb9e";
@@ -10,49 +13,58 @@ test("continuity signature changes when the active menu drifts away from the sav
   assert.notEqual(saved, drifted);
 });
 
-test("manual Intelligence navigation is authoritative and programmatic restore cannot overwrite it", () => {
+test("only Business Case workflow views are eligible for browser-return continuity", () => {
+  for (const view of ["customer", "existing", "solution", "additionalCosts", "pricing", "assumptions", "business", "report"]) {
+    assert.equal(isProjectContinuityView(view), true, `${view} should be restorable`);
+  }
+  for (const view of ["crm", "datek", "partnerReports", "projects", "catalogue", "admin", "internalReport", "defaults"]) {
+    assert.equal(isProjectContinuityView(view), false, `${view} must never take over a Business Case`);
+  }
+});
+
+test("CMS Partners and other global views cannot be stored or restored under a Business Case", () => {
   const source = fs.readFileSync(
     new URL("../src/intelligenceUiContinuityRuntime.js", import.meta.url),
     "utf8",
   );
-  assert.match(source, /let lastExplicitView = ""/);
-  assert.match(source, /let lastExplicitRef = ""/);
-  assert.match(source, /function rememberManualView\(element\)/);
-  assert.match(source, /&& !restoringView\) \{/);
-  assert.match(source, /rememberManualView\(nav\)/);
-  assert.doesNotMatch(source, /if \(!restoringView\)[\s\S]*?rememberFromElement\(nav\)/);
+  assert.match(source, /const PROJECT_VIEW_LABELS = new Map/);
+  assert.doesNotMatch(source, /\["cms partners", "datek"\]/);
+  assert.doesNotMatch(source, /\["crm", "crm"\]/);
+  assert.match(source, /if \(!parsed \|\| typeof parsed !== "object" \|\| !PROJECT_VIEW_IDS\.has\(parsed\.view\)\) return null/);
+  assert.match(source, /if \(!PROJECT_VIEW_IDS\.has\(view\)\) return/);
 });
 
-test("browser return restores the saved view after the async Supabase refresh window", () => {
+test("leaving from a global or admin view disables Business Case restore", () => {
+  const source = fs.readFileSync(
+    new URL("../src/intelligenceUiContinuityRuntime.js", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /function captureProjectViewBeforeLeave\(\)/);
+  assert.match(source, /if \(!activeProjectView\) \{\s*restoreOnReturn = false;\s*clearExplicitView\(\)/);
+  assert.match(source, /Explicit navigation to a global\/admin area disables project restore/);
+  assert.match(source, /restoreOnReturn = false;\s*clearExplicitView\(\)/);
+});
+
+test("project workflow view is restored after the Supabase refresh window", () => {
   const source = fs.readFileSync(
     new URL("../src/intelligenceUiContinuityRuntime.js", import.meta.url),
     "utf8",
   );
   assert.match(source, /\[140, 850, 1700\]\.forEach/);
-  assert.match(source, /window\.addEventListener\("focus"/);
-  assert.match(source, /if \(hasLeftBrowser\) scheduleReturnRestore\(\)/);
+  assert.match(source, /window\.addEventListener\("focus", scheduleReturnRestore\)/);
   assert.match(source, /document\.addEventListener\("visibilitychange"/);
-  assert.match(source, /rememberCurrentViewBeforeLeave\(\)/);
+  assert.match(source, /captureProjectViewBeforeLeave\(\)/);
+  assert.match(source, /if \(!restoreOnReturn\) return/);
 });
 
-test("stale persisted CMS state cannot beat the latest explicit project view", () => {
+test("manual project navigation stays authoritative and catalogue mutation observer does not navigate", () => {
   const source = fs.readFileSync(
     new URL("../src/intelligenceUiContinuityRuntime.js", import.meta.url),
     "utf8",
   );
-  assert.match(source, /if \(lastExplicitView && lastExplicitRef === ref\) \{\s*return \{ view: lastExplicitView, label: "" \};/);
-  assert.match(source, /if \(lastExplicitView && lastExplicitRef === ref\) \{\s*writeStoredView\(ref, lastExplicitView\)/);
-  assert.match(source, /element\.classList\.contains\("active"\)/);
-  assert.doesNotMatch(source, /parentElement\?\.classList\.contains\("active"\)/);
-});
-
-test("continuity uses the real App view id for price administration and does not restore on initial load", () => {
-  const source = fs.readFileSync(
-    new URL("../src/intelligenceUiContinuityRuntime.js", import.meta.url),
-    "utf8",
-  );
-  assert.match(source, /\["amministrazione prezzi", "admin"\]/);
-  assert.match(source, /\["price administration", "admin"\]/);
-  assert.doesNotMatch(source, /scheduleRestore\(450\)/);
-  assert.match(source, /event\.persisted && hasLeftBrowser/);
+  assert.match(source, /rememberManualProjectView\(nav\)/);
+  assert.match(source, /if \(nav && !restoringView\)/);
+  assert.match(source, /const observer = new MutationObserver\(refresh\)/);
+  assert.doesNotMatch(source, /const observer = new MutationObserver\([^)]*scheduleReturnRestore/);
+  assert.doesNotMatch(source, /DOMContentLoaded[\s\S]{0,160}scheduleReturnRestore/);
 });
