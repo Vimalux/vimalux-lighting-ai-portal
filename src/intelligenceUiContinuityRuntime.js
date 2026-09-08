@@ -1,6 +1,8 @@
 const VIEW_STORAGE_PREFIX = "vimalux-intelligence-last-view";
 
-const VIEW_LABELS = new Map([
+// Browser-return continuity is deliberately limited to the Business Case workflow.
+// Global/admin areas must never take over a project view on browser return.
+const PROJECT_VIEW_LABELS = new Map([
   ["cliente e progetto", "customer"],
   ["customer & project", "customer"],
   ["illuminazione esistente", "existing"],
@@ -17,20 +19,9 @@ const VIEW_LABELS = new Map([
   ["economic analysis", "business"],
   ["rapporto", "report"],
   ["report", "report"],
-  ["crm", "crm"],
-  ["cms partners", "datek"],
-  ["partner reports", "partnerReports"],
-  ["progetti", "projects"],
-  ["projects", "projects"],
-  ["catalogo prodotti", "catalogue"],
-  ["product catalogue", "catalogue"],
-  ["amministrazione prezzi", "admin"],
-  ["price administration", "admin"],
-  ["impostazioni default", "defaults"],
-  ["default settings", "defaults"],
-  ["rapporto interno", "internalReport"],
-  ["internal report", "internalReport"],
 ]);
+
+const PROJECT_VIEW_IDS = new Set(PROJECT_VIEW_LABELS.values());
 
 function norm(value) {
   return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
@@ -44,9 +35,12 @@ function storageKey(ref = currentBusinessCaseRef()) {
   return `${VIEW_STORAGE_PREFIX}:${ref}`;
 }
 
-function navCandidates() {
-  return [...document.querySelectorAll("aside button, aside a, nav button, nav a")]
-    .filter((el) => VIEW_LABELS.has(norm(el.textContent)));
+function sidebarCandidates() {
+  return [...document.querySelectorAll("aside button, aside a, nav button, nav a")];
+}
+
+function projectNavCandidates() {
+  return sidebarCandidates().filter((el) => PROJECT_VIEW_LABELS.has(norm(el.textContent)));
 }
 
 function isActiveCandidate(element) {
@@ -57,19 +51,20 @@ function isActiveCandidate(element) {
   );
 }
 
-function activeNavCandidate() {
-  return navCandidates().find(isActiveCandidate) || null;
+function activeSidebarCandidate() {
+  return sidebarCandidates().find(isActiveCandidate) || null;
 }
 
 function writeStoredView(ref, view, label = "") {
-  if (!view) return;
+  if (!PROJECT_VIEW_IDS.has(view)) return;
   try { localStorage.setItem(storageKey(ref), JSON.stringify({ view, label })); } catch (_) {}
 }
 
 function storedView(ref = currentBusinessCaseRef()) {
   try {
     const parsed = JSON.parse(localStorage.getItem(storageKey(ref)) || "null");
-    return parsed && typeof parsed === "object" ? parsed : null;
+    if (!parsed || typeof parsed !== "object" || !PROJECT_VIEW_IDS.has(parsed.view)) return null;
+    return parsed;
   } catch (_) {
     return null;
   }
@@ -79,12 +74,16 @@ export function continuityRestoreSignature(ref, savedView, activeView) {
   return `${String(ref || "global")}|${String(savedView || "")}|${String(activeView || "")}`;
 }
 
+export function isProjectContinuityView(view) {
+  return PROJECT_VIEW_IDS.has(String(view || ""));
+}
+
 let restoreTimers = [];
 let lastUserNavigationAt = 0;
 let restoringView = false;
 let lastExplicitView = "";
 let lastExplicitRef = "";
-let hasLeftBrowser = false;
+let restoreOnReturn = false;
 const USER_NAVIGATION_GRACE_MS = 700;
 
 function clearRestoreTimers() {
@@ -92,49 +91,60 @@ function clearRestoreTimers() {
   restoreTimers = [];
 }
 
-function rememberManualView(element) {
-  const label = norm(element?.textContent);
-  const view = VIEW_LABELS.get(label);
-  if (!view) return;
-  const ref = currentBusinessCaseRef();
-  lastExplicitView = view;
-  lastExplicitRef = ref;
-  writeStoredView(ref, view, label);
+function clearExplicitView() {
+  lastExplicitView = "";
+  lastExplicitRef = "";
 }
 
-function rememberCurrentViewBeforeLeave() {
+function rememberManualProjectView(element) {
+  const label = norm(element?.textContent);
+  const view = PROJECT_VIEW_LABELS.get(label);
+  if (!view) return false;
   const ref = currentBusinessCaseRef();
-  if (lastExplicitView && lastExplicitRef === ref) {
-    writeStoredView(ref, lastExplicitView);
-    return;
-  }
-  const active = activeNavCandidate();
-  if (!active) return;
-  const label = norm(active.textContent);
-  const view = VIEW_LABELS.get(label);
-  if (!view) return;
   lastExplicitView = view;
   lastExplicitRef = ref;
   writeStoredView(ref, view, label);
+  return true;
+}
+
+function captureProjectViewBeforeLeave() {
+  const ref = currentBusinessCaseRef();
+  const activeSidebar = activeSidebarCandidate();
+  const activeLabel = norm(activeSidebar?.textContent);
+  const activeProjectView = PROJECT_VIEW_LABELS.get(activeLabel);
+
+  // If a global/admin area is active, do not restore any Business Case view.
+  // This prevents CMS Partners/CRM/etc. from being persisted under a project.
+  if (!activeProjectView) {
+    restoreOnReturn = false;
+    clearExplicitView();
+    clearRestoreTimers();
+    return;
+  }
+
+  restoreOnReturn = true;
+  lastExplicitView = activeProjectView;
+  lastExplicitRef = ref;
+  writeStoredView(ref, activeProjectView, activeLabel);
 }
 
 function preferredSavedView() {
   const ref = currentBusinessCaseRef();
-  if (lastExplicitView && lastExplicitRef === ref) {
+  if (lastExplicitView && lastExplicitRef === ref && PROJECT_VIEW_IDS.has(lastExplicitView)) {
     return { view: lastExplicitView, label: "" };
   }
   return storedView(ref);
 }
 
 function restoreView() {
-  if (document.hidden) return;
+  if (!restoreOnReturn || document.hidden) return;
   if (Date.now() - lastUserNavigationAt < USER_NAVIGATION_GRACE_MS) return;
 
   const saved = preferredSavedView();
-  if (!saved?.view) return;
-  const candidates = navCandidates();
-  const target = candidates.find((el) => VIEW_LABELS.get(norm(el.textContent)) === saved.view);
-  if (!target) return; // Permission-safe: unavailable admin views are never forced for agents.
+  if (!saved?.view || !PROJECT_VIEW_IDS.has(saved.view)) return;
+  const candidates = projectNavCandidates();
+  const target = candidates.find((el) => PROJECT_VIEW_LABELS.get(norm(el.textContent)) === saved.view);
+  if (!target) return;
   if (isActiveCandidate(target)) return;
 
   restoringView = true;
@@ -146,9 +156,10 @@ function restoreView() {
 }
 
 function scheduleReturnRestore() {
+  if (!restoreOnReturn) return;
   clearRestoreTimers();
   // Supabase can refresh the session after focus and re-run Business Case link
-  // hydration. Restore once immediately and again after that async refresh window.
+  // hydration. Restore the project-workflow view after that async window.
   [140, 850, 1700].forEach((delay) => {
     const scheduledAt = Date.now();
     const timer = setTimeout(() => {
@@ -173,7 +184,7 @@ function enforceMppt(grid) {
   if (!hybrid || !mppt) return;
 
   if (hybrid.checked) {
-    if (!mppt.checked) mppt.click(); // Persist through React onChange, not just DOM state.
+    if (!mppt.checked) mppt.click();
     mppt.disabled = true;
     mppt.title = "MPPT required for VIMALUX hybrid luminaires";
     if (mpptLabel?.querySelector("span")) mpptLabel.querySelector("span").textContent = "MPPT · obbligatorio";
@@ -214,10 +225,16 @@ function isNewLedButton(element) {
 if (typeof document !== "undefined") {
   document.addEventListener("click", (event) => {
     const nav = event.target?.closest?.("aside button, aside a, nav button, nav a");
-    if (nav && VIEW_LABELS.has(norm(nav.textContent)) && !restoringView) {
+    if (nav && !restoringView) {
       lastUserNavigationAt = Date.now();
       clearRestoreTimers();
-      rememberManualView(nav);
+      if (PROJECT_VIEW_LABELS.has(norm(nav.textContent))) {
+        rememberManualProjectView(nav);
+      } else {
+        // Explicit navigation to a global/admin area disables project restore.
+        restoreOnReturn = false;
+        clearExplicitView();
+      }
     }
     if (isNewLedButton(event.target)) setTimeout(focusNewestLedProduct, 180);
   }, true);
@@ -243,27 +260,22 @@ if (typeof document !== "undefined") {
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
-      hasLeftBrowser = true;
-      rememberCurrentViewBeforeLeave();
+      captureProjectViewBeforeLeave();
       clearRestoreTimers();
       return;
     }
-    if (hasLeftBrowser) scheduleReturnRestore();
+    scheduleReturnRestore();
   });
   window.addEventListener("pagehide", () => {
-    hasLeftBrowser = true;
-    rememberCurrentViewBeforeLeave();
+    captureProjectViewBeforeLeave();
     clearRestoreTimers();
   });
   window.addEventListener("blur", () => {
-    hasLeftBrowser = true;
-    rememberCurrentViewBeforeLeave();
+    captureProjectViewBeforeLeave();
     clearRestoreTimers();
   });
   window.addEventListener("pageshow", (event) => {
-    if (event.persisted && hasLeftBrowser) scheduleReturnRestore();
+    if (event.persisted) scheduleReturnRestore();
   });
-  window.addEventListener("focus", () => {
-    if (hasLeftBrowser) scheduleReturnRestore();
-  });
+  window.addEventListener("focus", scheduleReturnRestore);
 }
