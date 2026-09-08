@@ -10,13 +10,18 @@ test("continuity signature changes when the active menu drifts away from the sav
   assert.notEqual(saved, drifted);
 });
 
-test("Intelligence continuity listens for browser focus and maps CMS Partners to the real datek view", () => {
+test("Intelligence continuity restores on browser return without locking manual navigation", () => {
   const source = fs.readFileSync(
     new URL("../src/intelligenceUiContinuityRuntime.js", import.meta.url),
     "utf8",
   );
   assert.match(source, /\["cms partners", "datek"\]/);
   assert.match(source, /window\.addEventListener\("focus"/);
-  assert.match(source, /const activeView = activeCandidate/);
-  assert.match(source, /continuityRestoreSignature\(currentBusinessCaseRef\(\), saved\.view, activeView\)/);
+  assert.match(source, /document\.addEventListener\("visibilitychange"/);
+  assert.match(source, /lastUserNavigationAt = Date\.now\(\)/);
+  assert.match(source, /clearTimeout\(restoreTimer\)/);
+  assert.match(source, /if \(!restoringView\)/);
+  assert.match(source, /const observer = new MutationObserver\(refresh\)/);
+  assert.match(source, /const refresh = \(\) => \{\s*enforceAllMppt\(\);\s*\};/);
+  assert.doesNotMatch(source, /const refresh = \(\) => \{[\s\S]*?scheduleRestore\(\);[\s\S]*?\};/);
 });

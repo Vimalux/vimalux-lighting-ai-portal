@@ -80,9 +80,14 @@ export function continuityRestoreSignature(ref, savedView, activeView) {
 
 let lastRestoreSignature = "";
 let restoreTimer = null;
+let lastUserNavigationAt = 0;
+let restoringView = false;
+const USER_NAVIGATION_GRACE_MS = 600;
 
 function restoreView() {
   if (document.hidden) return;
+  if (Date.now() - lastUserNavigationAt < USER_NAVIGATION_GRACE_MS) return;
+
   const saved = storedView();
   if (!saved?.view) return;
   const candidates = navCandidates();
@@ -99,16 +104,24 @@ function restoreView() {
     lastRestoreSignature = signature;
     return;
   }
-  // The active view is part of the signature. If React/cloud/session refresh drifts
-  // back to another menu, the signature changes and the saved view is restored again.
   if (lastRestoreSignature === signature) return;
+
   lastRestoreSignature = signature;
-  target.click();
+  restoringView = true;
+  try {
+    target.click();
+  } finally {
+    restoringView = false;
+  }
 }
 
 function scheduleRestore(delay = 80) {
   clearTimeout(restoreTimer);
-  restoreTimer = setTimeout(restoreView, delay);
+  const scheduledAt = Date.now();
+  restoreTimer = setTimeout(() => {
+    if (lastUserNavigationAt > scheduledAt) return;
+    restoreView();
+  }, delay);
 }
 
 function detailsGridForHybridCheckbox(box) {
@@ -166,7 +179,14 @@ function isNewLedButton(element) {
 if (typeof document !== "undefined") {
   document.addEventListener("click", (event) => {
     const nav = event.target?.closest?.("aside button, aside a, nav button, nav a");
-    if (nav && VIEW_LABELS.has(norm(nav.textContent))) rememberFromElement(nav);
+    if (nav && VIEW_LABELS.has(norm(nav.textContent))) {
+      if (!restoringView) {
+        lastUserNavigationAt = Date.now();
+        clearTimeout(restoreTimer);
+        lastRestoreSignature = "";
+      }
+      rememberFromElement(nav);
+    }
     if (isNewLedButton(event.target)) setTimeout(focusNewestLedProduct, 180);
   }, true);
 
@@ -179,11 +199,19 @@ if (typeof document !== "undefined") {
 
   const refresh = () => {
     enforceAllMppt();
-    scheduleRestore();
   };
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", refresh, { once: true });
-  else refresh();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      refresh();
+      scheduleRestore(450);
+    }, { once: true });
+  } else {
+    refresh();
+    scheduleRestore(450);
+  }
 
+  // DOM mutations may update catalogue controls, but they must never force a
+  // navigation restore while the user is actively working in Intelligence.
   const observer = new MutationObserver(refresh);
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
