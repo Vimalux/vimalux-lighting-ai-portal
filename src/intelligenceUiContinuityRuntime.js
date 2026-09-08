@@ -18,7 +18,7 @@ const VIEW_LABELS = new Map([
   ["rapporto", "report"],
   ["report", "report"],
   ["crm", "crm"],
-  ["cms partners", "partners"],
+  ["cms partners", "datek"],
   ["partner reports", "partnerReports"],
   ["progetti", "projects"],
   ["projects", "projects"],
@@ -49,6 +49,15 @@ function navCandidates() {
     .filter((el) => VIEW_LABELS.has(norm(el.textContent)));
 }
 
+function isActiveCandidate(element) {
+  return Boolean(
+    element
+      && (element.classList.contains("active")
+        || element.getAttribute("aria-current") === "page"
+        || element.parentElement?.classList.contains("active")),
+  );
+}
+
 function rememberFromElement(element) {
   const label = norm(element?.textContent);
   const view = VIEW_LABELS.get(label);
@@ -65,6 +74,10 @@ function storedView() {
   }
 }
 
+export function continuityRestoreSignature(ref, savedView, activeView) {
+  return `${String(ref || "global")}|${String(savedView || "")}|${String(activeView || "")}`;
+}
+
 let lastRestoreSignature = "";
 let restoreTimer = null;
 
@@ -76,14 +89,18 @@ function restoreView() {
   const target = candidates.find((el) => VIEW_LABELS.get(norm(el.textContent)) === saved.view);
   if (!target) return; // Permission-safe: unavailable admin views are never forced for agents.
 
-  const signature = `${currentBusinessCaseRef()}|${saved.view}|${norm(target.textContent)}`;
-  const active = target.classList.contains("active")
-    || target.getAttribute("aria-current") === "page"
-    || target.parentElement?.classList.contains("active");
-  if (active) {
+  const activeCandidate = candidates.find(isActiveCandidate);
+  const activeView = activeCandidate
+    ? VIEW_LABELS.get(norm(activeCandidate.textContent)) || ""
+    : "";
+  const signature = continuityRestoreSignature(currentBusinessCaseRef(), saved.view, activeView);
+
+  if (isActiveCandidate(target)) {
     lastRestoreSignature = signature;
     return;
   }
+  // The active view is part of the signature. If React/cloud/session refresh drifts
+  // back to another menu, the signature changes and the saved view is restored again.
   if (lastRestoreSignature === signature) return;
   lastRestoreSignature = signature;
   target.click();
@@ -177,6 +194,10 @@ if (typeof document !== "undefined") {
     }
   });
   window.addEventListener("pageshow", () => {
+    lastRestoreSignature = "";
+    scheduleRestore(120);
+  });
+  window.addEventListener("focus", () => {
     lastRestoreSignature = "";
     scheduleRestore(120);
   });
