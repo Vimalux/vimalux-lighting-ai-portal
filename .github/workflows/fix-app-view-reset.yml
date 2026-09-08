@@ -1,0 +1,124 @@
+name: Fix App Business Case view reset
+on:
+  push:
+    paths:
+      - '.github/fix-app-view-reset.trigger'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Remove hydration-driven view reset in App
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          app = Path('src/App.jsx')
+          s = app.read_text()
+
+          helper_anchor = 'export default function App() {\n'
+          helper = '''export function sameBusinessCaseIdentity(currentProject, activeId, candidate, requestedId = "") {
+            const normalizeId = (value) => String(value || "").trim().toLowerCase();
+            const idsFor = (item) => [
+              item?.id,
+              item?.crm?.businessCaseRecordId,
+              item?.project?.businessCaseId,
+            ].map(normalizeId).filter(Boolean);
+            const currentIds = new Set([normalizeId(activeId), ...idsFor(currentProject)].filter(Boolean));
+            const candidateIds = new Set([normalizeId(requestedId), ...idsFor(candidate)].filter(Boolean));
+            return [...currentIds].some((id) => candidateIds.has(id));
+          }
+
+          export default function App() {
+          '''
+          if 'export function sameBusinessCaseIdentity(' not in s:
+              if helper_anchor not in s:
+                  raise SystemExit('App helper anchor not found')
+              s = s.replace(helper_anchor, helper, 1)
+
+          forced_agent = '        if (profile?.role === "agent") setView("customer");\n'
+          if forced_agent in s:
+              s = s.replace(forced_agent, '', 1)
+
+          old_match = '    if (match) { setActiveId(match.id); setView("customer"); return; }\n'
+          new_match = '''    if (match) {
+              const preserveCurrentView = workflow.some(([id]) => id === view)
+                && sameBusinessCaseIdentity(project, activeId, match, businessCaseId);
+              setActiveId(match.id);
+              if (!preserveCurrentView) setView("customer");
+              return;
+            }
+          '''
+          if old_match in s:
+              s = s.replace(old_match, new_match, 1)
+          elif 'sameBusinessCaseIdentity(project, activeId, match, businessCaseId)' not in s:
+              raise SystemExit('Direct Business Case match reset anchor not found')
+
+          old_loaded = '          setActiveId(migrated.id);\n          setView("customer");\n'
+          new_loaded = '''          const preserveCurrentView = workflow.some(([id]) => id === view)
+                    && sameBusinessCaseIdentity(project, activeId, migrated, businessCaseId);
+                  setActiveId(migrated.id);
+                  if (!preserveCurrentView) setView("customer");
+          '''
+          if old_loaded in s:
+              s = s.replace(old_loaded, new_loaded, 1)
+          elif 'sameBusinessCaseIdentity(project, activeId, migrated, businessCaseId)' not in s:
+              raise SystemExit('Loaded Business Case reset anchor not found')
+
+          app.write_text(s)
+
+          main = Path('src/main.jsx')
+          m = main.read_text()
+          m = m.replace('import "./businessCaseViewAuthorityRuntime.js";\n', '')
+          main.write_text(m)
+
+          for obsolete in [
+              Path('src/businessCaseViewAuthorityRuntime.js'),
+              Path('test/businessCaseViewAuthority.test.js'),
+          ]:
+              if obsolete.exists():
+                  obsolete.unlink()
+
+          test = Path('test/appBusinessCaseViewContinuity.test.js')
+          test.write_text('''import test from "node:test";
+          import assert from "node:assert/strict";
+          import fs from "node:fs";
+
+          const source = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+
+          test("Supabase profile hydration does not force an allowed Business Case view to customer", () => {
+            assert.doesNotMatch(source, /if \\(profile\\?\\.role === "agent"\\) setView\\("customer"\\)/);
+            assert.match(source, /if \\(isAgent && !isAgentViewAllowed\\(view, agentAllowedViews\\)\\) setView\\("customer"\\)/);
+          });
+
+          test("same active Business Case keeps its workflow view when URL match rehydrates", () => {
+            assert.match(source, /sameBusinessCaseIdentity\\(project, activeId, match, businessCaseId\\)/);
+            assert.match(source, /workflow\\.some\\(\\(\\[id\\]\\) => id === view\\)/);
+          });
+
+          test("same active Business Case keeps its workflow view when loaded from Supabase", () => {
+            assert.match(source, /sameBusinessCaseIdentity\\(project, activeId, migrated, businessCaseId\\)/);
+            const conditionalResets = source.match(/if \\(!preserveCurrentView\\) setView\\("customer"\\)/g) || [];
+            assert.equal(conditionalResets.length, 2);
+          });
+
+          test("Business Case identity accepts record UUID and human-readable BC code aliases", () => {
+            assert.match(source, /item\\?\\.crm\\?\\.businessCaseRecordId/);
+            assert.match(source, /item\\?\\.project\\?\\.businessCaseId/);
+            assert.match(source, /normalizeId\\(requestedId\\)/);
+          });
+          ''')
+          PY
+          npm test
+          npm run build
+      - name: Commit direct App fix
+        run: |
+          git config user.name "VIMALUX Automation"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          git add -A src/App.jsx src/main.jsx src/businessCaseViewAuthorityRuntime.js test/businessCaseViewAuthority.test.js test/appBusinessCaseViewContinuity.test.js
+          git diff --cached --quiet || git commit -m "Stop Supabase hydration from resetting active Business Case view"
+          git push origin HEAD:main
