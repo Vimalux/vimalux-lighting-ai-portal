@@ -113,7 +113,7 @@ function generatePdf(row, version) {
     ? (it ? "CAPEX progetto / investimento finanziato" : "Project CAPEX / financed investment")
     : (it ? "Investimento iniziale" : "Initial investment");
   const annualPaymentLabel = isLaaS
-    ? (it ? "Canone annuale LaaS / Noleggio tutto incluso" : "Annual all-inclusive LaaS / lease payment")
+    ? (it ? "Canone annuale LaaS / Noleggio tutto incluso - netto IVA" : "Annual all-inclusive LaaS / lease payment - excl. VAT")
     : isFinance
       ? (it ? "Pagamento annuale totale cliente" : "Total annual customer payment")
       : (it ? "OPEX annuale Smart / CMS" : "Annual Smart / CMS OPEX");
@@ -201,7 +201,7 @@ function generatePdf(row, version) {
       ...(isFinanced ? [[it ? "Investimento iniziale cliente" : "Customer upfront investment", money(upfrontCustomerInvestment, lang)]] : []),
       [annualPaymentLabel, money(annualFee, lang)],
       ...(isLaaS ? [
-        [it ? "Canone mensile LaaS / Noleggio tutto incluso" : "Monthly all-inclusive LaaS / lease payment", money(monthlyCustomerPayment, lang)],
+        [it ? "Canone mensile LaaS / Noleggio tutto incluso - netto IVA" : "Monthly all-inclusive LaaS / lease payment - excl. VAT", money(monthlyCustomerPayment, lang)],
         [it ? "OPEX servizi / mese (incluso nel canone)" : "Service OPEX / month (included in payment)", money(monthlyServiceOpex, lang)],
       ] : isFinance ? [
         [it ? "Rata mensile finanziamento CAPEX" : "Monthly CAPEX financing payment", money(monthlyFinancingPayment, lang)],
