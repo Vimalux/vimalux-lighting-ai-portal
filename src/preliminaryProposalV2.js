@@ -292,7 +292,7 @@ function generatePdf(row, version) {
       [it ? "Periodo di analisi" : "Analysis period", `${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} ${it ? "anni" : "years"}`],
       [it ? "Durata CMS" : "CMS service term", `${contractYears} ${it ? "anni" : "years"}`],
       ...(project.solution?.powerAidEnabled ? [[it ? "Durata PowerAiD" : "PowerAiD service term", `${powerAidYears} ${it ? "anni" : "years"}`]] : []),
-      [isLaaS ? (it ? "Indicizzazione OPEX servizi" : "Service OPEX escalation") : (it ? "Indicizzazione canone/OPEX" : "Service/OPEX escalation"), `${number(escalation, 1, lang)}% ${it ? "annuo" : "p.a."}`],
+      [isLaaS ? (it ? "Indicizzazione interna OPEX servizi" : "Internal service OPEX escalation") : (it ? "Indicizzazione canone/OPEX" : "Service/OPEX escalation"), isLaaS ? `${number(escalation, 1, lang)}% ${it ? "annuo · canone cliente fisso" : "p.a. · customer payment fixed"}` : `${number(escalation, 1, lang)}% ${it ? "annuo" : "p.a."}`],
       [it ? "Modello commerciale" : "Commercial model", String(project.assumptions?.dealType || project.assumptions?.financingModel || "cash")],
       [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],
     ],

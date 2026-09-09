@@ -101,7 +101,7 @@ function appendCashFlowPage(doc, project, calculated, options = {}) {
   doc.setTextColor(...teal);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
-  doc.text(it ? `Cash flow cliente - ${calculated.analysisPeriod} anni` : `Customer Cash Flow - ${calculated.analysisPeriod} years`, 14, 20);
+  doc.text(it ? `Cash flow economico netto IVA - ${calculated.analysisPeriod} anni` : `Economic cash flow excl. VAT - ${calculated.analysisPeriod} years`, 14, 20);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.2);
   doc.setTextColor(...muted);
@@ -122,8 +122,8 @@ function appendCashFlowPage(doc, project, calculated, options = {}) {
     tableStartY = 76;
   } else {
     doc.text(customerText(it
-      ? "Il grafico mostra il cash flow cumulativo del Comune includendo risparmi, servizi e pagamenti previsti dal modello finanziato selezionato."
-      : "The chart shows cumulative municipality cash flow including savings, services and payments under the selected financed model."),
+      ? "Valori economici al netto IVA. Il grafico mostra il cash flow cumulativo del Comune includendo risparmi, servizi e pagamenti previsti dal modello finanziato selezionato; l’impatto IVA è gestito separatamente nelle impostazioni cliente."
+      : "Economic values exclude VAT. The chart shows cumulative municipality cash flow including savings, services and payments under the selected financed model; VAT impact is handled separately in the customer settings."),
     14, 28, { maxWidth: 182 });
     lineChart(doc, 14, 36, 182, 83, cashRows, colors);
     tableStartY = 136;
@@ -132,7 +132,7 @@ function appendCashFlowPage(doc, project, calculated, options = {}) {
   doc.setTextColor(...teal);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
-  doc.text(it ? "Cash flow annuale" : "Annual Cash Flow", 14, tableStartY - 6);
+  doc.text(it ? "Cash flow annuale netto IVA" : "Annual cash flow excl. VAT", 14, tableStartY - 6);
 
   autoTable(doc, {
     startY: tableStartY,

@@ -11,7 +11,7 @@ export const BASE_ASSUMPTIONS = {
   sapFactor: 1.2,
   mhFactor: 1.15,
   mercuryFactor: 1.15,
-  co2KgPerKwh: .233,
+  co2KgPerKwh: .1926,
   cloPercent: 10,
   powerAidPercent: 40,
   powerAidCustomerFeePercent: 30,
