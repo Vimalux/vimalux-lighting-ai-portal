@@ -1,0 +1,55 @@
+name: Clarify LaaS VAT labels
+on:
+  push:
+    paths:
+      - '.github/clarify-laas-vat-labels.trigger'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Install dependencies
+        run: npm ci
+      - name: Clarify net VAT LaaS labels
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/preliminaryProposalV2.js')
+          s = path.read_text()
+
+          replacements = [
+              (
+                  '    ? (it ? "Canone annuale LaaS / Noleggio tutto incluso" : "Annual all-inclusive LaaS / lease payment")',
+                  '    ? (it ? "Canone annuale LaaS / Noleggio tutto incluso - netto IVA" : "Annual all-inclusive LaaS / lease payment - excl. VAT")',
+              ),
+              (
+                  '        [it ? "Canone mensile LaaS / Noleggio tutto incluso" : "Monthly all-inclusive LaaS / lease payment", money(monthlyCustomerPayment, lang)],',
+                  '        [it ? "Canone mensile LaaS / Noleggio tutto incluso - netto IVA" : "Monthly all-inclusive LaaS / lease payment - excl. VAT", money(monthlyCustomerPayment, lang)],',
+              ),
+          ]
+
+          for old, new in replacements:
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one anchor, found {count}: {old}')
+              s = s.replace(old, new, 1)
+
+          path.write_text(s)
+
+          test = Path('test/laasVatLabels.test.js')
+          test.write_text('''import test from "node:test";\nimport assert from "node:assert/strict";\nimport fs from "node:fs";\n\ntest("LaaS report labels state that customer payments exclude VAT", () => {\n  const proposal = fs.readFileSync("src/preliminaryProposalV2.js", "utf8");\n  assert.match(proposal, /Canone annuale LaaS \\/ Noleggio tutto incluso - netto IVA/);\n  assert.match(proposal, /Canone mensile LaaS \\/ Noleggio tutto incluso - netto IVA/);\n  assert.match(proposal, /Annual all-inclusive LaaS \\/ lease payment - excl\\. VAT/);\n  assert.match(proposal, /Monthly all-inclusive LaaS \\/ lease payment - excl\\. VAT/);\n});\n''')
+          PY
+      - name: Validate platform
+        run: npm test && npm run build
+      - name: Commit labels
+        run: |
+          git config user.name "VIMALUX Automation"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          git add src/preliminaryProposalV2.js test/laasVatLabels.test.js
+          git diff --cached --quiet || git commit -m "Clarify LaaS customer payments as net of VAT"
+          git push origin HEAD:main
