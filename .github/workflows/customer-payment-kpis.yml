@@ -1,0 +1,177 @@
+name: Update customer payment KPI visibility
+on:
+  push:
+    paths:
+      - '.github/customer-payment-kpis.trigger'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Install dependencies
+        run: npm ci
+      - name: Patch customer economics presentation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          app = Path('src/App.jsx')
+          s = app.read_text()
+
+          replacement = r'''function CustomerSummary({ p, r, money }) {
+            const it = p.language === "it";
+            const first = r.customerValueRows?.[0];
+            const currentMonthly = (first?.currentOperatingCost || 0) / 12;
+            const monthlySaving = (first?.customerSaving || r.customerAnnualNetBenefit || 0) / 12;
+            const newMonthly = Math.max(0, currentMonthly - monthlySaving);
+            const upfront = r.dealType === "cash" ? r.totalCapex : Number(p.assumptions.upfrontPayment || 0);
+            const serviceOpexMonthly = (r.totalAnnualOpex || 0) / 12;
+            const financeCapexMonthly = r.financingMonthlyPayment || 0;
+            const totalMonthly = r.monthlyPayment || 0;
+            const positiveFromStart = r.dealType !== "cash" && monthlySaving >= 0;
+            const paymentKpis = r.dealType === "noleggio_operativo"
+              ? [
+                  [it ? "Canone mensile LaaS / Noleggio tutto incluso" : "Monthly LaaS / all-inclusive payment", money(totalMonthly)],
+                  [it ? "OPEX servizi / mese (incluso nel canone)" : "Service OPEX / month (included in payment)", money(serviceOpexMonthly)],
+                ]
+              : r.dealType === "finance"
+                ? [
+                    [it ? "Rata mensile finanziamento CAPEX" : "Monthly CAPEX financing payment", money(financeCapexMonthly)],
+                    [it ? "OPEX servizi / mese" : "Service OPEX / month", money(serviceOpexMonthly)],
+                    [it ? "Pagamento mensile totale cliente" : "Total monthly customer payment", money(totalMonthly)],
+                  ]
+                : [
+                    [it ? "OPEX servizi / mese" : "Service OPEX / month", money(serviceOpexMonthly)],
+                  ];
+            return <><Card className="customer-summary-card" title={it ? "Sintesi economica cliente" : "Customer economics summary"}><div className="kpis customer-summary-kpis"><Kpi label={it ? "Investimento iniziale" : "Upfront investment"} value={money(upfront)} /><Kpi label={it ? "Costo operativo attuale / mese" : "Current operating cost / month"} value={money(currentMonthly)} />{paymentKpis.map(([label,value]) => <Kpi key={label} label={label} value={value} />)}<Kpi label={it ? "Nuovo costo totale / mese" : "New total cost / month"} value={money(newMonthly)} /><Kpi label={it ? "Risparmio netto / mese" : "Net saving / month"} value={money(monthlySaving)} /><Kpi label={it ? "Cash flow positivo dal primo mese" : "Positive cash flow from month one"} value={positiveFromStart ? (it ? "Sì" : "Yes") : "No"} /></div><p className="hint">{r.dealType === "noleggio_operativo" ? (it ? "Il canone mensile è il pagamento totale del cliente e comprende l'OPEX dei servizi previsto dal contratto. Nessun CAPEX iniziale salvo eventuale anticipo configurato." : "The monthly payment is the customer's total payment and includes contracted service OPEX. No upfront CAPEX unless a configured advance payment applies.") : r.dealType === "finance" ? (it ? "La rata CAPEX e l'OPEX sono mostrati separatamente; il pagamento mensile totale è la loro somma." : "CAPEX financing and service OPEX are shown separately; total monthly customer payment is their sum.") : (it ? "Scenario acquisto diretto: il CAPEX iniziale è sostenuto dal cliente; l'OPEX dei servizi resta indicato separatamente." : "Direct-purchase scenario: the customer funds the upfront CAPEX; service OPEX remains shown separately.")}</p></Card></>;
+          }
+          function Kpis({ p, r, t, money, num }) {
+            const it = p.language === "it";
+            const allInclusive = r.dealType === "noleggio_operativo";
+            const luminaires = Math.max(1, r.upgradedQuantity);
+            const money2 = (value) => formatMoney(value, p.language, p.project.currency, 2);
+            const serviceOpexMonthly = (r.totalAnnualOpex || 0) / 12;
+            const operationalPaybackLabel = it ? "Payback operativo (escl. finanziamento)" : "Operational payback (excl. financing)";
+            const operationalRoiLabel = it ? "ROI operativo (escl. finanziamento)" : "Operational ROI (excl. financing)";
+            const paymentKpis = allInclusive
+              ? [
+                  [it ? "Canone mensile LaaS / Noleggio tutto incluso" : "Monthly LaaS / all-inclusive payment", money2(r.monthlyPayment)],
+                  [it ? "OPEX servizi / mese (incluso nel canone)" : "Service OPEX / month (included in payment)", money2(serviceOpexMonthly)],
+                  [it ? "Canone mensile per apparecchio" : "Monthly payment per luminaire", money2(r.monthlyPayment / luminaires)],
+                ]
+              : r.dealType === "finance"
+                ? [
+                    [it ? "Rata mensile finanziamento CAPEX" : "Monthly CAPEX financing payment", money2(r.financingMonthlyPayment)],
+                    [it ? "OPEX servizi / mese" : "Service OPEX / month", money2(serviceOpexMonthly)],
+                    [it ? "Pagamento mensile totale cliente" : "Total monthly customer payment", money2(r.monthlyPayment)],
+                    [it ? "Pagamento totale per apparecchio" : "Total payment per luminaire", money2(r.monthlyPayment / luminaires)],
+                  ]
+                : [
+                    [it ? "OPEX servizi / mese" : "Service OPEX / month", money2(serviceOpexMonthly)],
+                  ];
+            const list = [
+              [t("capex"), money(r.totalCapex)],
+              ...paymentKpis,
+              [it ? "OPEX annuo per apparecchio" : "Annual OPEX per luminaire", money2(r.totalAnnualOpex / luminaires)],
+              ...(r.powerAidEnabled ? [
+                [it ? "PowerAiD service fee annua" : "Annual PowerAiD service fee", money2(r.powerAidCustomerFee)],
+                [it ? "Beneficio netto cliente PowerAiD" : "Customer net PowerAiD benefit", money2(r.powerAidCustomerNetBenefit), "positive"],
+              ] : []),
+              [t("annualNet"), money(r.customerAnnualNetBenefit)],
+              [operationalPaybackLabel, r.payback == null ? t("notAvailable") : `${num(r.payback, 1)} ${t("years")}`],
+              [operationalRoiLabel, formatPercent(r.roiPercent, p.language)],
+              [`${t("npv")} – ${r.analysisPeriod} ${t("years")}`, money(r.npv)],
+              [`${t("lifecycle")} – ${r.analysisPeriod} ${t("years")}`, money(r.lifecycleResult)],
+              [it ? "Riduzione intera installazione" : "Whole-installation reduction", formatPercent(r.energyReductionPercent, p.language)],
+              [it ? "Riduzione apparecchi aggiornati" : "Upgraded-luminaire reduction", formatPercent(r.upgradedEnergyReductionPercent, p.language)],
+              [t("co2Reduction"), `${num(r.co2ReductionKg / 1000, 1)} t`],
+            ];
+            return <div className="kpis">{list.map(([l,v,c]) => <div className={`kpi ${c || ""}`} key={l}><span>{l}</span><strong>{v}</strong></div>)}</div>;
+          }
+          function Business('''
+
+          pattern = r'function CustomerSummary\(\{ p, r, money \}\) \{.*?function Business\('
+          s2, count = re.subn(pattern, replacement, s, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit(f'CustomerSummary/Kpis replacement count={count}')
+          app.write_text(s2)
+
+          report = Path('src/report.js')
+          r = report.read_text()
+          replacements = {
+            'const paybackLabel = it ? "Tempo di ritorno operativo" : "Operational payback";': 'const paybackLabel = it ? "Payback operativo (escl. finanziamento)" : "Operational payback (excl. financing)";',
+            '? (it ? "Rata finanziamento" : "Financing payment")': '? (it ? "Rata mensile finanziamento CAPEX" : "Monthly CAPEX financing payment")',
+            'it ? "OPEX mensile" : "Monthly OPEX"': 'result.dealType === "noleggio_operativo" ? (it ? "OPEX mensile (incluso nel canone)" : "Monthly OPEX (included in payment)") : (it ? "OPEX mensile" : "Monthly OPEX")',
+          }
+          for old, new in replacements.items():
+              if old not in r:
+                  raise SystemExit(f'report anchor missing: {old}')
+              r = r.replace(old, new, 1)
+          report.write_text(r)
+
+          proposal = Path('src/proposalCostEvolutionPage.js')
+          p = proposal.read_text()
+          old = '["Payback", calculated.payback == null ? "-" : `${reportNumber(calculated.payback, 1, lang)} ${it ? "anni" : "yrs"}`],'
+          new = '[it ? "Payback operativo (escl. finanziamento)" : "Operational payback (excl. financing)", calculated.payback == null ? "-" : `${reportNumber(calculated.payback, 1, lang)} ${it ? "anni" : "yrs"}`],'
+          if old not in p:
+              raise SystemExit('proposal payback anchor missing')
+          proposal.write_text(p.replace(old, new, 1))
+
+          test = Path('test/customerPaymentKpis.test.js')
+          test.write_text(r'''import test from "node:test";
+          import assert from "node:assert/strict";
+          import fs from "node:fs";
+          import { calculateBusinessCase } from "../src/calculations.js";
+          import { defaultProject } from "../src/model.js";
+
+          const appSource = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+          const reportSource = fs.readFileSync(new URL("../src/report.js", import.meta.url), "utf8");
+
+          test("customer payment presentation distinguishes LaaS from CAPEX financing", () => {
+            assert.match(appSource, /Canone mensile LaaS \/ Noleggio tutto incluso/);
+            assert.match(appSource, /OPEX servizi \/ mese \(incluso nel canone\)/);
+            assert.match(appSource, /Rata mensile finanziamento CAPEX/);
+            assert.match(appSource, /Pagamento mensile totale cliente/);
+          });
+
+          test("operational ROI and payback are explicitly labelled as financing-independent", () => {
+            assert.match(appSource, /Payback operativo \(escl\. finanziamento\)/);
+            assert.match(appSource, /ROI operativo \(escl\. finanziamento\)/);
+            assert.match(reportSource, /Operational payback \(excl\. financing\)/);
+          });
+
+          test("interest rate changes financed customer payment and NPV but not operational ROI/payback", () => {
+            const project = defaultProject({ applyStoredDefaults: false });
+            project.assumptions.dealType = "noleggio_operativo";
+            project.assumptions.financingPeriod = 10;
+            project.assumptions.financingYears = 10;
+            project.assumptions.serviceAgreementPeriod = 10;
+            project.assumptions.contractYears = 10;
+            project.assumptions.analysisPeriod = 20;
+            project.assumptions.allInclusiveAnnualPayment = 0;
+            project.assumptions.interestRate = 7;
+            const at7 = calculateBusinessCase(project);
+            project.assumptions.interestRate = 8;
+            const at8 = calculateBusinessCase(project);
+            assert.ok(at8.financingMonthlyPayment > at7.financingMonthlyPayment);
+            assert.ok(at8.monthlyPayment > at7.monthlyPayment);
+            assert.ok(at8.npv < at7.npv);
+            assert.equal(at8.payback, at7.payback);
+            assert.equal(at8.roiPercent, at7.roiPercent);
+          });
+          ''')
+          PY
+          npm test
+          npm run build
+      - name: Commit KPI presentation update
+        run: |
+          git config user.name "VIMALUX Automation"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          git add src/App.jsx src/report.js src/proposalCostEvolutionPage.js test/customerPaymentKpis.test.js
+          git diff --cached --quiet || git commit -m "Clarify customer monthly payments and operational KPIs"
+          git push origin HEAD:main
