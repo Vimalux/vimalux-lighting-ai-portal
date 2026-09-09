@@ -108,11 +108,11 @@ export function generateCustomerPdf(project, result) {
   doc.setTextColor(15, 23, 42);
 
   section(it ? "Sintesi Esecutiva" : "Executive Summary", 52);
-  const paybackLabel = it ? "Tempo di ritorno operativo" : "Operational payback";
+  const paybackLabel = it ? "Payback operativo (escl. finanziamento)" : "Operational payback (excl. financing)";
   const paymentLabel = result.dealType === "noleggio_operativo"
     ? (it ? "Canone mensile" : "Monthly canone")
     : result.dealType === "finance"
-      ? (it ? "Rata finanziamento" : "Financing payment")
+      ? (it ? "Rata mensile finanziamento CAPEX" : "Monthly CAPEX financing payment")
       : t("monthlyPayment");
   const paymentValue = result.dealType === "finance"
     ? result.financingMonthlyPayment
@@ -120,7 +120,7 @@ export function generateCustomerPdf(project, result) {
   autoTable(doc, {
     startY: 57,
     theme: "grid",
-    head: [[t("preliminary"), it ? "Investimento iniziale (CAPEX)" : "Initial investment (CAPEX)", paymentLabel, it ? "OPEX mensile" : "Monthly OPEX", `${t("annualNet")}*`, t("roi"), paybackLabel]],
+    head: [[t("preliminary"), it ? "Investimento iniziale (CAPEX)" : "Initial investment (CAPEX)", paymentLabel, result.dealType === "noleggio_operativo" ? (it ? "OPEX mensile (incluso nel canone)" : "Monthly OPEX (included in payment)") : (it ? "OPEX mensile" : "Monthly OPEX"), `${t("annualNet")}*`, t("roi"), paybackLabel]],
     body: [[result.customerDecisionStatus.replace("_", "-"), money(result.totalCapex), money2(paymentValue), money2(result.totalAnnualOpex / 12), money(result.customerAnnualNetBenefit), percent(result.roiPercent), result.payback == null ? t("notAvailable") : `${formatNumber(result.payback, lang, 1)} ${t("years")}`]],
     headStyles: { fillColor: [15, 118, 110] },
     styles: { font: "helvetica", fontSize: 6.9, cellPadding: 1.8, valign: "middle" },

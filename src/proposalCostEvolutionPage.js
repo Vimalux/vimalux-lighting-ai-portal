@@ -232,7 +232,7 @@ export function repairCostEvolutionProposalPage(doc, project, calculated, pageNu
     body: [
       [customerText(it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit"), reportMoney(calculated.customerAnnualNetBenefit, lang)],
       [it ? "Profilo dimmer esistente" : "Existing dimming profile", dimmingSummaryValue(project, calculated, lang)],
-      ["Payback", calculated.payback == null ? "-" : `${reportNumber(calculated.payback, 1, lang)} ${it ? "anni" : "yrs"}`],
+      [it ? "Payback operativo (escl. finanziamento)" : "Operational payback (excl. financing)", calculated.payback == null ? "-" : `${reportNumber(calculated.payback, 1, lang)} ${it ? "anni" : "yrs"}`],
       [it ? "Investimento iniziale" : "Initial investment", reportMoney(calculated.totalCapex, lang)],
     ],
     headStyles: { fillColor: teal },
