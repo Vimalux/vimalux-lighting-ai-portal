@@ -1,0 +1,75 @@
+name: Final customer report corrections
+on:
+  push:
+    paths:
+      - '.github/final-customer-report-corrections.trigger'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Install dependencies
+        run: npm ci
+      - name: Patch CO2 default and customer report semantics
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              if old not in text:
+                  raise SystemExit(f'Anchor not found: {label}')
+              return text.replace(old, new, 1)
+
+          # Italy default CO2 factor for new Business Cases.
+          path = Path('src/model.js')
+          s = path.read_text()
+          s = replace_once(s, '  co2KgPerKwh: .233,\n', '  co2KgPerKwh: .1926,\n', 'base CO2 factor')
+          path.write_text(s)
+
+          # Make LaaS OPEX escalation explicitly internal and keep customer canone fixed.
+          path = Path('src/preliminaryProposalV2.js')
+          s = path.read_text()
+          old = '      [isLaaS ? (it ? "Indicizzazione OPEX servizi" : "Service OPEX escalation") : (it ? "Indicizzazione canone/OPEX" : "Service/OPEX escalation"), `${number(escalation, 1, lang)}% ${it ? "annuo" : "p.a."}`],\n'
+          new = '      [isLaaS ? (it ? "Indicizzazione interna OPEX servizi" : "Internal service OPEX escalation") : (it ? "Indicizzazione canone/OPEX" : "Service/OPEX escalation"), isLaaS ? `${number(escalation, 1, lang)}% ${it ? "annuo · canone cliente fisso" : "p.a. · customer payment fixed"}` : `${number(escalation, 1, lang)}% ${it ? "annuo" : "p.a."}`],\n'
+          s = replace_once(s, old, new, 'LaaS OPEX assumption wording')
+          path.write_text(s)
+
+          # The proposal cash-flow engine is net of VAT; label it explicitly rather than implying gross customer cash-out.
+          path = Path('src/proposalFinalVisualPages.js')
+          s = path.read_text()
+          s = replace_once(
+              s,
+              '  doc.text(it ? `Cash flow cliente - ${calculated.analysisPeriod} anni` : `Customer Cash Flow - ${calculated.analysisPeriod} years`, 14, 20);\n',
+              '  doc.text(it ? `Cash flow economico netto IVA - ${calculated.analysisPeriod} anni` : `Economic cash flow excl. VAT - ${calculated.analysisPeriod} years`, 14, 20);\n',
+              'cash flow title',
+          )
+          s = replace_once(
+              s,
+              '      ? "Il grafico mostra il cash flow cumulativo del Comune includendo risparmi, servizi e pagamenti previsti dal modello finanziato selezionato."\n      : "The chart shows cumulative municipality cash flow including savings, services and payments under the selected financed model."),\n',
+              '      ? "Valori economici al netto IVA. Il grafico mostra il cash flow cumulativo del Comune includendo risparmi, servizi e pagamenti previsti dal modello finanziato selezionato; l’impatto IVA è gestito separatamente nelle impostazioni cliente."\n      : "Economic values exclude VAT. The chart shows cumulative municipality cash flow including savings, services and payments under the selected financed model; VAT impact is handled separately in the customer settings."),\n',
+              'financed cash flow VAT disclosure',
+          )
+          s = replace_once(
+              s,
+              '  doc.text(it ? "Cash flow annuale" : "Annual Cash Flow", 14, tableStartY - 6);\n',
+              '  doc.text(it ? "Cash flow annuale netto IVA" : "Annual cash flow excl. VAT", 14, tableStartY - 6);\n',
+              'annual cash flow title',
+          )
+          path.write_text(s)
+
+          test = Path('test/customerReportVatCo2Semantics.test.js')
+          test.write_text('''import test from "node:test";\nimport assert from "node:assert/strict";\nimport fs from "node:fs";\n\ntest("Italy base CO2 factor and customer-report VAT semantics stay aligned", () => {\n  const model = fs.readFileSync("src/model.js", "utf8");\n  const proposal = fs.readFileSync("src/preliminaryProposalV2.js", "utf8");\n  const cashflow = fs.readFileSync("src/proposalFinalVisualPages.js", "utf8");\n  assert.match(model, /co2KgPerKwh:\\s*\\.1926/);\n  assert.match(proposal, /Indicizzazione interna OPEX servizi/);\n  assert.match(proposal, /canone cliente fisso/);\n  assert.match(cashflow, /Cash flow economico netto IVA/);\n  assert.match(cashflow, /Cash flow annuale netto IVA/);\n});\n''')
+          PY
+      - name: Validate platform
+        run: npm test && npm run build
+      - name: Commit corrections
+        run: |
+          git config user.name "VIMALUX Automation"
+          git config user.email "99176508+Vimalux@users.noreply.github.com"
+          git add src/model.js src/preliminaryProposalV2.js src/proposalFinalVisualPages.js test/customerReportVatCo2Semantics.test.js
+          git diff --cached --quiet || git commit -m "Correct CO2 default and VAT cash-flow report semantics"
+          git push origin HEAD:main
