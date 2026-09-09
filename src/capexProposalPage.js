@@ -46,14 +46,23 @@ export function appendCapexProposalPage(doc, project, options = {}) {
     : "This detail shows only quantities and customer sales prices included in the Business Case. Internal costs, margins and purchase prices are not shown.", 14, 28, { maxWidth: 182 });
 
   const standardQty = Math.max(0, detail.totalLuminaireQuantity - detail.hybridLuminaireQuantity);
+  const hasHybrid = detail.hybridLuminaireQuantity > 0;
+  const luminaireSummary = it
+    ? hasHybrid
+      ? `${number(detail.totalLuminaireQuantity, 0, lang)} apparecchi: ${number(standardQty, 0, lang)} LED standard + ${number(detail.hybridLuminaireQuantity, 0, lang)} Hybrid`
+      : `${number(detail.totalLuminaireQuantity, 0, lang)} apparecchi LED standard`
+    : hasHybrid
+      ? `${number(detail.totalLuminaireQuantity, 0, lang)} luminaires: ${number(standardQty, 0, lang)} standard LED + ${number(detail.hybridLuminaireQuantity, 0, lang)} Hybrid`
+      : `${number(detail.totalLuminaireQuantity, 0, lang)} standard LED luminaires`;
+  const luminaireSectionTitle = it
+    ? (hasHybrid ? "Apparecchi LED / Hybrid" : "Apparecchi LED")
+    : (hasHybrid ? "LED / Hybrid luminaires" : "LED luminaires");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
   doc.setTextColor(...navy);
-  doc.text(it
-    ? `${number(detail.totalLuminaireQuantity, 0, lang)} apparecchi: ${number(standardQty, 0, lang)} LED standard + ${number(detail.hybridLuminaireQuantity, 0, lang)} Hybrid`
-    : `${number(detail.totalLuminaireQuantity, 0, lang)} luminaires: ${number(standardQty, 0, lang)} standard LED + ${number(detail.hybridLuminaireQuantity, 0, lang)} Hybrid`, 14, 37);
+  doc.text(luminaireSummary, 14, 37);
 
-  section(it ? "Apparecchi LED / Hybrid" : "LED / Hybrid luminaires", 48);
+  section(luminaireSectionTitle, 48);
   autoTable(doc, {
     startY: 53,
     theme: "grid",

@@ -233,7 +233,7 @@ export function repairCostEvolutionProposalPage(doc, project, calculated, pageNu
       [customerText(it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit"), reportMoney(calculated.customerAnnualNetBenefit, lang)],
       [it ? "Profilo dimmer esistente" : "Existing dimming profile", dimmingSummaryValue(project, calculated, lang)],
       [it ? "Payback operativo (escl. finanziamento)" : "Operational payback (excl. financing)", calculated.payback == null ? "-" : `${reportNumber(calculated.payback, 1, lang)} ${it ? "anni" : "yrs"}`],
-      [it ? "Investimento iniziale" : "Initial investment", reportMoney(calculated.totalCapex, lang)],
+      [calculated.dealType === "cash" ? (it ? "Investimento iniziale" : "Initial investment") : (it ? "CAPEX progetto / investimento finanziato" : "Project CAPEX / financed investment"), reportMoney(calculated.totalCapex, lang)],
     ],
     headStyles: { fillColor: teal },
     alternateRowStyles: { fillColor: light },

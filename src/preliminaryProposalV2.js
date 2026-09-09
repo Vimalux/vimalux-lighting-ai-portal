@@ -104,6 +104,22 @@ function generatePdf(row, version) {
   const energySaving = Number(result.annualEnergySavingEUR) || 0;
   const netBenefit = Number(result.annualCustomerNetBenefit) || (energySaving + maintSaving - annualFee);
   const capexBreakdown = buildCustomerCapexRows(project, Number(result.capex) || 0, lang, result.additionalCapexSales);
+  const dealType = String(calculated.dealType || project.assumptions?.dealType || "cash").toLowerCase();
+  const isLaaS = dealType === "noleggio_operativo";
+  const isFinance = dealType === "finance";
+  const isFinanced = isLaaS || isFinance;
+  const upfrontCustomerInvestment = isFinanced ? Math.max(0, Number(project.assumptions?.upfrontPayment) || 0) : Math.max(0, Number(result.capex) || 0);
+  const projectCapexLabel = isFinanced
+    ? (it ? "CAPEX progetto / investimento finanziato" : "Project CAPEX / financed investment")
+    : (it ? "Investimento iniziale" : "Initial investment");
+  const annualPaymentLabel = isLaaS
+    ? (it ? "Canone annuale LaaS / Noleggio tutto incluso" : "Annual all-inclusive LaaS / lease payment")
+    : isFinance
+      ? (it ? "Pagamento annuale totale cliente" : "Total annual customer payment")
+      : (it ? "OPEX annuale Smart / CMS" : "Annual Smart / CMS OPEX");
+  const monthlyCustomerPayment = Math.max(0, Number(calculated.monthlyPayment) || annualFee / 12);
+  const monthlyFinancingPayment = Math.max(0, Number(calculated.financingMonthlyPayment) || 0);
+  const monthlyServiceOpex = Math.max(0, Number(calculated.totalAnnualOpex) || 0) / 12;
 
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const teal = [15, 118, 110];
@@ -138,19 +154,23 @@ function generatePdf(row, version) {
 
   autoTable(doc, {
     startY: 86, theme: "grid",
-    head: [[it ? "Investimento iniziale" : "Initial investment", it ? "Canone annuale Smart / CMS" : "Annual Smart / CMS fee", it ? `TCV ${contractYears} anni` : `TCV ${contractYears} years`]],
+    head: [[projectCapexLabel, annualPaymentLabel, it ? `TCV ${contractYears} anni` : `TCV ${contractYears} years`]],
     body: [[money(result.capex, lang), money(annualFee, lang), money(result.tcv, lang)]],
     headStyles: tableHead, styles: { font: "helvetica", fontSize: 8, cellPadding: 2.2 },
     ...alignedTable({ 0: "right", 1: "right", 2: "right" }),
   });
   doc.setFont("helvetica", "normal"); doc.setFontSize(7.1); doc.setTextColor(...muted);
   doc.text(it
-    ? `TCV include l'indicizzazione del canone/OPEX del ${number(escalation, 1, lang)}% annuo, ove applicabile.`
-    : `TCV includes ${number(escalation, 1, lang)}% annual service/OPEX escalation where applicable.`, 14, doc.lastAutoTable.finalY + 4.5);
+    ? (isLaaS
+      ? "TCV = somma dei canoni contrattuali previsti nel periodo."
+      : "TCV = somma dei pagamenti contrattuali previsti nel periodo.")
+    : (isLaaS
+      ? "TCV = sum of the contractual LaaS / lease payments over the term."
+      : "TCV = sum of contractual customer payments over the term."), 14, doc.lastAutoTable.finalY + 4.5);
 
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 8, theme: "grid",
-    head: [[customerText(it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit"), it ? "Riduzione energia" : "Energy reduction", it ? "Riduzione CO2" : "CO2 reduction", "Payback", customerText(it ? `VAN beneficio Comune (${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} anni)` : `Municipality-benefit NPV (${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} years)`) ]],
+    head: [[customerText(it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit"), it ? "Riduzione energia" : "Energy reduction", it ? "Riduzione CO2" : "CO2 reduction", isFinanced ? (it ? "Payback operativo (escl. finanziamento)" : "Operational payback (excl. financing)") : "Payback", customerText(it ? `VAN beneficio Comune (${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} anni)` : `Municipality-benefit NPV (${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} years)`) ]],
     body: [[money(netBenefit, lang), `${number(result.energyReductionPct, 1, lang)}%`, `${number(result.co2ReductionTons, 1, lang)} t/${it ? "anno" : "yr"}`, result.paybackYears == null ? "-" : `${number(result.paybackYears, 1, lang)} ${it ? "anni" : "years"}`, money(result.npv, lang)]],
     headStyles: tableHead, styles: { font: "helvetica", fontSize: 7.1, cellPadding: 2 },
     ...alignedTable({ 0: "right", 1: "right", 2: "right", 3: "right", 4: "right" }),
@@ -177,12 +197,21 @@ function generatePdf(row, version) {
   autoTable(doc, {
     startY: y + 5, theme: "grid", head: [[it ? "Voce" : "Item", it ? "Valore" : "Value"]],
     body: [
-      [it ? "Investimento iniziale (CAPEX)" : "Initial investment (CAPEX)", money(result.capex, lang)],
-      [it ? "Canone annuale Smart Lighting / CMS" : "Annual Smart Lighting / CMS fee", money(annualFee, lang)],
+      [projectCapexLabel, money(result.capex, lang)],
+      ...(isFinanced ? [[it ? "Investimento iniziale cliente" : "Customer upfront investment", money(upfrontCustomerInvestment, lang)]] : []),
+      [annualPaymentLabel, money(annualFee, lang)],
+      ...(isLaaS ? [
+        [it ? "Canone mensile LaaS / Noleggio tutto incluso" : "Monthly all-inclusive LaaS / lease payment", money(monthlyCustomerPayment, lang)],
+        [it ? "OPEX servizi / mese (incluso nel canone)" : "Service OPEX / month (included in payment)", money(monthlyServiceOpex, lang)],
+      ] : isFinance ? [
+        [it ? "Rata mensile finanziamento CAPEX" : "Monthly CAPEX financing payment", money(monthlyFinancingPayment, lang)],
+        [it ? "OPEX servizi / mese" : "Service OPEX / month", money(monthlyServiceOpex, lang)],
+        [it ? "Pagamento mensile totale cliente" : "Total monthly customer payment", money(monthlyCustomerPayment, lang)],
+      ] : []),
       [it ? "Durata CMS" : "CMS service term", `${contractYears} ${it ? "anni" : "years"}`],
       ...(project.solution?.powerAidEnabled ? [[it ? "Durata PowerAiD" : "PowerAiD service term", `${powerAidYears} ${it ? "anni" : "years"}`]] : []),
       ...(hybridBenefitEur > 0 ? [[it ? "Beneficio Hybrid Solar annuo (incluso nel risparmio energia)" : "Annual Hybrid Solar benefit (included in energy saving)", money(hybridBenefitEur, lang)]] : []),
-      [it ? `TCV ${contractYears} anni, indicizzato` : `Indexed TCV ${contractYears} years`, money(result.tcv, lang)],
+      [it ? `TCV ${contractYears} anni` : `TCV ${contractYears} years`, money(result.tcv, lang)],
       [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],
     ],
     headStyles: tableHead, styles: { font: "helvetica", fontSize: 8, cellPadding: 1.5 },
@@ -217,7 +246,7 @@ function generatePdf(row, version) {
       [it ? "Risparmio energia" : "Energy saving", money(energySaving, lang)],
       ...(hybridBenefitEur > 0 ? [[it ? "di cui Hybrid Solar (già incluso)" : "of which Hybrid Solar (already included)", money(hybridBenefitEur, lang)]] : []),
       [it ? "Risparmio manutenzione" : "Maintenance saving", money(maintSaving, lang)],
-      [it ? "Canone Smart Lighting / CMS" : "Smart Lighting / CMS fee", `(${money(annualFee, lang)})`],
+      [annualPaymentLabel, `(${money(annualFee, lang)})`],
       [customerText(it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit"), money(netBenefit, lang)],
     ],
     headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.25 },
@@ -263,7 +292,7 @@ function generatePdf(row, version) {
       [it ? "Periodo di analisi" : "Analysis period", `${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} ${it ? "anni" : "years"}`],
       [it ? "Durata CMS" : "CMS service term", `${contractYears} ${it ? "anni" : "years"}`],
       ...(project.solution?.powerAidEnabled ? [[it ? "Durata PowerAiD" : "PowerAiD service term", `${powerAidYears} ${it ? "anni" : "years"}`]] : []),
-      [it ? "Indicizzazione canone/OPEX" : "Service/OPEX escalation", `${number(escalation, 1, lang)}% ${it ? "annuo" : "p.a."}`],
+      [isLaaS ? (it ? "Indicizzazione OPEX servizi" : "Service OPEX escalation") : (it ? "Indicizzazione canone/OPEX" : "Service/OPEX escalation"), `${number(escalation, 1, lang)}% ${it ? "annuo" : "p.a."}`],
       [it ? "Modello commerciale" : "Commercial model", String(project.assumptions?.dealType || project.assumptions?.financingModel || "cash")],
       [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],
     ],

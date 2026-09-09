@@ -92,7 +92,10 @@ function appendCashFlowPage(doc, project, calculated, options = {}) {
     { year: 0, grossBenefit: 0, serviceOpex: 0, payment: initialOutlay, netCashFlow: -initialOutlay, cumulative: openingCash },
     ...cashRows,
   ];
-  const isCashDeal = String(calculated.dealType || "").toLowerCase() === "cash";
+  const normalizedDealType = String(calculated.dealType || "").toLowerCase();
+  const isCashDeal = normalizedDealType === "cash";
+  const isLaaS = normalizedDealType === "noleggio_operativo";
+  const isFinance = normalizedDealType === "finance";
 
   doc.addPage();
   doc.setTextColor(...teal);
@@ -137,15 +140,15 @@ function appendCashFlowPage(doc, project, calculated, options = {}) {
     head: [[
       it ? "Anno" : "Year",
       it ? "Beneficio lordo" : "Gross benefit",
-      it ? "Servizi/OPEX" : "Service/OPEX",
-      it ? "Invest./finanz." : "Invest./finance",
+      isLaaS ? (it ? "OPEX servizi (incluso)" : "Service OPEX (included)") : (it ? "Servizi/OPEX" : "Service/OPEX"),
+      isLaaS ? (it ? "Canone LaaS / Noleggio" : "LaaS / lease payment") : isFinance ? (it ? "Rata CAPEX / finanz." : "CAPEX / finance payment") : (it ? "Investimento" : "Investment"),
       it ? "Cash flow netto" : "Net cash flow",
       it ? "Cumulativo" : "Cumulative",
     ]],
     body: cashTableRows.map((row) => [
       row.year,
       reportMoney(row.grossBenefit, lang),
-      reportMoney(row.serviceOpex, lang),
+      isLaaS && Number(row.year) > 0 && safe(row.payment) > 0 ? (it ? "Incluso" : "Included") : reportMoney(row.serviceOpex, lang),
       reportMoney(row.payment, lang),
       reportMoney(row.netCashFlow, lang),
       reportMoney(row.cumulative, lang),
