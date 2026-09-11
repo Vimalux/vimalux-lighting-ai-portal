@@ -17,6 +17,7 @@ import WarrantySelector from "./WarrantySelector.jsx";
 import VatSettings, { VatSummaryCard } from "./VatSettings.jsx";
 import { applyWarrantyPricing } from "./warranty.js";
 import CatalogueExtended from "./CatalogueExtended.jsx";
+import ProcurementPanel from "./ProcurementPanel.jsx";
 import { compatibleLedProducts } from "./productCatalogue.js";
 import { isAgentViewAllowed, sanitizeAgentAdditionalCosts } from "./additionalCostsAccess.js";
 import { syncBusinessCaseResult } from "./businessCaseSync.js";
@@ -586,6 +587,7 @@ export default function App() {
         {!isAgent && <button className={view === "partnerReports" ? "active" : ""} onClick={() => setView("partnerReports")}>Partner reports</button>}
         <button className={view === "projects" ? "active" : ""} onClick={() => setView("projects")}>{t("projects")}</button>
         {!isAgent && <button className={view === "catalogue" ? "active" : ""} onClick={() => setView("catalogue")}>{t("catalogue")}</button>}
+        {!isAgent && <button className={view === "orderList" ? "active" : ""} onClick={() => setView("orderList")}>{t("orderList")}</button>}
         {!isAgent && <button className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}>{t("priceAdmin")}</button>}
         {!isAgent && <button className={view === "internalReport" ? "active" : ""} onClick={() => setView("internalReport")}>{t("internalReport")}</button>}
         {supabaseConfigured && <button className="signout" onClick={() => supabase.auth.signOut()}>Esci / Sign out</button>}
@@ -609,6 +611,7 @@ export default function App() {
           {!isAgent && view === "partnerReports" && <PartnerReports projects={syncedProjects} p={syncedProject} money={money} />}
           {view === "projects" && <Projects list={projects} activeId={activeId} select={(id) => { setActiveId(id); setView("customer"); }} remove={isAgent ? undefined : removeProject} create={isAgent ? undefined : create} importProjectFile={importProjectFile} t={t} />}
           {!isAgent && view === "catalogue" && <CatalogueExtended p={project} update={update} projects={projects} />}
+          {!isAgent && view === "orderList" && <ProcurementPanel key={project.id} p={project} />}
           {!isAgent && view === "admin" && <Admin p={project} r={result} setView={setView} reset={reset} t={t} />}
         </>}
       </main>
