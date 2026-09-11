@@ -82,7 +82,10 @@ function updateHeaderContext() {
   const ref = urlRef || renderedCode;
   if (!ref) return;
 
-  const match = projectForBusinessCase(ref) || projectForBusinessCase(renderedCode);
+  // An explicit Business Case link is authoritative while cloud data loads.
+  // The temporary header may still describe a different/default project.
+  const match = urlRef ? projectForBusinessCase(urlRef) : projectForBusinessCase(renderedCode);
+  if (urlRef && !match) return;
   const stable = String(match?.crm?.businessCaseRecordId || match?.id || ref).trim();
   const code = String(match?.project?.businessCaseId || match?.crm?.businessCase?.businessCaseId || renderedCode || ref).trim();
   const projectName = String(match?.project?.name || match?.name || match?.customer?.name || "").trim();

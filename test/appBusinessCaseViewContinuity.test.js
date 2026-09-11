@@ -10,18 +10,20 @@ test("Supabase profile hydration does not force an allowed Business Case view to
 });
 
 test("same active Business Case keeps its workflow view when URL match rehydrates", () => {
-  assert.match(source, /sameBusinessCaseIdentity\(project, activeId, match, businessCaseId\)/);
-  assert.match(source, /isProjectContinuityView\(view\)/);
+  const matchBranch = source.slice(source.indexOf("if (match) {"), source.indexOf("if (isStableBusinessCaseLink(params)"));
+  assert.match(matchBranch, /setActiveId\(match.id\)/);
+  assert.doesNotMatch(matchBranch, /setView/);
 });
 
 test("same active Business Case keeps its workflow view when loaded from Supabase", () => {
-  assert.match(source, /sameBusinessCaseIdentity\(project, activeId, migrated, businessCaseId\)/);
-  const conditionalResets = source.match(/if \(!preserveCurrentView\) setView\("customer"\)/g) || [];
-  assert.equal(conditionalResets.length, 2);
+  const loadBranch = source.slice(source.indexOf("loadBusinessCase(businessCaseId)"), source.indexOf("This legacy CRM link"));
+  assert.match(loadBranch, /setActiveId\(migrated.id\)/);
+  assert.doesNotMatch(loadBranch, /setView/);
 });
 
-test("Business Case identity accepts record UUID and human-readable BC code aliases", () => {
-  assert.match(source, /item\?\.crm\?\.businessCaseRecordId/);
-  assert.match(source, /item\?\.project\?\.businessCaseId/);
-  assert.match(source, /normalizeId\(requestedId\)/);
+test("persisted menu is scoped to the verified account and active Business Case", () => {
+  assert.match(source, /usePersistentNavigation\(/);
+  assert.match(source, /session && cloudReady && roleVerified/);
+  assert.match(source, /userId: session\?\.user\?\.id/);
+  assert.match(source, /projectId: project.crm\?\.businessCaseRecordId \|\| project.id/);
 });

@@ -126,6 +126,7 @@ function rememberManualProjectView(element) {
 }
 
 function captureProjectViewBeforeLeave() {
+  if (document.querySelector('aside[data-navigation-managed="react"]')) return;
   const ref = currentBusinessCaseRef();
   const activeProject = activeProjectCandidate();
   const activeLabel = norm(activeProject?.textContent);
@@ -164,6 +165,7 @@ function preferredSavedView() {
 }
 
 function restoreView() {
+  if (document.querySelector('aside[data-navigation-managed="react"]')) return;
   if (!restoreOnReturn || document.hidden) return;
   if (restoreUntil && Date.now() > restoreUntil) return;
   if (Date.now() - lastUserNavigationAt < USER_NAVIGATION_GRACE_MS) return;
@@ -255,7 +257,7 @@ function isNewLedButton(element) {
 if (typeof document !== "undefined") {
   document.addEventListener("click", (event) => {
     const nav = event.target?.closest?.("aside button, aside a, nav button, nav a");
-    if (nav && !restoringView) {
+    if (nav && !restoringView && !nav.closest('[data-navigation-managed="react"]')) {
       lastUserNavigationAt = Date.now();
       clearRestoreTimers();
       if (projectViewFromNavigation(nav)) {

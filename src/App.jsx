@@ -18,7 +18,8 @@ import VatSettings, { VatSummaryCard } from "./VatSettings.jsx";
 import { applyWarrantyPricing } from "./warranty.js";
 import CatalogueExtended from "./CatalogueExtended.jsx";
 import ProcurementPanel from "./ProcurementPanel.jsx";
-import { isProjectContinuityView } from "./intelligenceUiContinuityRuntime.js";
+import usePersistentNavigation from "./usePersistentNavigation.js";
+import { ADMIN_VIEWS, findLinkedProject } from "./navigationState.js";
 import { compatibleLedProducts } from "./productCatalogue.js";
 import { isAgentViewAllowed, sanitizeAgentAdditionalCosts } from "./additionalCostsAccess.js";
 import { syncBusinessCaseResult } from "./businessCaseSync.js";
@@ -130,18 +131,6 @@ const numeric = new Set([
   "totalContractValue",
 ]);
 
-export function sameBusinessCaseIdentity(currentProject, activeId, candidate, requestedId = "") {
-  const normalizeId = (value) => String(value || "").trim().toLowerCase();
-  const idsFor = (item) => [
-    item?.id,
-    item?.crm?.businessCaseRecordId,
-    item?.project?.businessCaseId,
-  ].map(normalizeId).filter(Boolean);
-  const currentIds = new Set([normalizeId(activeId), ...idsFor(currentProject)].filter(Boolean));
-  const candidateIds = new Set([normalizeId(requestedId), ...idsFor(candidate)].filter(Boolean));
-  return [...currentIds].some((id) => candidateIds.has(id));
-}
-
 export default function App() {
   const hadStoredProjects = useMemo(
     () => Boolean(localStorage.getItem("vimalux-intelligence-projects")),
@@ -150,8 +139,10 @@ export default function App() {
   const initial = useMemo(loadProjects, []);
   const emptyProject = useMemo(defaultProject, []);
   const [projects, setProjects] = useState(initial);
-  const [activeId, setActiveId] = useState(initial[0].id);
-  const [view, setView] = useState("customer");
+  const [activeId, setActiveId] = useState(() => {
+    const requestedId = new URLSearchParams(window.location.search).get("business_case_id");
+    return findLinkedProject(initial, requestedId)?.id || initial[0].id;
+  });
   const [session, setSession] = useState(null);
   const [currentProfile, setCurrentProfile] = useState(null);
   const [authReady, setAuthReady] = useState(!supabaseConfigured);
@@ -170,6 +161,12 @@ export default function App() {
   const visibleWorkflow = isAgent
     ? agentWorkflow
     : workflow;
+  const [view, setView] = usePersistentNavigation({
+    ready: !supabaseConfigured || Boolean(session && cloudReady && roleVerified),
+    userId: session?.user?.id || "local",
+    projectId: project.crm?.businessCaseRecordId || project.id,
+    allowedViews: isAgent ? agentAllowedViews : ADMIN_VIEWS,
+  });
   const t = useT(project.language);
   useEffect(() => {
     const crmMode = view === "crm";
@@ -269,21 +266,12 @@ export default function App() {
     const opportunityId = params.get("opportunity_id");
     const businessCaseId = params.get("business_case_id");
     if (!opportunityId && !businessCaseId) return;
-    const match = projects.find(
-      (item) =>
-        item.id === businessCaseId ||
-        item.crm?.businessCaseRecordId === businessCaseId ||
-        item.crm?.opportunityId === opportunityId ||
-        item.crm?.uniqueProjectId === opportunityId ||
-        item.project?.businessCaseId === businessCaseId,
-    );
+    const match = findLinkedProject(projects, businessCaseId, opportunityId);
     if (match) {
-    const preserveCurrentView = isProjectContinuityView(view)
-      && sameBusinessCaseIdentity(project, activeId, match, businessCaseId);
-    setActiveId(match.id);
-    if (!preserveCurrentView) setView("customer");
-    return;
-  }
+      setActiveId(match.id);
+      // Navigation belongs to the account/project context, not the auth refresh.
+      return;
+    }
     if (isStableBusinessCaseLink(params) && session) {
       let active = true;
       loadBusinessCase(businessCaseId)
@@ -295,10 +283,7 @@ export default function App() {
               ? current
               : [...current, migrated],
           );
-          const preserveCurrentView = isProjectContinuityView(view)
-          && sameBusinessCaseIdentity(project, activeId, migrated, businessCaseId);
-        setActiveId(migrated.id);
-        if (!preserveCurrentView) setView("customer");
+          setActiveId(migrated.id);
         })
         .catch((error) => {
           if (!active) return;
@@ -579,7 +564,7 @@ export default function App() {
   if (supabaseConfigured && !session) return <AuthScreen />;
   return (
     <div className="app">
-      <aside>
+      <aside data-navigation-managed="react">
         <div className="brand"><span>V</span><div><strong>VIMALUX</strong><small>Intelligence v1.0</small></div></div>
         <nav>{visibleWorkflow.map(([id, key], i) => <button data-intelligence-view={id} className={view === id ? "active" : ""} onClick={() => setView(id)} key={id}><b>{i + 1}</b>{t(key)}</button>)}</nav>
         {!isAgent && <hr />}

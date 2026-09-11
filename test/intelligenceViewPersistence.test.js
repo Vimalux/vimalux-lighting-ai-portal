@@ -90,7 +90,7 @@ test("manual project navigation remains authoritative during the bounded return 
     "utf8",
   );
   assert.match(source, /rememberManualProjectView\(nav\)/);
-  assert.match(source, /if \(nav && !restoringView\)/);
+  assert.match(source, /if \(nav && !restoringView && !nav.closest/);
   assert.match(source, /lastUserNavigationAt = Date\.now\(\)/);
   assert.match(source, /if \(Date\.now\(\) - lastUserNavigationAt < USER_NAVIGATION_GRACE_MS\) return/);
 });
