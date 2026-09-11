@@ -18,6 +18,7 @@ import VatSettings, { VatSummaryCard } from "./VatSettings.jsx";
 import { applyWarrantyPricing } from "./warranty.js";
 import CatalogueExtended from "./CatalogueExtended.jsx";
 import ProcurementPanel from "./ProcurementPanel.jsx";
+import { isProjectContinuityView } from "./intelligenceUiContinuityRuntime.js";
 import { compatibleLedProducts } from "./productCatalogue.js";
 import { isAgentViewAllowed, sanitizeAgentAdditionalCosts } from "./additionalCostsAccess.js";
 import { syncBusinessCaseResult } from "./businessCaseSync.js";
@@ -277,7 +278,7 @@ export default function App() {
         item.project?.businessCaseId === businessCaseId,
     );
     if (match) {
-    const preserveCurrentView = workflow.some(([id]) => id === view)
+    const preserveCurrentView = isProjectContinuityView(view)
       && sameBusinessCaseIdentity(project, activeId, match, businessCaseId);
     setActiveId(match.id);
     if (!preserveCurrentView) setView("customer");
@@ -294,7 +295,7 @@ export default function App() {
               ? current
               : [...current, migrated],
           );
-          const preserveCurrentView = workflow.some(([id]) => id === view)
+          const preserveCurrentView = isProjectContinuityView(view)
           && sameBusinessCaseIdentity(project, activeId, migrated, businessCaseId);
         setActiveId(migrated.id);
         if (!preserveCurrentView) setView("customer");
@@ -580,14 +581,14 @@ export default function App() {
     <div className="app">
       <aside>
         <div className="brand"><span>V</span><div><strong>VIMALUX</strong><small>Intelligence v1.0</small></div></div>
-        <nav>{visibleWorkflow.map(([id, key], i) => <button className={view === id ? "active" : ""} onClick={() => setView(id)} key={id}><b>{i + 1}</b>{t(key)}</button>)}</nav>
+        <nav>{visibleWorkflow.map(([id, key], i) => <button data-intelligence-view={id} className={view === id ? "active" : ""} onClick={() => setView(id)} key={id}><b>{i + 1}</b>{t(key)}</button>)}</nav>
         {!isAgent && <hr />}
         {!isAgent && <button className={view === "crm" ? "active" : ""} onClick={() => setView("crm")}>CRM</button>}
         {!isAgent && <button className={view === "datek" ? "active" : ""} onClick={() => setView("datek")}>CMS Partners</button>}
         {!isAgent && <button className={view === "partnerReports" ? "active" : ""} onClick={() => setView("partnerReports")}>Partner reports</button>}
         <button className={view === "projects" ? "active" : ""} onClick={() => setView("projects")}>{t("projects")}</button>
         {!isAgent && <button className={view === "catalogue" ? "active" : ""} onClick={() => setView("catalogue")}>{t("catalogue")}</button>}
-        {!isAgent && <button className={view === "orderList" ? "active" : ""} onClick={() => setView("orderList")}>{t("orderList")}</button>}
+        {!isAgent && <button data-intelligence-view="orderList" className={view === "orderList" ? "active" : ""} onClick={() => setView("orderList")}>{t("orderList")}</button>}
         {!isAgent && <button className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}>{t("priceAdmin")}</button>}
         {!isAgent && <button className={view === "internalReport" ? "active" : ""} onClick={() => setView("internalReport")}>{t("internalReport")}</button>}
         {supabaseConfigured && <button className="signout" onClick={() => supabase.auth.signOut()}>Esci / Sign out</button>}

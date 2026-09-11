@@ -4,6 +4,7 @@ import fs from "node:fs";
 import {
   continuityRestoreSignature,
   isProjectContinuityView,
+  projectViewFromNavigation,
 } from "../src/intelligenceUiContinuityRuntime.js";
 
 test("continuity signature changes when the active menu drifts away from the saved view", () => {
@@ -14,12 +15,23 @@ test("continuity signature changes when the active menu drifts away from the sav
 });
 
 test("only Business Case workflow views are eligible for browser-return continuity", () => {
-  for (const view of ["customer", "existing", "solution", "additionalCosts", "pricing", "assumptions", "business", "report"]) {
+  for (const view of ["customer", "existing", "solution", "additionalCosts", "pricing", "assumptions", "business", "report", "orderList"]) {
     assert.equal(isProjectContinuityView(view), true, `${view} should be restorable`);
   }
   for (const view of ["crm", "datek", "partnerReports", "projects", "catalogue", "admin", "internalReport", "defaults"]) {
     assert.equal(isProjectContinuityView(view), false, `${view} must never take over a Business Case`);
   }
+});
+
+test("numbered and translated workflow buttons use stable view identity", () => {
+  for (const textContent of ["3Løsning", "3Soluzione", "3Solution"]) {
+    assert.equal(projectViewFromNavigation({ dataset: { intelligenceView: "solution" }, textContent }), "solution");
+  }
+  for (const textContent of ["Ordreliste", "Lista ordini", "Order List"]) {
+    assert.equal(projectViewFromNavigation({ dataset: { intelligenceView: "orderList" }, textContent }), "orderList");
+  }
+  assert.equal(projectViewFromNavigation({ dataset: { intelligenceView: "admin" }, textContent: "Report" }), null);
+  assert.equal(projectViewFromNavigation(null), null);
 });
 
 test("CMS Partners and other global views cannot be stored or restored under a Business Case", () => {

@@ -11,7 +11,7 @@ test("Supabase profile hydration does not force an allowed Business Case view to
 
 test("same active Business Case keeps its workflow view when URL match rehydrates", () => {
   assert.match(source, /sameBusinessCaseIdentity\(project, activeId, match, businessCaseId\)/);
-  assert.match(source, /workflow\.some\(\(\[id\]\) => id === view\)/);
+  assert.match(source, /isProjectContinuityView\(view\)/);
 });
 
 test("same active Business Case keeps its workflow view when loaded from Supabase", () => {

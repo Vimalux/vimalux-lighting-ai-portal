@@ -19,6 +19,9 @@ const PROJECT_VIEW_LABELS = new Map([
   ["economic analysis", "business"],
   ["rapporto", "report"],
   ["report", "report"],
+  ["lista ordini", "orderList"],
+  ["order list", "orderList"],
+  ["ordreliste", "orderList"],
 ]);
 
 const PROJECT_VIEW_IDS = new Set(PROJECT_VIEW_LABELS.values());
@@ -41,8 +44,14 @@ function sidebarCandidates() {
   return [...document.querySelectorAll("aside button, aside a, nav button, nav a")];
 }
 
+export function projectViewFromNavigation(element) {
+  const view = element?.dataset?.intelligenceView;
+  if (view) return PROJECT_VIEW_IDS.has(view) ? view : null;
+  return PROJECT_VIEW_LABELS.get(norm(element?.textContent)) || null;
+}
+
 function projectNavCandidates() {
-  return sidebarCandidates().filter((el) => PROJECT_VIEW_LABELS.has(norm(el.textContent)));
+  return sidebarCandidates().filter((el) => projectViewFromNavigation(el));
 }
 
 function isActiveCandidate(element) {
@@ -107,7 +116,7 @@ function disableProjectRestore() {
 
 function rememberManualProjectView(element) {
   const label = norm(element?.textContent);
-  const view = PROJECT_VIEW_LABELS.get(label);
+  const view = projectViewFromNavigation(element);
   if (!view) return false;
   const ref = currentBusinessCaseRef();
   lastExplicitView = view;
@@ -120,7 +129,7 @@ function captureProjectViewBeforeLeave() {
   const ref = currentBusinessCaseRef();
   const activeProject = activeProjectCandidate();
   const activeLabel = norm(activeProject?.textContent);
-  let activeProjectView = PROJECT_VIEW_LABELS.get(activeLabel);
+  let activeProjectView = projectViewFromNavigation(activeProject);
 
   // Blur/pagehide can occur while an unrelated global nav item also carries an
   // active marker, or while React is temporarily rerendering the project menu.
@@ -162,7 +171,7 @@ function restoreView() {
   const saved = preferredSavedView();
   if (!saved?.view || !PROJECT_VIEW_IDS.has(saved.view)) return;
   const candidates = projectNavCandidates();
-  const target = candidates.find((el) => PROJECT_VIEW_LABELS.get(norm(el.textContent)) === saved.view);
+  const target = candidates.find((el) => projectViewFromNavigation(el) === saved.view);
   if (!target) return;
   if (isActiveCandidate(target)) return;
 
@@ -249,7 +258,7 @@ if (typeof document !== "undefined") {
     if (nav && !restoringView) {
       lastUserNavigationAt = Date.now();
       clearRestoreTimers();
-      if (PROJECT_VIEW_LABELS.has(norm(nav.textContent))) {
+      if (projectViewFromNavigation(nav)) {
         rememberManualProjectView(nav);
       } else {
         // Explicit navigation to a global/admin area disables project restore.
