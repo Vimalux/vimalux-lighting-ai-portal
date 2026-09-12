@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { calculateBusinessCase } from "../src/calculations.js";
 import { defaultProject } from "../src/model.js";
 import { groupProcurementBySupplier } from "../src/procurement.js";
-import { availablePartnerEquipment, partnerEquipmentAdditionalCosts } from "../src/partnerEquipment.js";
+import { availablePartnerEquipment, partnerEquipmentAdditionalCosts, partnerEquipmentPricingRows } from "../src/partnerEquipment.js";
 
 function projectWithFelicityEquipment() {
   const project = defaultProject({ applyStoredDefaults: false });
@@ -66,4 +66,36 @@ test("partner equipment CAPEX flows through the existing calculation engine exac
   const result = calculateBusinessCase(withEquipment);
   assert.equal(result.totalCapex - base.totalCapex, 2 * 2006);
   assert.equal(result.capexDirectCost - base.capexDirectCost, 2 * 1006);
+});
+
+test("selected partner equipment exposes dynamic project-pricing rows for hardware and implementation", () => {
+  const rows = partnerEquipmentPricingRows(projectWithFelicityEquipment());
+  assert.equal(rows.length, 2);
+  const hardware = rows.find((row) => row.key === "salesPrice");
+  const implementation = rows.find((row) => row.key === "implementationSalesPrice");
+  assert.ok(hardware);
+  assert.ok(implementation);
+  assert.equal(hardware.q, 2);
+  assert.equal(hardware.cat, 2000);
+  assert.equal(hardware.cost, 1000);
+  assert.equal(hardware.total, 4000);
+  assert.match(hardware.label, /FELICITY/);
+  assert.match(hardware.label, /FSI-HIVE_LTE-AC-1U-N/);
+  assert.equal(implementation.total, 12);
+});
+
+test("project price overrides change partner-equipment economics without changing catalogue master data", () => {
+  const project = projectWithFelicityEquipment();
+  const before = structuredClone(project.catalogue.smart.find((item) => item.id === "felicity-camera"));
+  const base = calculateBusinessCase(project);
+  project.pricing.overrides["felicity-camera"] = {
+    salesPrice: 1750,
+    implementationSalesPrice: 4,
+  };
+  const rows = partnerEquipmentPricingRows(project);
+  assert.equal(rows.find((row) => row.key === "salesPrice").total, 3500);
+  assert.equal(rows.find((row) => row.key === "implementationSalesPrice").total, 8);
+  const overridden = calculateBusinessCase(project);
+  assert.equal(overridden.totalCapex - base.totalCapex, 2 * ((1750 + 4) - (2000 + 6)));
+  assert.deepEqual(project.catalogue.smart.find((item) => item.id === "felicity-camera"), before);
 });
