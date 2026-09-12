@@ -4,9 +4,9 @@ import fs from "node:fs";
 
 const source = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 
-test("dashboard phases follow CMS and PowerAiD state changes independently", () => {
+test("dashboard phases follow CMS and Adaptive Dimming state changes independently", () => {
   assert.match(source, /phaseKey = \(row\) => `\$\{Boolean\(row\?\.cmsActive\)\}\|\$\{Boolean\(row\?\.powerAidActive\)\}/);
-  assert.match(source, /CMS \+ PowerAiD/);
+  assert.match(source, /CMS \+ Adaptive Dimming/);
   assert.match(source, /Solo CMS/);
   assert.match(source, /Post-servizi/);
 });
