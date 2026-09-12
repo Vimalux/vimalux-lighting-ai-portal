@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { adaptiveDimmingPartnerOptions, resolveAdaptiveDimmingPartner, resolveCmsPartner } from "./partners.js";
 import { partnerDisplayText, productRoles, productSupportsPartner } from "./partnerRoles.js";
 import { uid } from "./model.js";
@@ -14,12 +14,13 @@ export default function PartnerEquipmentSelector({ p, update, adaptive = true })
 
   const belongs = (product) => product && productRoles(product).includes(role);
   const isLcuProduct = (product) => ["LCU", "ZHAGA"].includes(String(product?.type || "").trim().toUpperCase());
-  const products = smart.filter((item) =>
+  const compatibleCmsProducts = smart.filter((item) =>
     item.active !== false
     && belongs(item)
     && productSupportsPartner(item, selectedPartner, role)
-    && (adaptive || !isLcuProduct(item))
   );
+  const lcuProducts = adaptive ? [] : compatibleCmsProducts.filter(isLcuProduct);
+  const products = compatibleCmsProducts.filter((item) => adaptive || !isLcuProduct(item));
 
   const rows = allRows
     .map((row, index) => ({ row, index }))
@@ -27,6 +28,18 @@ export default function PartnerEquipmentSelector({ p, update, adaptive = true })
 
   const replaceRows = (next) => update(["solution", "partnerEquipment"], next);
   const change = (index, field, value) => replaceRows(allRows.map((row, i) => i === index ? { ...row, [field]: value } : row));
+
+  // During staging the old top-level LCU selector is still present in App.jsx.
+  // Hide that duplicate control once the consolidated CMS block is mounted.
+  useEffect(() => {
+    if (adaptive) return undefined;
+    const select = document.querySelector('select[aria-label="LCU"]');
+    const label = select?.closest("label");
+    if (!label) return undefined;
+    const previousDisplay = label.style.display;
+    label.style.display = "none";
+    return () => { label.style.display = previousDisplay; };
+  }, [adaptive]);
 
   // Adaptive Dimming products are only shown when Adaptive Dimming is enabled.
   // CMS products and LCU quantity are independent of Adaptive Dimming and are shown whenever CMS is enabled.
@@ -53,23 +66,33 @@ export default function PartnerEquipmentSelector({ p, update, adaptive = true })
       {adaptiveDimmingPartnerOptions(p).map((name) => <option key={name} value={name}>{name}</option>)}
     </select></label>}
 
-    {!adaptive && <div className="form-grid lcu-quantity-control">
-      <label><span>{it ? "Quantità LCU" : "LCU quantity"}</span><input type="number" min="0" step="1" value={lcuQuantity} onChange={(e) => update(["solution", "lcuQuantityOverride"], e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0))} /></label>
+    {!adaptive && <>
+      <div className="form-grid">
+        <label><span>{it ? "Prodotto LCU" : "LCU product"}</span><select aria-label={it ? "Prodotto LCU" : "LCU product"} value={lcuProducts.some((item) => item.id === p.solution?.lcuProductId) ? p.solution.lcuProductId : ""} onChange={(e) => update(["solution", "lcuProductId"], e.target.value)}>
+          <option value="">{it ? "-- seleziona LCU --" : "-- select LCU --"}</option>
+          {lcuProducts.map((item) => <option key={item.id} value={item.id}>{partnerDisplayText(item.name)} · {item.supplier || ""} {item.supplierSku || ""}</option>)}
+        </select></label>
+        <label><span>{it ? "Quantità LCU" : "LCU quantity"}</span><input type="number" min="0" step="1" value={lcuQuantity} onChange={(e) => update(["solution", "lcuQuantityOverride"], e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0))} /></label>
+      </div>
       <div className="lcu-quantity-auto">
         <span className="hint">{it ? `Automatico: ${automaticLcuQuantity} unità (uguale agli apparecchi selezionati per l'upgrade)` : `Automatic: ${automaticLcuQuantity} units (equal to luminaires selected for upgrade)`}</span>
         {hasLcuQuantityOverride && <button type="button" className="secondary partner-add-button" onClick={() => update(["solution", "lcuQuantityOverride"], null)}>{it ? "Ripristina automatico" : "Reset to automatic"}</button>}
       </div>
-    </div>}
+    </>}
 
     <p className="hint">{adaptive
       ? (it ? "Selezionare il partner e i prodotti per il dimming adattivo. Le quantità entrano nel CAPEX, nella lista ordini del relativo fornitore e nel report partner." : "Select the adaptive-dimming partner and products. Quantities feed CAPEX, the relevant supplier order list and the partner report.")
-      : (it ? `La quantità LCU parte automaticamente dal numero di apparecchi da aggiornare e può essere modificata per il progetto. Eventuali altri prodotti CMS del partner ${selectedPartner || "selezionato"} possono essere aggiunti qui sotto.` : `LCU quantity starts automatically from the number of luminaires to upgrade and can be changed for the project. Any additional CMS products from ${selectedPartner || "the selected partner"} can be added below.`)}</p>
+      : (it ? `LCU e quantità sono gestite qui. Eventuali altri prodotti CMS / Lighting Control del partner ${selectedPartner || "selezionato"} possono essere aggiunti sotto.` : `LCU and quantity are managed here. Any additional CMS / Lighting Control products from ${selectedPartner || "the selected partner"} can be added below.`)}</p>
+
+    {!adaptive && !lcuProducts.length && <p className="hint">{it
+      ? `Nessuna LCU configurata per ${selectedPartner || "il partner selezionato"}.`
+      : `No LCU is configured for ${selectedPartner || "the selected partner"}.`}</p>}
 
     {!adaptive && !products.length && <p className="hint">{it
-      ? `Nessun prodotto CMS aggiuntivo configurato per ${selectedPartner || "il partner selezionato"}. La LCU selezionata sopra resta comunque attiva.`
-      : `No additional CMS products are configured for ${selectedPartner || "the selected partner"}. The LCU selected above remains active.`}</p>}
+      ? `Nessun altro prodotto CMS configurato per ${selectedPartner || "il partner selezionato"}.`
+      : `No additional CMS products are configured for ${selectedPartner || "the selected partner"}.`}</p>}
 
-    {(adaptive || products.length > 0 || rows.length > 0) && <button type="button" className="secondary partner-add-button" disabled={!availableToAdd} onClick={() => replaceRows([...allRows, { id: uid(), partnerRole: role, productId: "", quantity: 1 }])}>+ {adaptive ? (it ? "Aggiungi prodotto" : "Add product") : (it ? "Aggiungi prodotto CMS" : "Add CMS product")}</button>}
+    {(adaptive || products.length > 0 || rows.length > 0) && <button type="button" className="secondary partner-add-button" disabled={!availableToAdd} onClick={() => replaceRows([...allRows, { id: uid(), partnerRole: role, productId: "", quantity: 1 }])}>+ {adaptive ? (it ? "Aggiungi prodotto" : "Add product") : (it ? "Aggiungi prodotto DATEK / CMS" : "Add DATEK / CMS product")}</button>}
 
     {rows.map(({ row, index }) => <div className="form-grid partner-equipment-row" key={row.id || index}>
       <label><span>{adaptive ? (it ? "Prodotto Adaptive Dimming" : "Adaptive Dimming product") : (it ? "Prodotto CMS" : "CMS product")}</span><select aria-label={adaptive ? (it ? "Prodotto Adaptive Dimming" : "Adaptive Dimming product") : (it ? "Prodotto CMS" : "CMS product")} value={row.productId || ""} onChange={(e) => change(index, "productId", e.target.value)}>
