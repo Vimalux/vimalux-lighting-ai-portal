@@ -49,8 +49,14 @@ export function buildProcurementRows(project = {}) {
 
   const upgradedQuantity = (project.groups || []).reduce((sum, group) => group?.upgradeSelected === false ? sum : sum + numberValue(group?.quantity), 0);
   const solution = project.solution || {};
+  const hasLcuQuantityOverride = solution.lcuQuantityOverride !== null
+    && solution.lcuQuantityOverride !== undefined
+    && solution.lcuQuantityOverride !== "";
+  const lcuQuantity = solution.smartEnabled === false
+    ? 0
+    : hasLcuQuantityOverride ? numberValue(solution.lcuQuantityOverride) : upgradedQuantity;
   const smartItems = [
-    ["lcuProductId", upgradedQuantity, "LCU"],
+    ["lcuProductId", lcuQuantity, "LCU"],
     ["gatewayProductId", solution.gatewayQuantity, "Gateway"],
     ["antennaProductId", solution.antennaQuantity, "Antenna"],
     ["meterProductId", solution.meterQuantity, "Energy Meter"],
