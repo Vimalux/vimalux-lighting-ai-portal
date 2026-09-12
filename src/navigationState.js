@@ -11,7 +11,12 @@ export function navigationKey(userId, projectId) {
 
 export function findLinkedProject(projects, businessCaseId, opportunityId) {
   return projects.find((item) =>
-    (businessCaseId && [item.id, item.crm?.businessCaseRecordId, item.project?.businessCaseId].includes(businessCaseId)) ||
+    (businessCaseId && [
+      item.id,
+      item.crm?.businessCaseRecordId,
+      item.crm?.legacyIntelligenceId,
+      item.project?.businessCaseId,
+    ].includes(businessCaseId)) ||
     (opportunityId && [item.crm?.opportunityId, item.crm?.uniqueProjectId].includes(opportunityId)),
   );
 }
