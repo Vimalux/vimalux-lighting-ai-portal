@@ -41,6 +41,8 @@ import {
   loadCloudState,
   loadCurrentProfile,
   saveCloudState,
+  loadStagingCatalogue,
+  stagingPreview,
   supabase,
   supabaseConfigured,
 } from "./supabase.js";
@@ -144,9 +146,9 @@ export default function App() {
     return findLinkedProject(initial, requestedId)?.id || initial[0].id;
   });
   const [session, setSession] = useState(null);
-  const [currentProfile, setCurrentProfile] = useState(null);
-  const [authReady, setAuthReady] = useState(!supabaseConfigured);
-  const [cloudReady, setCloudReady] = useState(!supabaseConfigured);
+  const [currentProfile, setCurrentProfile] = useState(stagingPreview ? { id: "staging-preview", role: "admin", email: "staging@vimalux.local", full_name: "Staging Preview" } : null);
+  const [authReady, setAuthReady] = useState(stagingPreview || !supabaseConfigured);
+  const [cloudReady, setCloudReady] = useState(stagingPreview || !supabaseConfigured);
   const [syncState, setSyncState] = useState(
     supabaseConfigured ? "connecting" : "local",
   );
@@ -162,7 +164,7 @@ export default function App() {
     ? agentWorkflow
     : workflow;
   const [view, setView] = usePersistentNavigation({
-    ready: !supabaseConfigured || Boolean(session && cloudReady && roleVerified),
+    ready: stagingPreview || !supabaseConfigured || Boolean(session && cloudReady && roleVerified),
     userId: session?.user?.id || "local",
     projectId: project.crm?.businessCaseRecordId || project.id,
     allowedViews: isAgent ? agentAllowedViews : ADMIN_VIEWS,
@@ -192,7 +194,27 @@ export default function App() {
     if (isAgent && !isAgentViewAllowed(view, agentAllowedViews)) setView("customer");
   }, [isAgent, view]);
   useEffect(() => {
-    if (!supabaseConfigured) return;
+    if (!stagingPreview) return;
+    let active = true;
+    setSyncState("loading");
+    loadStagingCatalogue()
+      .then((catalogue) => {
+        if (!active || !catalogue) return;
+        setProjects((current) => current.map((item) => migrateProject({ ...item, catalogue })));
+        setCurrentProfile({ id: "staging-preview", role: "admin", email: "staging@vimalux.local", full_name: "Staging Preview" });
+        setCloudReady(true);
+        setSyncState("local");
+        setSyncError("");
+      })
+      .catch((error) => {
+        if (!active) return;
+        setSyncError(`Staging catalogue: ${error.message}`);
+        setSyncState("error");
+      });
+    return () => { active = false; };
+  }, []);
+  useEffect(() => {
+    if (!supabaseConfigured || stagingPreview) return;
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setAuthReady(true);
@@ -205,7 +227,7 @@ export default function App() {
     return () => data.subscription.unsubscribe();
   }, []);
   useEffect(() => {
-    if (!supabaseConfigured || !session) return;
+    if (!supabaseConfigured || stagingPreview || !session) return;
     let active = true;
     setSyncState("loading");
     Promise.all([
@@ -235,7 +257,7 @@ export default function App() {
     };
   }, [session]);
   useEffect(() => {
-    if (!supabaseConfigured || !session || !cloudReady) return;
+    if (!supabaseConfigured || stagingPreview || !session || !cloudReady) return;
     setSyncState("saving");
     const timer = setTimeout(
       () =>
@@ -564,7 +586,7 @@ export default function App() {
     }
   };
   if (!authReady) return <div className="auth-screen"><div className="auth-card"><strong>VIMALUX Intelligence</strong><p>Connessione a Supabase…</p></div></div>;
-  if (supabaseConfigured && !session) return <AuthScreen />;
+  if (supabaseConfigured && !stagingPreview && !session) return <AuthScreen />;
   return (
     <div className="app">
       <aside data-navigation-managed="react">
@@ -579,7 +601,7 @@ export default function App() {
         {!isAgent && <button data-intelligence-view="orderList" className={view === "orderList" ? "active" : ""} onClick={() => setView("orderList")}>{t("orderList")}</button>}
         {!isAgent && <button className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}>{t("priceAdmin")}</button>}
         {!isAgent && <button className={view === "internalReport" ? "active" : ""} onClick={() => setView("internalReport")}>{t("internalReport")}</button>}
-        {supabaseConfigured && <button className="signout" onClick={() => supabase.auth.signOut()}>Esci / Sign out</button>}
+        {supabaseConfigured && !stagingPreview && <button className="signout" onClick={() => supabase.auth.signOut()}>Esci / Sign out</button>}
       </aside>
       <main>
         <header><div><small>{project.project.businessCaseId}</small><h1>{view === "datek" ? "CMS Partners" : t(view === "admin" ? "priceAdmin" : visibleWorkflow.find((x) => x[0] === view)?.[1] || view)}</h1></div><div className="header-actions"><span className={`saved ${syncState}`}>● {syncState === "saving" ? "Salvataggio…" : syncState === "error" ? "Errore sincronizzazione" : syncState === "local" ? t("save") : "Supabase sincronizzato"}</span><select value={project.language} onChange={(e) => update(["language"], e.target.value)} aria-label="Language"><option value="it">Italiano</option><option value="en">English</option><option value="da">Dansk</option></select></div></header>
