@@ -1,3 +1,5 @@
+import { selectedPartnerEquipment } from "./partnerEquipment.js";
+
 const numberValue = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
@@ -68,6 +70,21 @@ export function buildProcurementRows(project = {}) {
         quantity,
         unit: "pz",
         unitCost: product.costPrice,
+      });
+    });
+
+    selectedPartnerEquipment(project).forEach(({ key, product, quantity }) => {
+      push({
+        key: `partner-equipment:${key}`,
+        source: "Partner Equipment",
+        productId: product.id,
+        supplier: product.supplier || product.cmsPartner || product.vendor,
+        supplierSku: product.supplierSku,
+        brand: product.brand,
+        description: product.name || product.id,
+        quantity,
+        unit: "pz",
+        unitCost: numberValue(product.costPrice) + numberValue(product.implementationCost),
       });
     });
   }
