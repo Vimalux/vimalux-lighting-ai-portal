@@ -3,8 +3,14 @@ import { crmMetrics } from "./crm.js";
 
 import { PARTNER_ROLES, normalizePartner as partnerName, partnerOptions, productPartner, productRoles, selectedEquipmentRole } from "./partnerRoles.js";
 
-export const CMS_PARTNERS = [];
-export const cmsPartnerOptions = (source = []) => partnerOptions(source, "CMS");
+// Configured CMS / Lighting Control partners stay selectable even before every
+// partner has products loaded in the catalogue. Catalogue metadata still controls
+// which LCU / CMS products are available after a partner is selected.
+export const CMS_PARTNERS = ["DATEK", "ITRON", "TVILIGHT", "OPTION"];
+export const cmsPartnerOptions = (source = []) => [...new Set([
+  ...CMS_PARTNERS,
+  ...partnerOptions(source, "CMS"),
+])].sort();
 export function adaptiveDimmingPartnerOptions(source = []) {
   const projects = Array.isArray(source) ? source : [source];
   const names = partnerOptions(projects, "ADAPTIVE_DIMMING");
