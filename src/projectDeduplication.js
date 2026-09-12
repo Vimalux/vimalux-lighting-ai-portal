@@ -25,14 +25,17 @@ export function isSameImportedProject(a, b) {
 
 export function dedupeProjects(projects = []) {
   const byCloudId = new Map();
+  const byLegacyId = new Map();
   const byImportIdentity = new Map();
   const result = [];
 
   for (const project of projects) {
     const cloudId = isStableCloudId(project?.id) ? String(project.id) : "";
+    const legacyId = String(project?.crm?.legacyIntelligenceId || "").trim();
     const identity = projectImportIdentity(project);
 
     if (cloudId && byCloudId.has(cloudId)) continue;
+    if (legacyId && byLegacyId.has(legacyId)) continue;
 
     if (identity && byImportIdentity.has(identity)) {
       const existingIndex = byImportIdentity.get(identity);
@@ -42,6 +45,7 @@ export function dedupeProjects(projects = []) {
       if (!existingStable && currentStable) {
         result[existingIndex] = project;
         if (cloudId) byCloudId.set(cloudId, existingIndex);
+        if (legacyId) byLegacyId.set(legacyId, existingIndex);
       }
       continue;
     }
@@ -49,6 +53,7 @@ export function dedupeProjects(projects = []) {
     const index = result.length;
     result.push(project);
     if (cloudId) byCloudId.set(cloudId, index);
+    if (legacyId) byLegacyId.set(legacyId, index);
     if (identity) byImportIdentity.set(identity, index);
   }
 
