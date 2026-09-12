@@ -1,0 +1,16 @@
+const fs = require('fs');
+const path = 'src/App.jsx';
+let s = fs.readFileSync(path, 'utf8');
+const oldAdd = '  const add = () => replaceRows([...rows, { id: uid(), productId: products[0]?.id || "", quantity: 1 }]);';
+const newAdd = '  const add = () => replaceRows([...rows, { id: uid(), productId: "", quantity: 1 }]);';
+if (!s.includes(oldAdd) && !s.includes(newAdd)) throw new Error('Partner equipment add anchor not found');
+s = s.replace(oldAdd, newAdd);
+const oldOptions = '<label><span>{p.language === "it" ? "Prodotto partner" : "Partner product"}</span><select value={row.productId || ""} onChange={(e) => change(index, "productId", e.target.value)}><option value="">-- select product --</option>{products.map((item) => <option key={item.id} value={item.id}>{item.name} {item.supplierSku ? `· ${item.supplierSku}` : ""}</option>)}</select></label>';
+const newOptions = '<label><span>{p.language === "it" ? "Prodotto partner" : "Partner product"}</span><select value={row.productId || ""} onChange={(e) => change(index, "productId", e.target.value)}><option value="">{p.language === "it" ? "-- seleziona prodotto --" : "-- select product --"}</option>{products.filter((item) => item.id === row.productId || !rows.some((other, otherIndex) => otherIndex !== index && other.productId === item.id)).map((item) => <option key={item.id} value={item.id}>{item.name} {item.supplierSku ? `· ${item.supplierSku}` : ""}</option>)}</select></label>';
+if (!s.includes(oldOptions) && !s.includes(newOptions)) throw new Error('Partner equipment options anchor not found');
+s = s.replace(oldOptions, newOptions);
+const oldButton = '<button type="button" className="secondary" onClick={add} disabled={!products.length}>+ {p.language === "it" ? "Aggiungi prodotto" : "Add product"}</button>';
+const newButton = '<button type="button" className="secondary" onClick={add} disabled={!products.some((item) => !rows.some((row) => row.productId === item.id))}>+ {p.language === "it" ? "Aggiungi prodotto" : "Add product"}</button>';
+if (!s.includes(oldButton) && !s.includes(newButton)) throw new Error('Partner equipment button anchor not found');
+s = s.replace(oldButton, newButton);
+fs.writeFileSync(path, s);
