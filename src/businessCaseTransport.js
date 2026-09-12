@@ -55,6 +55,7 @@ export function projectFromBusinessCaseRow(row) {
   project.crm = {
     ...(project.crm || {}),
     projectLineageId,
+    legacyIntelligenceId: row.legacy_intelligence_id || project.crm?.legacyIntelligenceId || "",
     customerId: row.customer_id || "",
     opportunityId: row.crm_opportunity_id || "",
     uniqueProjectId: row.crm_opportunity_id || "",
@@ -78,10 +79,6 @@ export function projectFromBusinessCaseRow(row) {
   project.customer.email = crm.email || crmContact.email || project.customer.email || "";
   project.customer.telephone = crm.phone || crmContact.phone || project.customer.telephone || "";
 
-  // CRM owns the preliminary lamp count only until Intelligence has persisted a
-  // technical installation. Once saved Intelligence groups exist, those groups
-  // are authoritative; otherwise reopening a Business Case would overwrite a
-  // user's edited lamp quantities with the older CRM estimate.
   const crmLampCount = number(crm.lamps ?? crm.luminaires ?? crm.lamp_count ?? crm.luminaire_count);
   const hasStoredGroups = Boolean(
     stored && Array.isArray(project.groups) && project.groups.length > 0,
@@ -119,6 +116,7 @@ export function projectFromBusinessCaseRow(row) {
   const migrated = migrateProject(project);
   migrated.crm.opportunityId = row.crm_opportunity_id || "";
   migrated.crm.uniqueProjectId = row.crm_opportunity_id || "";
+  migrated.crm.legacyIntelligenceId = row.legacy_intelligence_id || migrated.crm.legacyIntelligenceId || "";
   migrated.crm.projectLineageId = projectLineageId;
   migrated.project.projectLineageId = projectLineageId;
   return migrated;
