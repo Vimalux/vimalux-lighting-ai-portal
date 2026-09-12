@@ -4,10 +4,26 @@ const autoTable = typeof autoTableModule === "function" ? autoTableModule : auto
 import { partnerDisplayText } from "./partnerRoles.js";
 
 const slug = (value) => String(value || "supplier").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "supplier";
+const placeholderProjectNames = new Set(["nuovo progetto", "new project", "project"]);
+const usableProjectName = (value) => {
+  const text = String(value || "").trim();
+  return text && !placeholderProjectNames.has(text.toLowerCase()) ? text : "";
+};
+
+export function resolveSupplierOrderProjectName(p = {}) {
+  return usableProjectName(p.project?.name)
+    || usableProjectName(p.name)
+    || usableProjectName(p.crm?.projectName)
+    || usableProjectName(p.crm?.project_name)
+    || usableProjectName(p.crm?.opportunityName)
+    || usableProjectName(p.crm?.opportunity_name)
+    || usableProjectName(p.customer?.name)
+    || "Nuovo progetto";
+}
 
 export function createSupplierOrderPdf(group, p, it) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const projectName = p.project?.name || p.name || "Project";
+  const projectName = resolveSupplierOrderProjectName(p);
   const businessCase = p.project?.businessCaseId || p.project?.business_case_id || "";
   const locale = it ? "it-IT" : "en-GB";
   const quantity = new Intl.NumberFormat(locale, { useGrouping: true, minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -69,5 +85,5 @@ export function createSupplierOrderPdf(group, p, it) {
 
 export function generateSupplierOrderPdf(group, p, it) {
   const doc = createSupplierOrderPdf(group,p,it);
-  doc.save(`${slug(p.project?.name || p.name)}-${slug(group.supplier)}-${it ? "richiesta-offerta-fornitura" : "partner-order-list"}.pdf`);
+  doc.save(`${slug(resolveSupplierOrderProjectName(p))}-${slug(group.supplier)}-${it ? "richiesta-offerta-fornitura" : "partner-order-list"}.pdf`);
 }
