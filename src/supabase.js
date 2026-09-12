@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { projectFromBusinessCaseRow } from "./businessCaseTransport.js";
 import { isStableCloudId, persistIntelligenceProject } from "./businessCasePersistence.js";
 import { activeIntelligenceProjects, isArchivedProject } from "./projectVisibility.js";
+import { dedupeProjects, isSameImportedProject } from "./projectDeduplication.js";
 import {
   createOrGetBusinessCaseForOpportunity,
   lookupBusinessCaseForOpportunity,
@@ -35,30 +36,34 @@ export async function loadCloudState(localProjects, includeLocalProjects = true)
   if (projectError) throw projectError;
   if (catalogueError) throw catalogueError;
   const masterCatalogue = catalogue ? { led: catalogue.led || [], smart: catalogue.smart || [] } : null;
-  const cloudProjects = activeIntelligenceProjects((projectRows || []).map((row) => {
+  const cloudProjects = dedupeProjects(activeIntelligenceProjects((projectRows || []).map((row) => {
     const project = projectFromBusinessCaseRow(row);
     return masterCatalogue ? { ...project, catalogue: masterCatalogue } : project;
-  }));
+  })));
   if (!includeLocalProjects) return cloudProjects;
   const pendingImports = (localProjects || []).filter((item) =>
     !isArchivedProject(item) &&
     !isStableCloudId(item?.id) &&
     (item?.importedTechnical || item?.importedCommercial) &&
-    !cloudProjects.some((cloud) => cloud.id === item.id)
+    !cloudProjects.some((cloud) => cloud.id === item.id || isSameImportedProject(cloud, item))
   );
-  return [...cloudProjects, ...pendingImports.map((item) => masterCatalogue ? { ...item, catalogue: masterCatalogue } : item)];
+  return dedupeProjects([
+    ...cloudProjects,
+    ...pendingImports.map((item) => masterCatalogue ? { ...item, catalogue: masterCatalogue } : item),
+  ]);
 }
 
 export async function saveCloudState(projects) {
-  if (!projects.length) return [];
+  const uniqueProjects = dedupeProjects(projects);
+  if (!uniqueProjects.length) return [];
   const promotions = [];
-  const catalogue = projects[0].catalogue;
+  const catalogue = uniqueProjects[0].catalogue;
   const profile = await getCurrentProfile("id,role");
   if (["admin", "vimalux", "sales_manager"].includes(profile?.role)) {
     const { error: catalogueError } = await supabase.rpc("save_intelligence_catalogue", { catalogue_payload: catalogue });
     if (catalogueError) throw catalogueError;
   }
-  for (const project of projects) {
+  for (const project of uniqueProjects) {
     const persisted = await persistIntelligenceProject(supabase, project, profile);
     if (persisted?.promotion) promotions.push(persisted.promotion);
   }
