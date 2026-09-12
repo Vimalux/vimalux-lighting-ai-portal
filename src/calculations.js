@@ -2,6 +2,7 @@ import { calculateBusinessCase as calculateBaseBusinessCase, numberValue } from 
 import { calculateHybridSolar } from "./hybridSolar.js";
 import { publishLiveBusinessCaseResult } from "./liveBusinessCaseResult.js";
 import { normalizeNightlyDimmingProject } from "./existingDimming.js";
+import { projectWithPartnerEquipmentCosts } from "./partnerEquipment.js";
 
 export { numberValue };
 
@@ -74,10 +75,14 @@ function addHybridToCashFlow(project, base, annualHybridBenefit) {
 }
 
 export function calculateBusinessCase(project) {
+  // Partner equipment is stored as catalogue selections in Solution. For calculation only,
+  // convert those selections to virtual Additional Costs so the existing, tested CAPEX/OPEX
+  // engine remains authoritative. Stored project data is never rewritten here.
+  const projectWithPartnerCosts = projectWithPartnerEquipmentCosts(project);
   // Business Cases store intuitive nightly dimming schedules (e.g. 6.5 h full + 5 h reduced).
   // calculationsBase remains backward compatible with historic annual-hour profiles, so only a
   // calculation copy is normalized. The stored project data is never rewritten here.
-  const calculationProject = normalizeNightlyDimmingProject(project);
+  const calculationProject = normalizeNightlyDimmingProject(projectWithPartnerCosts);
   const base = calculateBaseBusinessCase(calculationProject);
   const hybrid = calculateHybridSolar(calculationProject);
   if (!hybrid.enabled || hybrid.totalUsableSolarKwh <= 0) {
