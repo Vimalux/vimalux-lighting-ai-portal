@@ -1,1 +1,1 @@
-2026-09-12 safe-release staging trigger v2
+2026-09-12 safe-release staging trigger v3
