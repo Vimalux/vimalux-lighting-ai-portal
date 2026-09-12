@@ -13,8 +13,9 @@ export function projectImportIdentity(project) {
   const customer = normalize(project?.customer?.name);
   const projectName = normalize(project?.project?.name || project?.name);
   const fileName = normalize(project?.importedTechnical?.fileName || project?.importedCommercial?.fileName);
-  if (!customer && !projectName && !fileName) return "";
-  return [customer, projectName, fileName].join("|");
+  if (fileName && customer) return `file:${customer}|${fileName}`;
+  if (!customer && !projectName) return "";
+  return `project:${customer}|${projectName}`;
 }
 
 export function isSameImportedProject(a, b) {
