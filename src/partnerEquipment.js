@@ -1,3 +1,5 @@
+import { productPartner, productRoles } from "./partnerRoles.js";
+
 const num = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
@@ -6,16 +8,14 @@ const num = (value) => {
 const norm = (value) => String(value || "").trim().toUpperCase();
 
 export function smartProductPartner(product = {}) {
-  return [product.cmsPartner, product.vendor, product.supplier]
-    .map(norm)
-    .find(Boolean) || "";
+  return productPartner(product, productRoles(product)[0]);
 }
 
 export function availablePartnerEquipment(project = {}, partner = "") {
   const selectedPartner = norm(partner);
   return (project.catalogue?.smart || []).filter((product) =>
     product?.active !== false
-    && String(product?.type || "").trim().toLowerCase() === "other"
+    && productRoles(product).some((role) => role !== "CMS")
     && (!selectedPartner || smartProductPartner(product) === selectedPartner)
   );
 }
@@ -73,9 +73,11 @@ export function partnerEquipmentAdditionalCosts(project = {}) {
 
 export function projectWithPartnerEquipmentCosts(project = {}) {
   const generated = partnerEquipmentAdditionalCosts(project);
-  if (!generated.length) return project;
+  const stored = project.additionalCosts || [];
+  const original = stored.filter((row) => !row.virtualPartnerEquipment);
+  if (!generated.length && original.length === stored.length) return project;
   return {
     ...project,
-    additionalCosts: [...(project.additionalCosts || []), ...generated],
+    additionalCosts: [...original, ...generated],
   };
 }

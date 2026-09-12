@@ -33,7 +33,7 @@ function phaseLabel(phase, calculated, lang) {
       ? (it ? "Pagamento all-inclusive" : "All-inclusive payment")
       : (it ? "Finanziamento + Smart" : "Financing + Smart");
   }
-  if (display.cmsActive && display.powerAidActive) return "CMS + PowerAiD";
+  if (display.cmsActive && display.powerAidActive) return "CMS + Adaptive Dimming";
   if (display.cmsActive) return it ? "Solo CMS" : "CMS only";
   return it ? "Dopo il contratto Smart" : "After Smart contract";
 }

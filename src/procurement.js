@@ -1,3 +1,4 @@
+import { partnerDisplayText } from "./partnerRoles.js";
 import { selectedPartnerEquipment } from "./partnerEquipment.js";
 
 const numberValue = (value) => {
@@ -21,6 +22,7 @@ export function buildProcurementRows(project = {}) {
       ...row,
       key,
       supplier: text(row.supplier),
+      description: partnerDisplayText(row.description),
       quantity,
       unitCost: numberValue(row.unitCost),
       totalCost: quantity * numberValue(row.unitCost),
@@ -73,6 +75,8 @@ export function buildProcurementRows(project = {}) {
       });
     });
 
+  }
+
     selectedPartnerEquipment(project).forEach(({ key, product, quantity }) => {
       push({
         key: `partner-equipment:${key}`,
@@ -87,9 +91,8 @@ export function buildProcurementRows(project = {}) {
         unitCost: numberValue(product.costPrice) + numberValue(product.implementationCost),
       });
     });
-  }
 
-  (project.additionalCosts || []).forEach((item, index) => {
+  (project.additionalCosts || []).filter((item) => !item.virtualPartnerEquipment).forEach((item, index) => {
     push({
       key: `cost:${item.id || index}`,
       source: item.category || "Project cost",
@@ -126,11 +129,11 @@ export function groupProcurementBySupplier(project = {}) {
 
 export function procurementCsv(group, project = {}) {
   const quote = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
-  const header = ["Supplier", "Source", "Brand", "Product / Work", "Supplier SKU", "Quantity", "Unit", "Unit cost", "Total cost", "Project", "Business Case"];
+  const header = ["Supplier", "Source", "Brand", "Product / Work", "Supplier SKU", "Quantity", "Unit", "Project", "Business Case"];
   const projectName = project.project?.name || project.name || "";
   const businessCase = project.project?.businessCaseId || "";
   const lines = group.items.map((item) => [
-    group.supplier, item.source, item.brand, item.description, item.supplierSku || "", item.quantity, item.unit, item.unitCost, item.totalCost, projectName, businessCase,
+    group.supplier, item.source, item.brand, item.description, item.supplierSku || "", item.quantity, item.unit, projectName, businessCase,
   ].map(quote).join(";"));
   return [header.map(quote).join(";"), ...lines].join("\n");
 }

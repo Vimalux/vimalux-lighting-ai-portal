@@ -1,89 +1,73 @@
 import { calculateBusinessCase } from "./calculations.js";
 import { crmMetrics } from "./crm.js";
 
-// Kept for backwards compatibility. Partner options are derived from catalogue master data.
+import { PARTNER_ROLES, normalizePartner as partnerName, partnerOptions, productPartner, productRoles, selectedEquipmentRole } from "./partnerRoles.js";
+
 export const CMS_PARTNERS = [];
-
-const partnerName = (value) => String(value || "").trim().toUpperCase();
-const smartType = (item) => String(item?.type || "").trim().toUpperCase();
-const isAdaptiveProduct = (item) => smartType(item) === "OTHER" || String(item?.partnerRole || "").toUpperCase() === "ADAPTIVE_DIMMING";
-const isCmsProduct = (item) => !isAdaptiveProduct(item) && ["LCU", "GATEWAY", "ANTENNA", "ENERGY METER", "CMS"].includes(smartType(item));
-const productPartner = (item) => [item?.cmsPartner, item?.vendor, item?.supplier, item?.brand].map(partnerName).find(Boolean) || "";
-const adaptiveProductPartner = (item) => [item?.supplier, item?.vendor, item?.brand].map(partnerName).find(Boolean) || "";
-
-export function cmsPartnerOptions(source = []) {
-  const projects = Array.isArray(source) ? source : [source];
-  const names = projects.flatMap((project) => {
-    const catalogueNames = (project?.catalogue?.smart || [])
-      .filter((item) => item?.active !== false && isCmsProduct(item))
-      .map(productPartner)
-      .filter(Boolean);
-    const explicit = partnerName(project?.solution?.cmsPartner);
-    return explicit ? [...catalogueNames, explicit] : catalogueNames;
-  });
-  return [...new Set(names.map(partnerName).filter(Boolean))].sort();
-}
-
+export const cmsPartnerOptions = (source = []) => partnerOptions(source, "CMS");
 export function adaptiveDimmingPartnerOptions(source = []) {
   const projects = Array.isArray(source) ? source : [source];
-  const names = projects.flatMap((project) => {
-    const catalogueNames = (project?.catalogue?.smart || [])
-      .filter((item) => item?.active !== false && isAdaptiveProduct(item))
-      .map(adaptiveProductPartner)
-      .filter(Boolean);
-    const explicit = partnerName(project?.solution?.adaptiveDimmingPartner);
-    // Legacy projects used FELICITY implicitly before Adaptive Dimming partner
-    // became an explicit project field. Keep that classification only as a fallback.
-    const legacy = project?.solution?.powerAidEnabled && !explicit && !catalogueNames.length ? "FELICITY" : "";
-    return [explicit, ...catalogueNames, legacy].filter(Boolean);
-  });
-  return [...new Set(names.map(partnerName).filter(Boolean))].sort();
+  const names = partnerOptions(projects, "ADAPTIVE_DIMMING");
+  for (const project of projects) {
+    const legacy = resolveAdaptiveDimmingPartner(project);
+    if (legacy) names.push(legacy);
+  }
+  return [...new Set(names)].sort();
 }
-
-export function technologyPartnerOptions(source = []) {
-  return [...new Set([...cmsPartnerOptions(source), ...adaptiveDimmingPartnerOptions(source)])].sort();
-}
-
 export function resolveCmsPartner(project) {
-  const selectedLcu = (project?.catalogue?.smart || []).find(
-    (item) => item.id === project?.solution?.lcuProductId,
-  );
-  const selectedPartner = productPartner(selectedLcu);
-  if (selectedPartner) return selectedPartner;
   const explicit = partnerName(project?.solution?.cmsPartner);
   if (explicit) return explicit;
-  if (project?.solution?.smartEnabled && project?.solution?.cmsEnabled) return "DATEK";
-  return "";
+  const selected = (project?.catalogue?.smart || []).find((item) => item.id === project?.solution?.lcuProductId);
+  if (selected && productRoles(selected).includes("CMS")) return productPartner(selected, "CMS");
+  return project?.solution?.smartEnabled && project?.solution?.cmsEnabled && !selected ? "DATEK" : "";
 }
-
 export function resolveAdaptiveDimmingPartner(project) {
   if (!project?.solution?.powerAidEnabled) return "";
-  const explicit = partnerName(project?.solution?.adaptiveDimmingPartner);
-  if (explicit) return explicit;
-  const selectedIds = new Set((project?.solution?.partnerEquipment || []).map((row) => row?.productId).filter(Boolean));
-  const selected = (project?.catalogue?.smart || []).find((item) => selectedIds.has(item.id) && isAdaptiveProduct(item));
-  const selectedPartner = adaptiveProductPartner(selected);
-  if (selectedPartner) return selectedPartner;
-  // Backwards-compatible classification for projects created before the partner
-  // selector existed. New projects override this by storing adaptiveDimmingPartner.
-  return "FELICITY";
+  // An explicitly empty selection must not silently revert to the legacy supplier.
+  if (Object.hasOwn(project.solution, "adaptiveDimmingPartner")) return partnerName(project.solution.adaptiveDimmingPartner);
+  const ids = new Set((project.solution.partnerEquipment || []).map((row) => row.productId));
+  const selected = (project.catalogue?.smart || []).find((item) => ids.has(item.id) && productRoles(item).includes("ADAPTIVE_DIMMING"));
+  return selected ? productPartner(selected, "ADAPTIVE_DIMMING") : "FELICITY";
+}
+export function projectPartnerRoles(project) {
+  const entries = [];
+  const add = (partner, role) => { if (partner && !entries.some((entry) => entry.partner === partner && entry.role === role)) entries.push({ partner, role }); };
+  if (project.solution?.smartEnabled && project.solution?.cmsEnabled) {
+    const partner = resolveCmsPartner(project);
+    if (cmsPartnerOptions(project).includes(partner)) add(partner, "CMS");
+  }
+  if (project.solution?.powerAidEnabled) add(resolveAdaptiveDimmingPartner(project), "ADAPTIVE_DIMMING");
+  for (const row of project.solution?.partnerEquipment || []) {
+    const product = (project.catalogue?.smart || []).find((item) => item.id === row.productId);
+    if (!product || product.active === false || !(Number(row.quantity) > 0)) continue;
+    const role = selectedEquipmentRole(row, product);
+    if (role !== "CMS" && role !== "ADAPTIVE_DIMMING") add(productPartner(product, role), role);
+  }
+  return entries;
+}
+export function partnerReportOptions(projects = []) {
+  const entries = new Map();
+  for (const project of projects) for (const entry of projectPartnerRoles(project)) {
+    if (entry.partner === "VIMALUX") continue; // Reserved consolidated business report.
+    const key = entry.partner + ":" + entry.role;
+    entries.set(key, { ...entry, key, label: entry.partner + " · " + PARTNER_ROLES[entry.role] });
+  }
+  return [...entries.values()].sort((a,b) => a.key.localeCompare(b.key));
+}
+export function technologyPartnerOptions(projects = []) {
+  return [...new Set(partnerReportOptions(projects).map((entry) => entry.partner))];
 }
 
-export function partnerProjectRows(projects = [], partner) {
+export function partnerProjectRows(projects = [], partner, role) {
   const normalizedPartner = partnerName(partner);
-  const cmsPartners = new Set(cmsPartnerOptions(projects));
-  const adaptivePartners = new Set(adaptiveDimmingPartnerOptions(projects));
-  const isCmsPartner = cmsPartners.has(normalizedPartner);
-  const isAdaptivePartner = adaptivePartners.has(normalizedPartner);
-  const sourceProjects = normalizedPartner === "VIMALUX"
-    ? projects
-    : isCmsPartner
-      ? projects.filter((project) => project.solution?.smartEnabled && project.solution?.cmsEnabled && resolveCmsPartner(project) === normalizedPartner)
-      : isAdaptivePartner
-        ? projects.filter((project) => project.solution?.powerAidEnabled && resolveAdaptiveDimmingPartner(project) === normalizedPartner)
-        : [];
+  const consolidated = normalizedPartner === "VIMALUX";
+  const sourceProjects = consolidated ? projects : projects.filter((project) => projectPartnerRoles(project)
+    .some((entry) => entry.partner === normalizedPartner && (!role || entry.role === role)));
 
   return sourceProjects.map((project) => {
+    const roles = consolidated ? [] : projectPartnerRoles(project).filter((entry) => entry.partner === normalizedPartner && (!role || entry.role === role)).map((entry) => entry.role);
+    const isCmsPartner = roles.includes("CMS");
+    const isAdaptivePartner = roles.includes("ADAPTIVE_DIMMING");
     const result = calculateBusinessCase(project);
     const crm = crmMetrics(project);
     const years = Math.max(1, Math.round(Number(project.assumptions.contractYears) || 1));
@@ -94,33 +78,24 @@ export function partnerProjectRows(projects = [], partner) {
       luminaires: result.totalQuantity,
       lcus: result.lcuQuantity,
       contractYears: years,
-      partnerRole: isCmsPartner ? "CMS" : isAdaptivePartner ? "ADAPTIVE_DIMMING" : "VIMALUX",
+      partnerRole: consolidated ? "VIMALUX" : roles.join(" + "),
     };
 
-    if (isCmsPartner) {
+    if (!consolidated) {
+      const cmsContract = isCmsPartner ? Array.from({ length: years }, (_, i) => result.cmsRevenue * Math.pow(1 + Number(project.assumptions.opexEscalation || 0) / 100, i)).reduce((a, b) => a + b, 0) : 0;
+      const otherRows = (project.solution?.partnerEquipment || []).flatMap((selection) => {
+        const product = (project.catalogue?.smart || []).find((item) => item.id === selection.productId);
+        return product && product.active !== false && roles.some((r) => r !== "CMS" && r !== "ADAPTIVE_DIMMING" && selectedEquipmentRole(selection, product) === r && productPartner(product,r) === normalizedPartner) ? [{ product, quantity: Math.max(0, Number(selection.quantity) || 0) }] : [];
+      });
+      const equipmentAnnual = otherRows.reduce((sum, { product, quantity }) => sum + quantity * (Number(product.annualCost) || 0), 0);
+      const equipmentCapex = otherRows.reduce((sum, { product, quantity }) => sum + quantity * ((Number(product.costPrice) || 0) + (Number(product.implementationCost) || 0)), 0);
+      const annualRevenue = (isCmsPartner ? result.cmsRevenue : 0) + (isAdaptivePartner ? result.powerAidSupplierCost : 0) + equipmentAnnual;
       return {
         ...common,
-        probability: crm.probability,
-        pipelineTcv: crm.totalContractValue,
-        weightedTcv: crm.weightedTcv,
-        annualRevenue: result.cmsRevenue,
-        mrr: result.cmsRevenue / 12,
-        arr: result.cmsRevenue,
-        totalContractValue: result.contractOpexRevenue && result.cmsRevenue
-          ? Array.from({ length: years }, (_, i) => result.cmsRevenue * Math.pow(1 + Number(project.assumptions.opexEscalation || 0) / 100, i)).reduce((a, b) => a + b, 0)
-          : 0,
-      };
-    }
-
-    if (isAdaptivePartner) {
-      return {
-        ...common,
-        annualRevenue: result.powerAidSupplierCost,
-        mrr: result.powerAidSupplierCost / 12,
-        arr: result.powerAidSupplierCost,
-        customerFee: result.powerAidCustomerFee,
-        vimaluxMargin: result.powerAidVimaluxMargin,
-        totalContractValue: result.powerAidSupplierContractCost,
+        ...(isCmsPartner ? { probability: crm.probability, pipelineTcv: crm.totalContractValue, weightedTcv: crm.weightedTcv } : {}),
+        annualRevenue, mrr: annualRevenue / 12, arr: annualRevenue,
+        ...(isAdaptivePartner ? { customerFee: result.powerAidCustomerFee, vimaluxMargin: result.powerAidVimaluxMargin } : {}),
+        totalContractValue: cmsContract + (isAdaptivePartner ? result.powerAidSupplierContractCost : 0) + equipmentCapex + Array.from({ length: years }, (_, i) => equipmentAnnual * Math.pow(1 + Number(project.assumptions.opexEscalation || 0) / 100, i)).reduce((a,b) => a+b,0),
       };
     }
 
@@ -134,8 +109,8 @@ export function partnerProjectRows(projects = [], partner) {
   });
 }
 
-export function partnerTotals(projects, partner) {
-  const rows = partnerProjectRows(projects, partner);
+export function partnerTotals(projects, partner, role) {
+  const rows = partnerProjectRows(projects, partner, role);
   const sum = (key) => rows.reduce((total, row) => total + (Number(row[key]) || 0), 0);
   const municipalities = new Set(rows.map((row) => row.municipality).filter((value) => value !== "-")).size;
   return {

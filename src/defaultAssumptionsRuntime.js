@@ -20,8 +20,8 @@ const groups = [
     title: "Risparmi",
     fields: [
       ["cloPercent", "Percentuale CLO (%)"],
-      ["powerAidPercent", "Risparmio PowerAiD (%)"],
-      ["powerAidCustomerFeePercent", "Fee cliente PowerAiD (%)"],
+      ["powerAidPercent", "Risparmio Adaptive Dimming (%)"],
+      ["powerAidCustomerFeePercent", "Fee cliente Adaptive Dimming (%)"],
       ["powerAidSupplierSharePercent", "Costo interno/fornitore (% fee cliente)"],
       ["existingMaintenance", "Manutenzione esistente / lampada / anno"],
       ["newMaintenance", "Nuova manutenzione / lampada / anno"],
@@ -31,7 +31,7 @@ const groups = [
     title: "Finanziaria",
     fields: [
       ["serviceAgreementPeriod", "Durata servizi CMS (anni)"],
-      ["powerAidServicePeriod", "Durata PowerAiD (anni)"],
+      ["powerAidServicePeriod", "Durata Adaptive Dimming (anni)"],
       ["financingPeriod", "Periodo finanziamento (anni)"],
       ["analysisPeriod", "Periodo di analisi (anni)"],
       ["interestRate", "Tasso interesse (%)"],

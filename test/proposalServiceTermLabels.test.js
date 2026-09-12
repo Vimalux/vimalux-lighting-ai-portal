@@ -4,9 +4,9 @@ import fs from "node:fs";
 
 const source = fs.readFileSync(new URL("../src/preliminaryProposalV2.js", import.meta.url), "utf8");
 
-test("proposal shows CMS and PowerAiD service terms separately", () => {
+test("proposal shows CMS and Adaptive Dimming service terms separately", () => {
   assert.match(source, /Durata CMS/);
-  assert.match(source, /Durata PowerAiD/);
+  assert.match(source, /Durata Adaptive Dimming/);
   assert.match(source, /powerAidServicePeriod/);
   assert.doesNotMatch(source, /Durata servizi Smart/);
   assert.doesNotMatch(source, /"Durata servizi"/);

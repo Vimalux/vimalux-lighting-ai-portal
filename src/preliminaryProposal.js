@@ -43,7 +43,7 @@ function solutionDescription(project, it) {
   const parts = [it ? "upgrade a LED ad alta efficienza" : "high-efficiency LED upgrade"];
   if (solution.smartEnabled) parts.push(it ? "controllo Smart Lighting connesso" : "connected Smart Lighting control");
   if (solution.cmsEnabled) parts.push(it ? "monitoraggio CMS, allarmi e gestione remota" : "CMS monitoring, alarms and remote management");
-  if (solution.powerAidEnabled) parts.push(it ? "ottimizzazione adattiva PowerAiD" : "PowerAiD adaptive optimization");
+  if (solution.powerAidEnabled) parts.push(it ? "ottimizzazione adattiva Adaptive Dimming" : "Adaptive Dimming adaptive optimization");
   return parts.join(", ");
 }
 
@@ -53,7 +53,7 @@ function scopeRows(project, result, it) {
     [it ? "Upgrade LED" : "LED upgrade", `${Math.round(Number(result.upgradeLuminaires) || 0)} ${it ? "punti luce" : "lighting points"}`],
     [it ? "Controllo connesso" : "Connected control", solution.smartEnabled ? `${Math.round(Number(result.smartConnectedLuminaires) || 0)} ${it ? "punti luce Smart" : "Smart lighting points"}` : (it ? "Non incluso" : "Not included")],
     ["CMS", solution.cmsEnabled ? (it ? "Monitoraggio, allarmi e gestione remota" : "Monitoring, alarms and remote management") : (it ? "Non incluso" : "Not included")],
-    ["Adaptive Lighting", solution.powerAidEnabled ? "PowerAiD" : (it ? "Predisposizione / da validare" : "Prepared / to be validated")],
+    ["Adaptive Lighting", solution.powerAidEnabled ? "Adaptive Dimming" : (it ? "Predisposizione / da validare" : "Prepared / to be validated")],
   ];
 }
 

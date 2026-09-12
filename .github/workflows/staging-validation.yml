@@ -1,0 +1,24 @@
+name: Staging validation
+on:
+  push:
+    branches: [staging/felicity-procurement-safe-release]
+  pull_request:
+    branches: [staging/felicity-procurement-safe-release]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Verify committed source is unchanged
+        run: git diff --exit-code HEAD
