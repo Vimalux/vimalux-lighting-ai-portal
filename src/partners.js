@@ -8,25 +8,36 @@ const partnerName = (value) => String(value || "").trim().toUpperCase();
 const smartType = (item) => String(item?.type || "").trim().toUpperCase();
 const isAdaptiveProduct = (item) => smartType(item) === "OTHER" || String(item?.partnerRole || "").toUpperCase() === "ADAPTIVE_DIMMING";
 const isCmsProduct = (item) => !isAdaptiveProduct(item) && ["LCU", "GATEWAY", "ANTENNA", "ENERGY METER", "CMS"].includes(smartType(item));
+const productPartner = (item) => [item?.cmsPartner, item?.vendor, item?.supplier, item?.brand].map(partnerName).find(Boolean) || "";
+const adaptiveProductPartner = (item) => [item?.supplier, item?.vendor, item?.brand].map(partnerName).find(Boolean) || "";
 
 export function cmsPartnerOptions(source = []) {
   const projects = Array.isArray(source) ? source : [source];
-  const names = projects.flatMap((project) =>
-    (project?.catalogue?.smart || [])
+  const names = projects.flatMap((project) => {
+    const catalogueNames = (project?.catalogue?.smart || [])
       .filter((item) => item?.active !== false && isCmsProduct(item))
-      .flatMap((item) => [item?.cmsPartner, item?.vendor, item?.supplier]),
-  ).map(partnerName).filter(Boolean);
-  return [...new Set(names)].sort();
+      .map(productPartner)
+      .filter(Boolean);
+    const explicit = partnerName(project?.solution?.cmsPartner);
+    return explicit ? [...catalogueNames, explicit] : catalogueNames;
+  });
+  return [...new Set(names.map(partnerName).filter(Boolean))].sort();
 }
 
 export function adaptiveDimmingPartnerOptions(source = []) {
   const projects = Array.isArray(source) ? source : [source];
-  const names = projects.flatMap((project) =>
-    (project?.catalogue?.smart || [])
+  const names = projects.flatMap((project) => {
+    const catalogueNames = (project?.catalogue?.smart || [])
       .filter((item) => item?.active !== false && isAdaptiveProduct(item))
-      .flatMap((item) => [item?.supplier, item?.vendor]),
-  ).map(partnerName).filter(Boolean);
-  return [...new Set(names)].sort();
+      .map(adaptiveProductPartner)
+      .filter(Boolean);
+    const explicit = partnerName(project?.solution?.adaptiveDimmingPartner);
+    // Legacy projects used FELICITY implicitly before Adaptive Dimming partner
+    // became an explicit project field. Keep that classification only as a fallback.
+    const legacy = project?.solution?.powerAidEnabled && !explicit && !catalogueNames.length ? "FELICITY" : "";
+    return [explicit, ...catalogueNames, legacy].filter(Boolean);
+  });
+  return [...new Set(names.map(partnerName).filter(Boolean))].sort();
 }
 
 export function technologyPartnerOptions(source = []) {
@@ -37,13 +48,11 @@ export function resolveCmsPartner(project) {
   const selectedLcu = (project?.catalogue?.smart || []).find(
     (item) => item.id === project?.solution?.lcuProductId,
   );
-  const selectedPartner = [selectedLcu?.cmsPartner, selectedLcu?.vendor, selectedLcu?.supplier]
-    .map(partnerName)
-    .find(Boolean);
+  const selectedPartner = productPartner(selectedLcu);
   if (selectedPartner) return selectedPartner;
   const explicit = partnerName(project?.solution?.cmsPartner);
-  if (explicit && cmsPartnerOptions(project).includes(explicit)) return explicit;
-  if (project?.solution?.smartEnabled && project?.solution?.cmsEnabled) return cmsPartnerOptions(project)[0] || "DATEK";
+  if (explicit) return explicit;
+  if (project?.solution?.smartEnabled && project?.solution?.cmsEnabled) return "DATEK";
   return "";
 }
 
@@ -53,7 +62,11 @@ export function resolveAdaptiveDimmingPartner(project) {
   if (explicit) return explicit;
   const selectedIds = new Set((project?.solution?.partnerEquipment || []).map((row) => row?.productId).filter(Boolean));
   const selected = (project?.catalogue?.smart || []).find((item) => selectedIds.has(item.id) && isAdaptiveProduct(item));
-  return partnerName(selected?.supplier || selected?.vendor);
+  const selectedPartner = adaptiveProductPartner(selected);
+  if (selectedPartner) return selectedPartner;
+  // Backwards-compatible classification for projects created before the partner
+  // selector existed. New projects override this by storing adaptiveDimmingPartner.
+  return "FELICITY";
 }
 
 export function partnerProjectRows(projects = [], partner) {
