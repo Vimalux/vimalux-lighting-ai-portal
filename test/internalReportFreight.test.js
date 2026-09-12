@@ -34,6 +34,7 @@ test("internal P&L shows freight separately without adding it again", () => {
 
 test("procurement screen and supplier PDF use locale grouping for quantities", () => {
   const source = fs.readFileSync(new URL("../src/ProcurementPanel.jsx", import.meta.url), "utf8");
-  const matches = source.match(/quantity\.format\(item\.quantity\)/g) || [];
+  const pdfSource = fs.readFileSync(new URL("../src/supplierOrderPdf.js", import.meta.url), "utf8");
+  const matches = (source + pdfSource).match(/quantity\.format\(item\.quantity\)/g) || [];
   assert.ok(matches.length >= 2, "quantity should be grouped in both PDF and on-screen procurement table");
 });

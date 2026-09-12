@@ -88,7 +88,7 @@ export function generateCustomerPdf(project, result) {
       doc.setFillColor(236, 253, 245); doc.setDrawColor(167, 243, 208); doc.roundedRect(18, boxY, 174, 32, 2, 2, "FD");
       const comparison = [[it ? `Senza Smart - anni ${postContract.year}-${result.analysisPeriod}` : `Without Smart - years ${postContract.year}-${result.analysisPeriod}`, `${money(postContract.customerSaving)} / ${it ? "anno" : "year"}`], [it ? `Con Smart - anni ${postContract.year}-${result.analysisPeriod}` : `With Smart - years ${postContract.year}-${result.analysisPeriod}`, `${money(postContract.fullSmartNetBenefit)} / ${it ? "anno" : "year"}`], [it ? "Beneficio aggiuntivo Smart" : "Additional Smart benefit", `${money(postContract.fullSmartNetBenefit - postContract.customerSaving)} / ${it ? "anno" : "year"}`]];
       comparison.forEach(([label, value], index) => { const cx = 24 + index * 56; doc.setTextColor(71, 85, 105); doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.text(label, cx, boxY + 8, { maxWidth: 50 }); doc.setTextColor(index === 2 && result.fullSmartIncrementalSavings < 0 ? 190 : 4, index === 2 && result.fullSmartIncrementalSavings < 0 ? 18 : 120, index === 2 && result.fullSmartIncrementalSavings < 0 ? 60 : 87); doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(value, cx, boxY + 20, { maxWidth: 50 }); });
-      doc.setFont("helvetica", "normal"); doc.setTextColor(71, 85, 105); doc.setFontSize(6.5); doc.text(`${it ? "Beneficio aggiuntivo totale" : "Total additional benefit"}: ${money(result.fullSmartIncrementalSavings)}. ${result.powerAidEnabled ? (it ? "PowerAiD incluso solo quando genera un risparmio incrementale." : "PowerAiD included only when it generates incremental savings.") : (it ? "PowerAiD non incluso nello scenario." : "PowerAiD is not included in the scenario.")}`, 24, boxY + 27, { maxWidth: 160 });
+      doc.setFont("helvetica", "normal"); doc.setTextColor(71, 85, 105); doc.setFontSize(6.5); doc.text(`${it ? "Beneficio aggiuntivo totale" : "Total additional benefit"}: ${money(result.fullSmartIncrementalSavings)}. ${result.powerAidEnabled ? (it ? "Adaptive Dimming incluso solo quando genera un risparmio incrementale." : "Adaptive Dimming included only when it generates incremental savings.") : (it ? "Adaptive Dimming non incluso nello scenario." : "Adaptive Dimming is not included in the scenario.")}`, 24, boxY + 27, { maxWidth: 160 });
     } else if (result.cmsEnabled) {
       doc.setFillColor(236, 253, 245); doc.setDrawColor(167, 243, 208); doc.roundedRect(42, 158, 126, 16, 2, 2, "FD"); doc.setTextColor(4, 120, 87); doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.text(it ? `Smart attivo per l'intero periodo di analisi - ${result.analysisPeriod} anni` : `Smart active throughout the full analysis period - ${result.analysisPeriod} years`, 105, 168, { align: "center" });
     }
@@ -177,9 +177,9 @@ export function generateCustomerPdf(project, result) {
       ["Smart Lighting", result.smartEnabled ? t("yes") : t("no")],
       [it ? "Quantità LCU calcolata" : "Calculated LCU quantity", result.lcuQuantity],
       ["CMS", result.cmsEnabled ? t("yes") : t("no")],
-      ["PowerAiD", result.powerAidEnabled ? t("yes") : t("no")],
+      ["Adaptive Dimming", result.powerAidEnabled ? t("yes") : t("no")],
       ["CLO", percent(result.smartEnabled ? project.assumptions.cloPercent : 0)],
-      result.powerAidEnabled ? [it ? "Riduzione PowerAiD" : "PowerAiD reduction", percent(project.assumptions.powerAidPercent)] : null,
+      result.powerAidEnabled ? [it ? "Riduzione Adaptive Dimming" : "Adaptive Dimming reduction", percent(project.assumptions.powerAidPercent)] : null,
     ]),
     styles: { font: "helvetica", fontSize: 7.3, cellPadding: 1.05 },
     columnStyles: { 0: { halign: "left", cellWidth: 98 }, 1: { halign: "left" } },
@@ -249,7 +249,7 @@ export function generateCustomerPdf(project, result) {
       [t("capex"), money(result.totalCapex)],
       ["CMS", money2(result.cmsOpex)],
       ["Gateway OPEX", money2(result.gatewayOpex)],
-      ["PowerAiD fee", money2(result.powerAidFee)],
+      ["Adaptive Dimming fee", money2(result.powerAidFee)],
       ...additionalAnnualOpexRows,
       [t("annualOpex"), money2(result.totalAnnualOpex)],
     ]),

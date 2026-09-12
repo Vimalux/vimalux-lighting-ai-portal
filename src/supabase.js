@@ -8,8 +8,16 @@ import {
   lookupBusinessCaseForOpportunity,
 } from "./crmBusinessCase.js";
 
-const url = import.meta.env.VITE_SHARED_SUPABASE_URL || "https://ymzdjjpvuvhxxzsffqik.supabase.co";
-const key = import.meta.env.VITE_SHARED_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_ma_iqpL_aHaoxQSsGs8TeA_p_MGg695";
+const productionHost = typeof window !== "undefined" && window.location.hostname === "app.vimalux.com";
+export const stagingPreview = !productionHost;
+
+const productionUrl = import.meta.env.VITE_SHARED_SUPABASE_URL || "https://ymzdjjpvuvhxxzsffqik.supabase.co";
+const productionKey = import.meta.env.VITE_SHARED_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_ma_iqpL_aHaoxQSsGs8TeA_p_MGg695";
+const stagingUrl = "https://jjmfvxbfljixdqyibeza.supabase.co";
+const stagingKey = "sb_publishable_o8WIR8kuQ86vY1NjqdA3gQ_pslhpaHM";
+
+const url = stagingPreview ? stagingUrl : productionUrl;
+const key = stagingPreview ? stagingKey : productionKey;
 
 export const supabaseConfigured = Boolean(url && key);
 export const supabase = supabaseConfigured
@@ -18,6 +26,13 @@ export const supabase = supabaseConfigured
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     })
   : null;
+
+export async function loadStagingCatalogue() {
+  if (!stagingPreview || !supabase) return null;
+  const { data, error } = await supabase.rpc("get_intelligence_catalogue");
+  if (error) throw error;
+  return data ? { led: data.led || [], smart: data.smart || [] } : null;
+}
 
 async function getCurrentProfile(fields = "id,email,full_name,role") {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -54,6 +69,7 @@ export async function loadCloudState(localProjects, includeLocalProjects = true)
 }
 
 export async function saveCloudState(projects) {
+  if (stagingPreview) return [];
   const uniqueProjects = dedupeProjects(projects);
   if (!uniqueProjects.length) return [];
   const promotions = [];
@@ -71,6 +87,7 @@ export async function saveCloudState(projects) {
 }
 
 export async function deleteCloudProject(projectId) {
+  if (stagingPreview) throw new Error("Deletion is disabled in staging preview.");
   const { error } = await supabase.rpc("delete_business_case", { case_id: projectId });
   if (error) throw error;
 }
@@ -92,6 +109,7 @@ export async function createOrOpenBusinessCase(opportunityId) {
 }
 
 export async function publishPreliminaryProposal(caseId, options = {}) {
+  if (stagingPreview) throw new Error("Publishing is disabled in staging preview.");
   const { data, error } = await supabase.rpc("publish_intelligence_preliminary_proposal", {
     case_id: caseId,
     quotation_id: options.quotationId || null,
@@ -104,5 +122,6 @@ export async function publishPreliminaryProposal(caseId, options = {}) {
 }
 
 export async function loadCurrentProfile() {
+  if (stagingPreview) return { id: "staging-preview", role: "admin", email: "staging@vimalux.local", full_name: "Staging Preview" };
   return getCurrentProfile();
 }

@@ -1,3 +1,6 @@
+import { partnerDisplayText } from "./partnerRoles.js";
+import { selectedPartnerEquipment } from "./partnerEquipment.js";
+
 const numberValue = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
@@ -19,6 +22,7 @@ export function buildProcurementRows(project = {}) {
       ...row,
       key,
       supplier: text(row.supplier),
+      description: partnerDisplayText(row.description),
       quantity,
       unitCost: numberValue(row.unitCost),
       totalCost: quantity * numberValue(row.unitCost),
@@ -45,8 +49,14 @@ export function buildProcurementRows(project = {}) {
 
   const upgradedQuantity = (project.groups || []).reduce((sum, group) => group?.upgradeSelected === false ? sum : sum + numberValue(group?.quantity), 0);
   const solution = project.solution || {};
+  const hasLcuQuantityOverride = solution.lcuQuantityOverride !== null
+    && solution.lcuQuantityOverride !== undefined
+    && solution.lcuQuantityOverride !== "";
+  const lcuQuantity = solution.smartEnabled === false
+    ? 0
+    : hasLcuQuantityOverride ? numberValue(solution.lcuQuantityOverride) : upgradedQuantity;
   const smartItems = [
-    ["lcuProductId", upgradedQuantity, "LCU"],
+    ["lcuProductId", lcuQuantity, "LCU"],
     ["gatewayProductId", solution.gatewayQuantity, "Gateway"],
     ["antennaProductId", solution.antennaQuantity, "Antenna"],
     ["meterProductId", solution.meterQuantity, "Energy Meter"],
@@ -70,9 +80,25 @@ export function buildProcurementRows(project = {}) {
         unitCost: product.costPrice,
       });
     });
+
   }
 
-  (project.additionalCosts || []).forEach((item, index) => {
+    selectedPartnerEquipment(project).forEach(({ key, product, quantity }) => {
+      push({
+        key: `partner-equipment:${key}`,
+        source: "Partner Equipment",
+        productId: product.id,
+        supplier: product.supplier || product.cmsPartner || product.vendor,
+        supplierSku: product.supplierSku,
+        brand: product.brand,
+        description: product.name || product.id,
+        quantity,
+        unit: "pz",
+        unitCost: numberValue(product.costPrice) + numberValue(product.implementationCost),
+      });
+    });
+
+  (project.additionalCosts || []).filter((item) => !item.virtualPartnerEquipment).forEach((item, index) => {
     push({
       key: `cost:${item.id || index}`,
       source: item.category || "Project cost",
@@ -109,11 +135,11 @@ export function groupProcurementBySupplier(project = {}) {
 
 export function procurementCsv(group, project = {}) {
   const quote = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
-  const header = ["Supplier", "Source", "Brand", "Product / Work", "Supplier SKU", "Quantity", "Unit", "Unit cost", "Total cost", "Project", "Business Case"];
+  const header = ["Supplier", "Source", "Brand", "Product / Work", "Supplier SKU", "Quantity", "Unit", "Project", "Business Case"];
   const projectName = project.project?.name || project.name || "";
   const businessCase = project.project?.businessCaseId || "";
   const lines = group.items.map((item) => [
-    group.supplier, item.source, item.brand, item.description, item.supplierSku || "", item.quantity, item.unit, item.unitCost, item.totalCost, projectName, businessCase,
+    group.supplier, item.source, item.brand, item.description, item.supplierSku || "", item.quantity, item.unit, projectName, businessCase,
   ].map(quote).join(";"));
   return [header.map(quote).join(";"), ...lines].join("\n");
 }

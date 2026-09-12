@@ -64,7 +64,7 @@ function solutionDescription(project, it, hybridUnits = 0) {
   if (hybridUnits > 0) parts.push(it ? `integrazione Hybrid Solar su ${Math.round(hybridUnits)} apparecchi` : `Hybrid Solar integration on ${Math.round(hybridUnits)} luminaires`);
   if (solution.smartEnabled) parts.push(it ? "controllo Smart Lighting connesso" : "connected Smart Lighting control");
   if (solution.cmsEnabled) parts.push(it ? "monitoraggio CMS, allarmi e gestione remota" : "CMS monitoring, alarms and remote management");
-  if (solution.powerAidEnabled) parts.push(it ? "ottimizzazione adattiva PowerAiD" : "PowerAiD adaptive optimization");
+  if (solution.powerAidEnabled) parts.push(it ? "ottimizzazione adattiva Adaptive Dimming" : "Adaptive Dimming adaptive optimization");
   return parts.join(", ");
 }
 
@@ -209,7 +209,7 @@ function generatePdf(row, version) {
         [it ? "Pagamento mensile totale cliente" : "Total monthly customer payment", money(monthlyCustomerPayment, lang)],
       ] : []),
       [it ? "Durata CMS" : "CMS service term", `${contractYears} ${it ? "anni" : "years"}`],
-      ...(project.solution?.powerAidEnabled ? [[it ? "Durata PowerAiD" : "PowerAiD service term", `${powerAidYears} ${it ? "anni" : "years"}`]] : []),
+      ...(project.solution?.powerAidEnabled ? [[it ? "Durata Adaptive Dimming" : "Adaptive Dimming service term", `${powerAidYears} ${it ? "anni" : "years"}`]] : []),
       ...(hybridBenefitEur > 0 ? [[it ? "Beneficio Hybrid Solar annuo (incluso nel risparmio energia)" : "Annual Hybrid Solar benefit (included in energy saving)", money(hybridBenefitEur, lang)]] : []),
       [it ? `TCV ${contractYears} anni` : `TCV ${contractYears} years`, money(result.tcv, lang)],
       [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],
@@ -232,7 +232,7 @@ function generatePdf(row, version) {
       ...(hybridUnits > 0 ? [["Hybrid Solar", `${number(hybridUnits, 0, lang)} ${it ? "apparecchi" : "luminaires"} · ${number(hybridInstalledPvKwp, 2, lang)} kWp · ${number(hybridGridOffsetKwh, 0, lang)} kWh/${it ? "anno" : "yr"} ${it ? "offset rete" : "grid offset"}`]] : []),
       [it ? "Controllo connesso" : "Connected control", `${Math.round(Number(result.smartConnectedLuminaires) || 0)} ${it ? "punti luce Smart" : "Smart lighting points"}`],
       ["CMS", project.solution?.cmsEnabled ? (it ? "Monitoraggio, allarmi e gestione remota" : "Monitoring, alarms and remote management") : (it ? "Non incluso" : "Not included")],
-      ["Adaptive Lighting", project.solution?.powerAidEnabled ? "PowerAiD" : (it ? "Predisposizione / da validare" : "Prepared / to be validated")],
+      ["Adaptive Lighting", project.solution?.powerAidEnabled ? "Adaptive Dimming" : (it ? "Predisposizione / da validare" : "Prepared / to be validated")],
     ],
     headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 7.6, cellPadding: 1.25 },
     columnStyles: { 0: { fontStyle: "bold", cellWidth: 48, halign: "left" }, 1: { halign: "left" } },
@@ -291,7 +291,7 @@ function generatePdf(row, version) {
       [it ? "Ore di funzionamento annue" : "Annual operating hours", number(project.assumptions?.operatingHours, 0, lang)],
       [it ? "Periodo di analisi" : "Analysis period", `${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} ${it ? "anni" : "years"}`],
       [it ? "Durata CMS" : "CMS service term", `${contractYears} ${it ? "anni" : "years"}`],
-      ...(project.solution?.powerAidEnabled ? [[it ? "Durata PowerAiD" : "PowerAiD service term", `${powerAidYears} ${it ? "anni" : "years"}`]] : []),
+      ...(project.solution?.powerAidEnabled ? [[it ? "Durata Adaptive Dimming" : "Adaptive Dimming service term", `${powerAidYears} ${it ? "anni" : "years"}`]] : []),
       [isLaaS ? (it ? "Indicizzazione interna OPEX servizi" : "Internal service OPEX escalation") : (it ? "Indicizzazione canone/OPEX" : "Service/OPEX escalation"), isLaaS ? `${number(escalation, 1, lang)}% ${it ? "annuo · canone cliente fisso" : "p.a. · customer payment fixed"}` : `${number(escalation, 1, lang)}% ${it ? "annuo" : "p.a."}`],
       [it ? "Modello commerciale" : "Commercial model", String(project.assumptions?.dealType || project.assumptions?.financingModel || "cash")],
       [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],

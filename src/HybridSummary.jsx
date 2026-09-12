@@ -62,8 +62,8 @@ export default function HybridSummary({ p, update }) {
       <div>
         <h2>{it ? "Hybrid Solar / Beneficio" : "Hybrid Solar / Benefit"}</h2>
         <p className="hint">{it
-          ? "Il contributo solare viene calcolato per gli apparecchi ibridi selezionati dopo LED, CLO e PowerAiD. Il beneficio utilizzabile è incluso nel Business Case, nel consumo di rete, nel risparmio energetico, nel payback, nel ROI e nel cash flow."
-          : "Solar contribution is calculated for selected hybrid luminaires after LED, CLO and PowerAiD. The usable benefit is included in the Business Case, grid consumption, energy savings, payback, ROI and cash flow."}</p>
+          ? "Il contributo solare viene calcolato per gli apparecchi ibridi selezionati dopo LED, CLO e Adaptive Dimming. Il beneficio utilizzabile è incluso nel Business Case, nel consumo di rete, nel risparmio energetico, nel payback, nel ROI e nel cash flow."
+          : "Solar contribution is calculated for selected hybrid luminaires after LED, CLO and Adaptive Dimming. The usable benefit is included in the Business Case, grid consumption, energy savings, payback, ROI and cash flow."}</p>
       </div>
     </div>
 

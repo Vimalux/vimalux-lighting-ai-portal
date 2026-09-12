@@ -2,10 +2,70 @@ import { calculateBusinessCase as calculateBaseBusinessCase, numberValue } from 
 import { calculateHybridSolar } from "./hybridSolar.js";
 import { publishLiveBusinessCaseResult } from "./liveBusinessCaseResult.js";
 import { normalizeNightlyDimmingProject } from "./existingDimming.js";
+import { projectWithPartnerEquipmentCosts } from "./partnerEquipment.js";
 
 export { numberValue };
 
 const positive = (value) => Math.max(0, numberValue(value));
+const LCU_PRICE_KEYS = ["costPrice", "salesPrice", "implementationCost", "implementationSalesPrice", "annualCost", "annualSalesPrice"];
+const hasLcuOverride = (project) => {
+  const value = project?.solution?.lcuQuantityOverride;
+  return value !== null && value !== undefined && value !== "";
+};
+const automaticLcuQuantity = (project) => project?.solution?.smartEnabled === false ? 0 : (project?.groups || []).reduce(
+  (sum, group) => group?.upgradeSelected === false ? sum : sum + positive(group?.quantity),
+  0,
+);
+
+function projectWithLcuQuantityOverride(project) {
+  const automaticQuantity = automaticLcuQuantity(project);
+  const effectiveQuantity = project?.solution?.smartEnabled === false
+    ? 0
+    : hasLcuOverride(project) ? positive(project.solution.lcuQuantityOverride) : automaticQuantity;
+  const lcuId = project?.solution?.lcuProductId;
+  if (!hasLcuOverride(project) || !lcuId || automaticQuantity <= 0 || effectiveQuantity === automaticQuantity) {
+    return { project, effectiveQuantity, originalLcu: null };
+  }
+
+  const ratio = effectiveQuantity / automaticQuantity;
+  let originalLcu = null;
+  const smart = (project.catalogue?.smart || []).map((item) => {
+    if (item.id !== lcuId) return item;
+    originalLcu = item;
+    const scaled = { ...item };
+    LCU_PRICE_KEYS.forEach((key) => { scaled[key] = numberValue(item[key]) * ratio; });
+    return scaled;
+  });
+
+  const overrides = { ...(project.pricing?.overrides || {}) };
+  if (overrides[lcuId]) {
+    const lcuOverrides = { ...overrides[lcuId] };
+    LCU_PRICE_KEYS.forEach((key) => {
+      if (lcuOverrides[key] !== undefined && lcuOverrides[key] !== null && lcuOverrides[key] !== "") {
+        lcuOverrides[key] = numberValue(lcuOverrides[key]) * ratio;
+      }
+    });
+    overrides[lcuId] = lcuOverrides;
+  }
+
+  return {
+    effectiveQuantity,
+    originalLcu,
+    project: {
+      ...project,
+      catalogue: { ...(project.catalogue || {}), smart },
+      pricing: { ...(project.pricing || {}), overrides },
+    },
+  };
+}
+
+function presentLcuQuantity(result, effectiveQuantity, originalLcu) {
+  return {
+    ...result,
+    lcuQuantity: effectiveQuantity,
+    hardware: originalLcu ? { ...(result.hardware || {}), lcu: originalLcu } : result.hardware,
+  };
+}
 
 function hybridGridBeforeSolar(project, base) {
   const cloRate = base.cmsEnabled ? positive(project?.assumptions?.cloPercent) / 100 : 0;
@@ -74,11 +134,19 @@ function addHybridToCashFlow(project, base, annualHybridBenefit) {
 }
 
 export function calculateBusinessCase(project) {
+  // Partner equipment is stored as catalogue selections in Solution. For calculation only,
+  // convert those selections to virtual Additional Costs so the existing, tested CAPEX/OPEX
+  // engine remains authoritative. Stored project data is never rewritten here.
+  const projectWithPartnerCosts = projectWithPartnerEquipmentCosts(project);
+  // LCU quantity defaults to one per upgraded luminaire. A project override changes only
+  // LCU/CMS commercial quantities; luminaire counts and energy-saving calculations stay intact.
+  const lcuPrepared = projectWithLcuQuantityOverride(projectWithPartnerCosts);
   // Business Cases store intuitive nightly dimming schedules (e.g. 6.5 h full + 5 h reduced).
   // calculationsBase remains backward compatible with historic annual-hour profiles, so only a
   // calculation copy is normalized. The stored project data is never rewritten here.
-  const calculationProject = normalizeNightlyDimmingProject(project);
-  const base = calculateBaseBusinessCase(calculationProject);
+  const calculationProject = normalizeNightlyDimmingProject(lcuPrepared.project);
+  const baseRaw = calculateBaseBusinessCase(calculationProject);
+  const base = presentLcuQuantity(baseRaw, lcuPrepared.effectiveQuantity, lcuPrepared.originalLcu);
   const hybrid = calculateHybridSolar(calculationProject);
   if (!hybrid.enabled || hybrid.totalUsableSolarKwh <= 0) {
     return publishLiveBusinessCaseResult(project, { ...base, hybridSolar: hybrid, hybridSolarSavingKwh: 0, hybridSolarSavingEUR: 0 });
@@ -110,6 +178,8 @@ export function calculateBusinessCase(project) {
 
   return publishLiveBusinessCaseResult(project, {
     ...adjusted,
+    lcuQuantity: lcuPrepared.effectiveQuantity,
+    hardware: lcuPrepared.originalLcu ? { ...(adjusted.hardware || {}), lcu: lcuPrepared.originalLcu } : adjusted.hardware,
     hybridSolar: hybrid,
     hybridSolarSavingKwh,
     hybridSolarSavingEUR,

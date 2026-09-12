@@ -123,7 +123,7 @@ function buildDisplayedPhases(calculated) {
 function phaseTitle(phase, lang) {
   const it = lang === "it";
   const range = `${phase.startYear}-${phase.endYear}`;
-  if (phase.row?.cmsActive && phase.row?.powerAidActive) return `CMS + PowerAiD ${range}`;
+  if (phase.row?.cmsActive && phase.row?.powerAidActive) return `CMS + Adaptive Dimming ${range}`;
   if (phase.row?.cmsActive) return `${it ? "Solo CMS" : "CMS only"} ${range}`;
   if (safe(phase.row?.investmentPayment) > 0) return `${it ? "Finanziamento" : "Financing"} ${range}`;
   return `${it ? "Post-servizi" : "Post-service"} ${range}`;
@@ -131,8 +131,8 @@ function phaseTitle(phase, lang) {
 
 function phaseSubtitle(phase, lang) {
   const it = lang === "it";
-  if (phase.row?.cmsActive && phase.row?.powerAidActive) return it ? "CMS, CLO, manutenzione e PowerAiD attivi" : "CMS, CLO, maintenance and PowerAiD active";
-  if (phase.row?.cmsActive) return it ? "CMS, CLO e manutenzione attivi; PowerAiD terminato" : "CMS, CLO and maintenance active; PowerAiD ended";
+  if (phase.row?.cmsActive && phase.row?.powerAidActive) return it ? "CMS, CLO, manutenzione e Adaptive Dimming attivi" : "CMS, CLO, maintenance and Adaptive Dimming active";
+  if (phase.row?.cmsActive) return it ? "CMS, CLO e manutenzione attivi; Adaptive Dimming terminato" : "CMS, CLO and maintenance active; Adaptive Dimming ended";
   return it ? "Solo benefici LED non dipendenti dai servizi Smart" : "Only LED benefits independent of Smart services";
 }
 

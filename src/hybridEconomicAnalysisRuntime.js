@@ -117,7 +117,7 @@ function makeHybridCard(display) {
   const hint = document.createElement("p");
   hint.className = "hint";
   hint.textContent = display.savingKwh > 0
-    ? (it ? "Il contributo solare è applicato dopo LED, CLO e PowerAiD e riduce esclusivamente il consumo degli apparecchi ibridi." : "Solar contribution is applied after LED, CLO and PowerAiD and only offsets the load of hybrid luminaires.")
+    ? (it ? "Il contributo solare è applicato dopo LED, CLO e Adaptive Dimming e riduce esclusivamente il consumo degli apparecchi ibridi." : "Solar contribution is applied after LED, CLO and Adaptive Dimming and only offsets the load of hybrid luminaires.")
     : (it ? "Apparecchi ibridi rilevati. Il beneficio resta a zero finché non è disponibile una resa solare dal Comune o inserita manualmente." : "Hybrid luminaires detected. Benefit remains zero until a municipality solar yield or manual yield is available.");
 
   const autoStatus = getHybridSolarAutoStatus();
