@@ -24,6 +24,12 @@ function serviceYearsFor(project) {
   return Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
 }
 
+function isNoleggioProject(project) {
+  const dealType = String(project?.assumptions?.dealType || "").toLowerCase();
+  const financingModel = String(project?.assumptions?.financingModel || "").toLowerCase();
+  return dealType === "noleggio_operativo" || ["laas", "noleggio_operativo", "ppp"].includes(financingModel);
+}
+
 function phaseRange(node) {
   const label = String(node.querySelector("strong")?.textContent || "");
   const match = label.match(/(\d+)\s*[–-]\s*(\d+)|(?:Anni|Years)\s*(\d+)/i);
@@ -33,12 +39,13 @@ function phaseRange(node) {
   return null;
 }
 
-function patchChart(chart, serviceYears, it) {
+function patchChart(chart, serviceYears, it, isNoleggio) {
   if (!chart) return;
   const title = chart.querySelector("h3");
-  if (title) title.textContent = it
+  const desiredTitle = it
     ? `Evoluzione dei costi e dei risparmi - ${serviceYears} anni`
     : `Cost and savings development - ${serviceYears} years`;
+  if (title && title.textContent !== desiredTitle) title.textContent = desiredTitle;
 
   chart.querySelectorAll(".value-period-phase").forEach((phase) => {
     const range = phaseRange(phase);
@@ -51,6 +58,11 @@ function patchChart(chart, serviceYears, it) {
       const label = phase.querySelector("strong");
       if (label) label.textContent = `${it ? "Anni" : "Years"} ${range.start}–${serviceYears}`;
       phase.style.flexGrow = String(Math.max(1, serviceYears - range.start + 1));
+    }
+    if (isNoleggio) {
+      const stateLabel = [...phase.children].find((child) => child.tagName === "SPAN" && !child.classList.contains("value-summary-bar"));
+      const desired = it ? "Pagamento all-inclusive" : "All-inclusive payment";
+      if (stateLabel && stateLabel.textContent !== desired) stateLabel.textContent = desired;
     }
   });
 }
@@ -66,9 +78,10 @@ function patchCashflowTable(serviceYears, it) {
 
   const hint = section.querySelector(".hint");
   if (hint) {
-    hint.textContent = it
+    const desired = it
       ? `Dettaglio annuale limitato al periodo contrattuale/servizi di ${serviceYears} anni, con beneficio lordo, OPEX, pagamento e flusso netto cliente.`
       : `Annual detail limited to the ${serviceYears}-year contract/service period, with gross benefit, OPEX, payment and customer net cash flow.`;
+    if (hint.textContent !== desired) hint.textContent = desired;
   }
 }
 
@@ -77,7 +90,8 @@ function patchReportHorizon() {
   const serviceYears = serviceYearsFor(project);
   if (!project || !serviceYears) return;
   const it = project?.language !== "en";
-  patchChart(document.querySelector(ROOT_SELECTOR), serviceYears, it);
+  const isNoleggio = isNoleggioProject(project);
+  patchChart(document.querySelector(ROOT_SELECTOR), serviceYears, it, isNoleggio);
   patchCashflowTable(serviceYears, it);
 }
 

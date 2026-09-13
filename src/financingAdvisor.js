@@ -9,23 +9,37 @@ const n = (value) => {
 const positive = (value) => Math.max(0, n(value));
 const years = (value, fallback = 1) => Math.max(1, Math.round(positive(value) || fallback));
 
-function modeledProject(project, financingYears) {
-  return {
-    ...project,
-    assumptions: {
-      ...(project.assumptions || {}),
-      financingPeriod: financingYears,
-      financingYears,
-      // The advisor must compare financing durations on the same underlying economics.
-      // A manually negotiated/imported all-inclusive canone is preserved in stored data,
-      // but is intentionally ignored in this advisory calculation.
-      allInclusiveAnnualPayment: 0,
-    },
-  };
+function dealTypeOf(project) {
+  const explicit = project?.assumptions?.dealType;
+  if (["cash", "finance", "noleggio_operativo"].includes(explicit)) return explicit;
+  const legacy = project?.assumptions?.financingModel;
+  if (legacy === "finance") return "finance";
+  if (["laas", "ppp"].includes(legacy)) return "noleggio_operativo";
+  return "cash";
 }
 
-function evaluateDuration(project, financingYears, serviceYears) {
-  const result = calculateBusinessCase(applyWarrantyPricing(modeledProject(project, financingYears)));
+function modeledProject(project, durationYears, mode) {
+  const assumptions = {
+    ...(project.assumptions || {}),
+    financingPeriod: durationYears,
+    financingYears: durationYears,
+    // Advisory scenarios must be comparable on calculated economics.
+    // Stored/manual canone is never overwritten in the project itself.
+    allInclusiveAnnualPayment: 0,
+  };
+
+  if (mode === "noleggio_operativo") {
+    assumptions.serviceAgreementPeriod = durationYears;
+    assumptions.contractYears = durationYears;
+    assumptions.analysisPeriod = durationYears;
+    if (project?.solution?.powerAidEnabled) assumptions.powerAidServicePeriod = durationYears;
+  }
+
+  return { ...project, assumptions };
+}
+
+function evaluateFinanceDuration(project, financingYears, serviceYears) {
+  const result = calculateBusinessCase(applyWarrantyPricing(modeledProject(project, financingYears, "finance")));
   const rows = (result.cashFlowRows || []).slice(0, serviceYears);
   const evaluated = rows.map((row) => {
     const financingPayment = row.year <= financingYears ? positive(result.financingAnnualPayment) : 0;
@@ -38,15 +52,58 @@ function evaluateDuration(project, financingYears, serviceYears) {
       grossBenefit,
       financingPayment,
       recurringOpex,
+      includedOpex: 0,
+      allInclusivePayment: 0,
+      customerPayment: financingPayment + recurringOpex,
       netCashFlow,
       marginPercent,
     };
   });
+  return summarizeScenario(financingYears, evaluated, "finance");
+}
+
+function evaluateNoleggioDuration(project, durationYears) {
+  const result = calculateBusinessCase(applyWarrantyPricing(modeledProject(project, durationYears, "noleggio_operativo")));
+  const rows = (result.cashFlowRows || []).slice(0, durationYears);
+  const evaluated = rows.map((row) => {
+    const grossBenefit = positive(row.grossBenefit);
+    const allInclusivePayment = positive(row.payment || result.allInclusiveAnnualPayment);
+    const includedOpex = positive(row.opex);
+    const netCashFlow = grossBenefit - allInclusivePayment;
+    const marginPercent = grossBenefit > 0 ? netCashFlow / grossBenefit * 100 : (netCashFlow >= 0 ? 100 : -100);
+    return {
+      year: row.year,
+      grossBenefit,
+      financingPayment: 0,
+      recurringOpex: 0,
+      includedOpex,
+      allInclusivePayment,
+      customerPayment: allInclusivePayment,
+      netCashFlow,
+      marginPercent,
+    };
+  });
+  return summarizeScenario(durationYears, evaluated, "noleggio_operativo");
+}
+
+function summarizeScenario(durationYears, evaluated, mode) {
   const minAnnualCashFlow = evaluated.length ? Math.min(...evaluated.map((row) => row.netCashFlow)) : 0;
   const minMarginPercent = evaluated.length ? Math.min(...evaluated.map((row) => row.marginPercent)) : 0;
-  const year1 = evaluated[0] || { grossBenefit: 0, financingPayment: 0, recurringOpex: 0, netCashFlow: 0, marginPercent: 0 };
+  const year1 = evaluated[0] || {
+    grossBenefit: 0,
+    financingPayment: 0,
+    recurringOpex: 0,
+    includedOpex: 0,
+    allInclusivePayment: 0,
+    customerPayment: 0,
+    netCashFlow: 0,
+    marginPercent: 0,
+  };
   return {
-    financingYears,
+    financingYears: durationYears,
+    durationYears,
+    contractYears: mode === "noleggio_operativo" ? durationYears : null,
+    mode,
     minAnnualCashFlow,
     minMarginPercent,
     year1,
@@ -56,20 +113,30 @@ function evaluateDuration(project, financingYears, serviceYears) {
 }
 
 export function financingCashflowAdvisor(project, options = {}) {
-  const dealType = project?.assumptions?.dealType || "cash";
-  if (dealType === "cash") return null;
+  const mode = dealTypeOf(project);
+  if (mode === "cash") return null;
 
-  const serviceYears = years(
+  const currentServiceYears = years(
     project?.assumptions?.serviceAgreementPeriod || project?.assumptions?.contractYears,
     10,
   );
-  const minimumYears = Math.min(serviceYears, years(options.minimumYears, 1));
-  const maximumYears = Math.max(minimumYears, Math.min(serviceYears, years(options.maximumYears, serviceYears)));
   const safetyMarginPercent = Math.max(0, n(options.safetyMarginPercent ?? 10));
 
+  let minimumYears;
+  let maximumYears;
+  if (mode === "noleggio_operativo") {
+    minimumYears = years(options.minimumYears, 1);
+    maximumYears = Math.max(minimumYears, years(options.maximumYears, 20));
+  } else {
+    minimumYears = Math.min(currentServiceYears, years(options.minimumYears, 1));
+    maximumYears = Math.max(minimumYears, Math.min(currentServiceYears, years(options.maximumYears, currentServiceYears)));
+  }
+
   const scenarios = [];
-  for (let financingYears = minimumYears; financingYears <= maximumYears; financingYears += 1) {
-    scenarios.push(evaluateDuration(project, financingYears, serviceYears));
+  for (let durationYears = minimumYears; durationYears <= maximumYears; durationYears += 1) {
+    scenarios.push(mode === "noleggio_operativo"
+      ? evaluateNoleggioDuration(project, durationYears)
+      : evaluateFinanceDuration(project, durationYears, currentServiceYears));
   }
 
   const minimum = scenarios.find((scenario) => scenario.qualifies) || null;
@@ -78,7 +145,11 @@ export function financingCashflowAdvisor(project, options = {}) {
   ) || minimum;
 
   return {
-    serviceYears,
+    mode,
+    serviceYears: currentServiceYears,
+    currentContractYears: currentServiceYears,
+    minimumYears,
+    maximumYears,
     safetyMarginPercent,
     minimum,
     recommended,
