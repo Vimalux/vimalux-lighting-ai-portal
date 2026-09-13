@@ -3,6 +3,7 @@ import { saveCloudState, supabaseConfigured } from "./supabase.js";
 import { financingCashflowAdvisor } from "./financingAdvisor.js";
 
 const ROOT_ID = "vimalux-financing-advisor";
+const MONTHLY_OVERRIDE_ID = "vimalux-laas-monthly-override";
 
 function localProjects() {
   try {
@@ -62,6 +63,19 @@ function money(project, value) {
   catch { return `${Math.round(Number(value) || 0)} ${currency}`; }
 }
 
+function parseLocalizedNumber(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return 0;
+  const normalized = raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+}
+
+async function persistProjects(projects) {
+  localStorage.setItem("vimalux-intelligence-projects", JSON.stringify(projects));
+  if (supabaseConfigured) await saveCloudState(projects);
+}
+
 async function applyDuration(projects, index, duration, root, mode) {
   const project = projects[index];
   const assumptions = {
@@ -77,11 +91,65 @@ async function applyDuration(projects, index, duration, root, mode) {
   }
   const updated = migrateProject({ ...project, assumptions, updatedAt: new Date().toISOString() });
   projects[index] = updated;
-  localStorage.setItem("vimalux-intelligence-projects", JSON.stringify(projects));
   const status = root.querySelector("[data-financing-advisor-status]");
   if (status) status.textContent = project?.language === "it" ? "Salvataggio..." : "Saving...";
-  if (supabaseConfigured) await saveCloudState(projects);
+  await persistProjects(projects);
   window.location.reload();
+}
+
+async function applyMonthlyOverride(projects, index, monthlyValue, statusNode) {
+  const project = projects[index];
+  const monthly = parseLocalizedNumber(monthlyValue);
+  const assumptions = {
+    ...(project.assumptions || {}),
+    allInclusiveAnnualPayment: monthly > 0 ? monthly * 12 : 0,
+  };
+  projects[index] = migrateProject({ ...project, assumptions, updatedAt: new Date().toISOString() });
+  if (statusNode) statusNode.textContent = project?.language === "it" ? "Salvataggio..." : "Saving...";
+  await persistProjects(projects);
+  window.location.reload();
+}
+
+function syncNoleggioPresentation(projects, index, project, isNoleggio, it) {
+  const financeField = findField(/periodo\s+(?:di\s+)?finanziamento|durata\s+(?:del\s+)?finanziamento|financing\s+period/i);
+  if (financeField) financeField.style.display = isNoleggio ? "none" : "";
+
+  const annualField = findField(/canone\s+annuo\s+tutto\s+incluso|all-inclusive\s+annual\s+payment/i);
+  const existingOverride = document.getElementById(MONTHLY_OVERRIDE_ID);
+
+  if (!isNoleggio) {
+    if (annualField) annualField.style.display = "";
+    if (existingOverride) existingOverride.remove();
+  } else if (annualField) {
+    annualField.style.display = "none";
+    if (!existingOverride) {
+      const storedAnnual = Number(project?.assumptions?.allInclusiveAnnualPayment || 0);
+      const wrapper = document.createElement("label");
+      wrapper.id = MONTHLY_OVERRIDE_ID;
+      wrapper.style.display = "grid";
+      wrapper.style.gap = "6px";
+      wrapper.innerHTML = `<span>${it ? "Canone mensile tutto incluso – override manuale" : "Monthly all-inclusive payment – manual override"}</span><input inputmode="decimal" value="${storedAnnual > 0 ? String((storedAnnual / 12).toFixed(2)) : ""}" placeholder="${it ? "Automatico" : "Automatic"}" /><small style="color:#64748b">${it ? "Lascia vuoto o 0 per usare il calcolo automatico. L'importo inserito viene applicato a TCV, cash flow, VAN e report." : "Leave blank or 0 to use the automatic calculation. The entered amount is applied to TCV, cash flow, NPV and reports."}</small><small data-laas-override-status style="color:#64748b"></small>`;
+      annualField.parentElement?.insertBefore(wrapper, annualField);
+      const input = wrapper.querySelector("input");
+      const status = wrapper.querySelector("[data-laas-override-status]");
+      input?.addEventListener("change", async () => {
+        try { await applyMonthlyOverride(projects, index, input.value, status); }
+        catch (error) { if (status) status.textContent = error?.message || "Errore"; }
+      });
+    }
+  }
+
+  document.querySelectorAll(".kpi span").forEach((span) => {
+    const text = String(span.textContent || "").trim();
+    if (!span.dataset.originalKpiLabel && /^(OPEX annuo per apparecchio|Annual OPEX per luminaire)$/i.test(text)) {
+      span.dataset.originalKpiLabel = text;
+    }
+    if (!span.dataset.originalKpiLabel) return;
+    const desired = isNoleggio
+      ? (it ? "Quota servizi/OPEX inclusa / apparecchio / anno" : "Included service/OPEX share / luminaire / year")
+      : span.dataset.originalKpiLabel;
+    if (span.textContent !== desired) span.textContent = desired;
+  });
 }
 
 function render() {
@@ -91,23 +159,23 @@ function render() {
   const storedProject = projects[index];
   const project = projectForVisibleDealType(storedProject);
   const advisor = financingCashflowAdvisor(project, { safetyMarginPercent: 10 });
+  const newMode = advisor?.mode || "cash";
+  const isNoleggio = newMode === "noleggio_operativo";
+  const it = project?.language !== "en";
+
+  syncNoleggioPresentation(projects, index, project, isNoleggio, it);
 
   const existingRoot = document.getElementById(ROOT_ID);
   const existingMode = existingRoot?.dataset?.mode || "";
-  const newMode = advisor?.mode || "cash";
   if (existingRoot && existingMode !== newMode) existingRoot.remove();
   else if (existingRoot) return;
 
-  const financeField = findField(/periodo\s+(?:di\s+)?finanziamento|durata\s+(?:del\s+)?finanziamento|financing\s+period/i);
-  if (financeField) financeField.style.display = newMode === "noleggio_operativo" ? "none" : "";
   if (!advisor) return;
-
+  const financeField = findField(/periodo\s+(?:di\s+)?finanziamento|durata\s+(?:del\s+)?finanziamento|financing\s+period/i);
   const serviceField = findField(/durata\s+servizi\s+cms|periodo\s+accordo\s+servizi|service\s+agreement\s+period|cms\s+service\s+period/i);
-  const isNoleggio = advisor.mode === "noleggio_operativo";
   const anchor = isNoleggio ? (serviceField || financeField) : financeField;
   if (!anchor) return;
 
-  const it = project?.language !== "en";
   const minimum = advisor.minimum;
   const recommended = advisor.recommended;
   const root = document.createElement("div");
