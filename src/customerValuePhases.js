@@ -50,14 +50,9 @@ export function buildYearOneCustomerValueScenario(calculated = {}, row = {}) {
 }
 
 export function buildYearOneCustomerValuePhases(calculated = {}) {
-  const allRows = Array.isArray(calculated?.customerValueRows) ? calculated.customerValueRows : [];
-  const serviceYears = Math.max(0, Math.round(positive(calculated?.serviceAgreementPeriod)));
-  // Customer-facing cost evolution must stop at the actual service/contract term.
-  // The longer financial analysis can still exist for NPV/lifecycle calculations without
-  // presenting post-service years as part of the contracted solution.
-  const rows = serviceYears > 0 ? allRows.slice(0, serviceYears) : allRows;
+  const rows = Array.isArray(calculated?.customerValueRows) ? calculated.customerValueRows : [];
   const first = rows[0] || null;
-  if (!first) return { phases: [], rows, first: null, analysisPeriod: 0, serviceYears };
+  if (!first) return { phases: [], rows, first: null, analysisPeriod: 0, serviceYears: 0 };
 
   const phases = [];
   let startIndex = 0;
@@ -78,8 +73,8 @@ export function buildYearOneCustomerValuePhases(calculated = {}) {
     phases,
     rows,
     first,
-    analysisPeriod: Math.max(1, rows.length),
-    serviceYears,
+    analysisPeriod: Math.max(1, Math.round(positive(calculated?.analysisPeriod) || rows.length)),
+    serviceYears: Math.max(0, Math.round(positive(calculated?.serviceAgreementPeriod))),
   };
 }
 
