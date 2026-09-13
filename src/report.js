@@ -5,8 +5,10 @@ import { formatMoney, formatNumber, formatPercent, useT } from "./i18n.js";
 import { aggregateReplacementRows } from "./reportSummary.js";
 import { reportCommercialContext } from "./reportCommercial.js";
 import { warrantyLabel } from "./warranty.js";
+import { contractReportResult } from "./contractReportHorizon.js";
 
 export function generateCustomerPdf(project, result) {
+  result = contractReportResult(result);
   const lang = project.language;
   const t = useT(lang);
   const it = lang === "it";
