@@ -11,24 +11,30 @@ function smartProject({ cmsYears = 10, powerAidYears = 10, analysisYears = 20 } 
   project.assumptions.serviceAgreementPeriod = cmsYears;
   project.assumptions.contractYears = cmsYears;
   project.assumptions.powerAidServicePeriod = powerAidYears;
-  // Legacy/manual analysisPeriod may differ, but customer-facing economics must follow service term.
   project.assumptions.analysisPeriod = analysisYears;
   return project;
 }
 
-test("service contract duration is the authoritative analysis, cash-flow and chart horizon", () => {
-  const result = calculateBusinessCase(smartProject({ cmsYears: 10, powerAidYears: 10, analysisYears: 20 }));
-  assert.equal(result.serviceAgreementPeriod, 10);
-  assert.equal(result.analysisPeriod, 10);
-  assert.equal(result.cashFlowRows.length, 10);
-  assert.equal(result.customerValueRows.length, 10);
+test("CMS and PowerAiD ending after 10 years remove Smart-dependent benefits and OPEX", () => {
+  const result = calculateBusinessCase(smartProject());
   const year10 = result.cashFlowRows[9];
+  const year11 = result.cashFlowRows[10];
+
   assert.equal(year10.cmsActive, true);
   assert.equal(year10.powerAidActive, true);
   assert.ok(year10.cloSavingEUR > 0);
   assert.ok(year10.powerAidGrossSavingEUR > 0);
   assert.ok(year10.maintenanceSavingEUR > 0);
   assert.ok(year10.serviceOpex > 0);
+
+  assert.equal(year11.cmsActive, false);
+  assert.equal(year11.powerAidActive, false);
+  assert.equal(year11.cloSavingEUR, 0);
+  assert.equal(year11.powerAidGrossSavingEUR, 0);
+  assert.equal(year11.powerAidCustomerFee, 0);
+  assert.equal(year11.maintenanceSavingEUR, 0);
+  assert.equal(year11.serviceOpex, 0);
+  assert.ok(year11.ledEnergySavingEUR > 0);
 });
 
 test("CMS 20 years with PowerAiD 10 years keeps CMS benefits and OPEX but ends PowerAiD", () => {
@@ -37,10 +43,8 @@ test("CMS 20 years with PowerAiD 10 years keeps CMS benefits and OPEX but ends P
   const year11 = result.cashFlowRows[10];
   const year20 = result.cashFlowRows[19];
 
-  assert.equal(result.analysisPeriod, 20);
   assert.equal(result.serviceAgreementPeriod, 20);
   assert.equal(result.powerAidServicePeriod, 10);
-  assert.equal(result.cashFlowRows.length, 20);
   assert.equal(year10.cmsActive, true);
   assert.equal(year10.powerAidActive, true);
 
@@ -57,13 +61,11 @@ test("CMS 20 years with PowerAiD 10 years keeps CMS benefits and OPEX but ends P
   assert.ok(year20.serviceOpex > 0);
 });
 
-test("PowerAiD cannot outlive CMS and no post-contract row is generated", () => {
-  const result = calculateBusinessCase(smartProject({ cmsYears: 10, powerAidYears: 20, analysisYears: 20 }));
+test("PowerAiD cannot outlive CMS", () => {
+  const result = calculateBusinessCase(smartProject({ cmsYears: 10, powerAidYears: 20 }));
   assert.equal(result.powerAidServicePeriod, 10);
-  assert.equal(result.analysisPeriod, 10);
-  assert.equal(result.cashFlowRows.length, 10);
   assert.equal(result.cashFlowRows[9].powerAidActive, true);
-  assert.equal(result.cashFlowRows[10], undefined);
+  assert.equal(result.cashFlowRows[10].powerAidActive, false);
 });
 
 test("legacy projects default PowerAiD to 10 years and clamp it to CMS duration", () => {
