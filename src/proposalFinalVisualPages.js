@@ -4,6 +4,7 @@ import { applyWarrantyPricing } from "./warranty.js";
 import { repairCostEvolutionProposalPage } from "./proposalCostEvolutionPage.js";
 import { transformProposalCustomerText } from "./proposalCustomerVatText.js";
 import { alignedTable, reportMoney, reportNumber } from "./reportPresentation.js";
+import { contractReportResult } from "./contractReportHorizon.js";
 
 const safe = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 
@@ -175,13 +176,14 @@ function appendCashFlowPage(doc, project, calculated, options = {}) {
 
 export function appendFinalProposalVisualPages(doc, project, options = {}) {
   const calculated = calculateBusinessCase(applyWarrantyPricing(project));
+  const reportCalculated = contractReportResult(calculated);
 
-  // Add a blank page first, then draw the reconciled year-1 cost/savings page on it.
-  // This avoids writing the legacy escalated chart/text into the PDF content stream.
+  // Rendering-only contract horizon: the underlying economic engine remains unchanged.
+  // A shorter financing term still creates the service-only phase inside this period.
   doc.addPage();
   const costPage = doc.getNumberOfPages();
-  repairCostEvolutionProposalPage(doc, project, calculated, costPage, options);
+  repairCostEvolutionProposalPage(doc, project, reportCalculated, costPage, options);
 
-  appendCashFlowPage(doc, project, calculated, options);
+  appendCashFlowPage(doc, project, reportCalculated, options);
   return calculated;
 }
