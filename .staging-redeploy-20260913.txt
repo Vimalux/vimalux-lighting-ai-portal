@@ -1,0 +1,1 @@
+Clean redeploy marker for staging/noleggio-cashflow-neutral-20260913 from known-good commit da53e5ca4daf2e3a16a22be5d675373c1ea7af1e. Preserves original staging alias/localStorage origin.
