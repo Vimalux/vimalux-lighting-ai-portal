@@ -65,14 +65,13 @@ async function applyDuration(projects, index, duration, root) {
 }
 
 function render() {
+  if (document.getElementById(ROOT_ID)) return;
   const financingField = findFinancingField();
   if (!financingField) return;
   const projects = localProjects();
   const index = activeIndex(projects);
   if (index < 0) return;
   const project = projects[index];
-  const existing = document.getElementById(ROOT_ID);
-  if (existing) existing.remove();
 
   const advisor = financingCashflowAdvisor(project, { safetyMarginPercent: 10 });
   if (!advisor) return;
