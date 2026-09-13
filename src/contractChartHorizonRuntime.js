@@ -33,14 +33,8 @@ function phaseRange(node) {
   return null;
 }
 
-function patchChart() {
-  const chart = document.querySelector(ROOT_SELECTOR);
+function patchChart(chart, serviceYears, it) {
   if (!chart) return;
-  const project = activeProject(localProjects());
-  const serviceYears = serviceYearsFor(project);
-  if (!serviceYears) return;
-
-  const it = project?.language !== "en";
   const title = chart.querySelector("h3");
   if (title) title.textContent = it
     ? `Evoluzione dei costi e dei risparmi - ${serviceYears} anni`
@@ -61,6 +55,32 @@ function patchChart() {
   });
 }
 
+function patchCashflowTable(serviceYears, it) {
+  const section = document.querySelector(".advanced-customer-economics.cashflow-visible");
+  if (!section) return;
+  const rows = [...section.querySelectorAll("tbody tr")];
+  rows.forEach((row) => {
+    const year = Number(String(row.querySelector("td")?.textContent || "").trim());
+    if (Number.isFinite(year) && year > serviceYears) row.remove();
+  });
+
+  const hint = section.querySelector(".hint");
+  if (hint) {
+    hint.textContent = it
+      ? `Dettaglio annuale limitato al periodo contrattuale/servizi di ${serviceYears} anni, con beneficio lordo, OPEX, pagamento e flusso netto cliente.`
+      : `Annual detail limited to the ${serviceYears}-year contract/service period, with gross benefit, OPEX, payment and customer net cash flow.`;
+  }
+}
+
+function patchReportHorizon() {
+  const project = activeProject(localProjects());
+  const serviceYears = serviceYearsFor(project);
+  if (!project || !serviceYears) return;
+  const it = project?.language !== "en";
+  patchChart(document.querySelector(ROOT_SELECTOR), serviceYears, it);
+  patchCashflowTable(serviceYears, it);
+}
+
 if (typeof document !== "undefined") {
   let scheduled = false;
   const schedule = () => {
@@ -68,7 +88,7 @@ if (typeof document !== "undefined") {
     scheduled = true;
     requestAnimationFrame(() => {
       scheduled = false;
-      patchChart();
+      patchReportHorizon();
     });
   };
   const observer = new MutationObserver(schedule);
