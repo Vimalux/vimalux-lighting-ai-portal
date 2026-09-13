@@ -66,16 +66,25 @@ async function savePeriods(root) {
   window.location.reload();
 }
 
-function findLegacyServiceField() {
+function findField(pattern) {
   return [...document.querySelectorAll("label")].find((label) => {
-    const text = String(label.querySelector("span")?.textContent || "").trim();
-    return /periodo accordo servizi|service agreement period|service period/i.test(text);
+    const text = String(label.textContent || "").replace(/\s+/g, " ").trim();
+    return pattern.test(text);
   });
+}
+
+function syncVisibleAnalysisPeriod(cmsYears) {
+  const analysisField = findField(/periodo\s+di\s+analisi|analysis\s+period/i);
+  const input = analysisField?.querySelector("input");
+  if (!input) return;
+  input.value = String(cmsYears);
+  input.disabled = true;
+  input.title = "Segue automaticamente la durata del contratto servizi";
 }
 
 function render() {
   if (document.getElementById(ROOT_ID)) return;
-  const legacy = findLegacyServiceField();
+  const legacy = findField(/periodo\s+(?:di\s+)?accordo\s+servizi|service\s+agreement\s+period|service\s+period/i);
   if (!legacy) return;
   const projects = localProjects();
   const index = activeIndex(projects);
@@ -86,6 +95,7 @@ function render() {
   const powerAidEnabled = Boolean(project?.solution?.powerAidEnabled);
   const it = project?.language !== "en";
 
+  syncVisibleAnalysisPeriod(cmsYears);
   legacy.style.display = "none";
   const root = document.createElement("div");
   root.id = ROOT_ID;
@@ -100,7 +110,7 @@ function render() {
       <input data-poweraid-years inputmode="numeric" value="${powerAidYears}" ${powerAidEnabled ? "" : "disabled"} style="border:1px solid #cbd7e3;border-radius:8px;padding:9px 10px;font:inherit;background:#fff">
     </label>
     <div style="grid-column:1/-1;display:flex;justify-content:space-between;gap:12px;align-items:center">
-      <small style="color:#64748b">${it ? "Adaptive Dimming non può superare la durata CMS. Il periodo di analisi/grafico segue la durata del contratto servizi. Dopo la scadenza CMS cessano CLO, risparmio manutenzione e servizi Smart; il risparmio LED continua." : "Adaptive Dimming cannot exceed the CMS term. The analysis/chart period follows the service contract term. After CMS expiry, CLO, maintenance saving and Smart services end; LED saving continues."}</small>
+      <small style="color:#64748b">${it ? "Adaptive Dimming non può superare la durata CMS. Il periodo di analisi/grafico segue automaticamente la durata del contratto servizi." : "Adaptive Dimming cannot exceed the CMS term. The analysis/chart period automatically follows the service contract term."}</small>
       <div style="display:flex;gap:10px;align-items:center;flex:0 0 auto">
         <small data-service-period-status style="color:#64748b"></small>
         <button type="button" data-save-service-periods class="primary">${it ? "Salva durate" : "Save periods"}</button>
