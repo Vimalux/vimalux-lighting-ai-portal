@@ -27,6 +27,19 @@ export const supabase = supabaseConfigured
     })
   : null;
 
+export function normalizePreviewRpcName(name, preview = stagingPreview) {
+  return preview && name === "list_business_cases" ? "list_business_cases_v2" : name;
+}
+
+// Staging compatibility only. Some legacy UI path can still request the pre-v2 RPC.
+// Reroute that request at the shared Supabase client boundary so the obsolete RPC is
+// never sent to PostgREST. Production behavior is intentionally untouched.
+if (stagingPreview && supabase?.rpc && !supabase.__vimaluxLegacyRpcRerouteInstalled) {
+  const originalRpc = supabase.rpc.bind(supabase);
+  supabase.rpc = (name, args, options) => originalRpc(normalizePreviewRpcName(name, true), args, options);
+  supabase.__vimaluxLegacyRpcRerouteInstalled = true;
+}
+
 export async function loadStagingCatalogue() {
   if (!stagingPreview || !supabase) return null;
   const { data, error } = await supabase.rpc("get_intelligence_catalogue");
