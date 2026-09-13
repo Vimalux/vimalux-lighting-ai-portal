@@ -13,6 +13,8 @@ import "./importedProductCategoryReconcile.js";
 import "./catalogueTabsRuntime.js";
 import "./defaultAssumptionsRuntime.js";
 import "./servicePeriodsRuntime.js";
+import "./financingAdvisorRuntime.js";
+import "./contractChartHorizonRuntime.js";
 import "./activeProjectContextRuntime.js";
 import "./intelligenceUiContinuityRuntime.js";
 import "./catalogueExpandedStateRuntime.js";
