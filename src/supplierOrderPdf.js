@@ -3,6 +3,8 @@ import autoTableModule from "jspdf-autotable";
 const autoTable = typeof autoTableModule === "function" ? autoTableModule : autoTableModule.default;
 import { partnerDisplayText } from "./partnerRoles.js";
 
+export const VIMALUX_ORDER_BLUE = [15, 111, 174];
+
 const slug = (value) => String(value || "supplier").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "supplier";
 const placeholderProjectNames = new Set(["nuovo progetto", "new project", "project"]);
 const usableProjectName = (value) => {
@@ -29,11 +31,13 @@ export function createSupplierOrderPdf(group, p, it) {
   const quantity = new Intl.NumberFormat(locale, { useGrouping: true, minimumFractionDigits: 0, maximumFractionDigits: 2 });
   const date = new Intl.DateTimeFormat(locale, { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
+  doc.setTextColor(...VIMALUX_ORDER_BLUE);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
   doc.text("VIMALUX", 15, 18);
   doc.setFontSize(14);
   doc.text(it ? "RICHIESTA DI OFFERTA E FORNITURA" : "PARTNER ORDER LIST", 15, 29);
+  doc.setTextColor(15, 23, 42);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
@@ -59,7 +63,7 @@ export function createSupplierOrderPdf(group, p, it) {
     ]),
     theme: "grid",
     styles: { font: "helvetica", fontSize: 8, cellPadding: 2.2 },
-    headStyles: { fontStyle: "bold" },
+    headStyles: { fontStyle: "bold", fillColor: VIMALUX_ORDER_BLUE, textColor: [255, 255, 255] },
     columnStyles: {
       0: { cellWidth: 96 },
       1: { cellWidth: 36 },
