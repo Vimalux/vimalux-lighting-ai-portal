@@ -3,6 +3,7 @@ import { projectFromBusinessCaseRow } from "./businessCaseTransport.js";
 import { isStableCloudId, persistIntelligenceProject } from "./businessCasePersistence.js";
 import { activeIntelligenceProjects, isArchivedProject } from "./projectVisibility.js";
 import { dedupeProjects, isSameImportedProject } from "./projectDeduplication.js";
+import { buildBusinessCaseSnapshot } from "./businessCaseSync.js";
 import {
   createOrGetBusinessCaseForOpportunity,
   lookupBusinessCaseForOpportunity,
@@ -31,16 +32,45 @@ export function normalizePreviewRpcName(name, preview = stagingPreview) {
   return preview && name === "list_business_cases" ? "list_business_cases_v2" : name;
 }
 
-// Staging preview must not depend on Business Case list RPC permissions.
-// Preview uses the locally stored active Business Case plus staging catalogue data.
-// Both legacy and v2 Business Case list calls are therefore resolved locally in preview.
+function previewBusinessCaseRows() {
+  try {
+    const stored = JSON.parse(localStorage.getItem("vimalux-intelligence-projects") || "[]");
+    const projects = Array.isArray(stored) ? stored : [];
+    return projects.map((project) => {
+      const snapshot = buildBusinessCaseSnapshot(project, project.updatedAt || project.createdAt || new Date().toISOString());
+      return {
+        id: project?.crm?.businessCaseRecordId || project?.id,
+        business_case_code: project?.project?.businessCaseId || snapshot.businessCaseId || "",
+        project_lineage_id: project?.crm?.projectLineageId || project?.project?.projectLineageId || "",
+        crm_opportunity_id: project?.crm?.opportunityId || project?.crm?.uniqueProjectId || "staging-preview",
+        intelligence_data: project,
+        result_summary: snapshot,
+        crm_fields: {
+          customer: project?.customer?.name || "",
+          project: project?.project?.name || project?.name || "",
+        },
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+// Staging preview is intentionally self-contained: customer proposal generation must
+// use the active locally stored Business Case and must not depend on staging RPC grants.
 // Production behavior is intentionally untouched.
 if (stagingPreview && supabase?.rpc && !supabase.__vimaluxPreviewRpcIsolationInstalled) {
   const originalRpc = supabase.rpc.bind(supabase);
   supabase.rpc = (name, args, options) => {
     const normalized = normalizePreviewRpcName(name, true);
     if (normalized === "list_business_cases_v2") {
+      return Promise.resolve({ data: previewBusinessCaseRows(), error: null, count: null, status: 200, statusText: "OK" });
+    }
+    if (normalized === "get_proposal_history") {
       return Promise.resolve({ data: [], error: null, count: 0, status: 200, statusText: "OK" });
+    }
+    if (normalized === "publish_intelligence_preliminary_proposal") {
+      return Promise.resolve({ data: { preview: true }, error: null, count: null, status: 200, statusText: "OK" });
     }
     return originalRpc(normalized, args, options);
   };
