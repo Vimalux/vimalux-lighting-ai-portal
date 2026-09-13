@@ -51,6 +51,7 @@ async function savePeriods(root) {
       ...(project.assumptions || {}),
       serviceAgreementPeriod: cmsYears,
       contractYears: cmsYears,
+      analysisPeriod: cmsYears,
       powerAidServicePeriod: powerAidYears,
     },
     updatedAt: new Date().toISOString(),
@@ -99,7 +100,7 @@ function render() {
       <input data-poweraid-years inputmode="numeric" value="${powerAidYears}" ${powerAidEnabled ? "" : "disabled"} style="border:1px solid #cbd7e3;border-radius:8px;padding:9px 10px;font:inherit;background:#fff">
     </label>
     <div style="grid-column:1/-1;display:flex;justify-content:space-between;gap:12px;align-items:center">
-      <small style="color:#64748b">${it ? "Adaptive Dimming non può superare la durata CMS. Dopo la scadenza CMS cessano CLO, risparmio manutenzione e servizi Smart; il risparmio LED continua." : "Adaptive Dimming cannot exceed the CMS term. After CMS expiry, CLO, maintenance saving and Smart services end; LED saving continues."}</small>
+      <small style="color:#64748b">${it ? "Adaptive Dimming non può superare la durata CMS. Il periodo di analisi/grafico segue la durata del contratto servizi. Dopo la scadenza CMS cessano CLO, risparmio manutenzione e servizi Smart; il risparmio LED continua." : "Adaptive Dimming cannot exceed the CMS term. The analysis/chart period follows the service contract term. After CMS expiry, CLO, maintenance saving and Smart services end; LED saving continues."}</small>
       <div style="display:flex;gap:10px;align-items:center;flex:0 0 auto">
         <small data-service-period-status style="color:#64748b"></small>
         <button type="button" data-save-service-periods class="primary">${it ? "Salva durate" : "Save periods"}</button>
