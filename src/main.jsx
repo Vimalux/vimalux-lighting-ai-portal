@@ -15,6 +15,7 @@ import "./defaultAssumptionsRuntime.js";
 import "./servicePeriodsRuntime.js";
 import "./financingAdvisorRuntime.js";
 import "./contractChartHorizonRuntime.js";
+import "./stagingLegacyErrorGuardRuntime.js";
 import "./activeProjectContextRuntime.js";
 import "./intelligenceUiContinuityRuntime.js";
 import "./catalogueExpandedStateRuntime.js";
