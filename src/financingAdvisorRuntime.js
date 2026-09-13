@@ -30,8 +30,8 @@ function activeIndex(projects) {
 
 function findFinancingField() {
   return [...document.querySelectorAll("label")].find((label) => {
-    const text = String(label.querySelector("span")?.textContent || "").trim();
-    return /periodo finanziamento|durata finanziamento|financing period/i.test(text);
+    const text = String(label.textContent || "").replace(/\s+/g, " ").trim();
+    return /periodo\s+(?:di\s+)?finanziamento|durata\s+(?:del\s+)?finanziamento|financing\s+period/i.test(text);
   });
 }
 
