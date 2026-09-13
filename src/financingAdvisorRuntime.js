@@ -33,7 +33,7 @@ function findField(pattern) {
 
 function dealTypeFromUi(project) {
   const label = findField(/tipo\s+di\s+accordo|deal\s+type/i);
-  const select = label?.parentElement?.querySelector("select") || label?.nextElementSibling;
+  const select = label?.control || (label?.htmlFor ? document.getElementById(label.htmlFor) : null) || label?.nextElementSibling || label?.parentElement?.querySelector("select");
   const value = String(select?.value || "").toLowerCase();
   const optionText = String(select?.selectedOptions?.[0]?.textContent || "").toLowerCase();
   const combined = `${value} ${optionText}`;
@@ -99,8 +99,6 @@ function render() {
   else if (existingRoot) return;
 
   const financeField = findField(/periodo\s+(?:di\s+)?finanziamento|durata\s+(?:del\s+)?finanziamento|financing\s+period/i);
-  const financeContainer = financeField?.parentElement;
-  if (financeContainer) financeContainer.style.display = newMode === "noleggio_operativo" ? "none" : "";
   if (!advisor) return;
 
   const serviceField = findField(/durata\s+servizi\s+cms|periodo\s+accordo\s+servizi|service\s+agreement\s+period|cms\s+service\s+period/i);
@@ -122,7 +120,7 @@ function render() {
 
   if (!minimum) {
     root.innerHTML = `<div style="display:grid;gap:4px"><strong style="color:#0f6fae">${title}</strong><span style="font-size:12px;color:#475569">${isNoleggio
-      ? (it ? `Nessuna durata tra ${advisor.minimumYears} e ${advisor.maximumYears} anni mantiene il cashflow cliente ≥ 0 con canone all-inclusive.` : `No duration between ${advisor.minimumYears} and ${advisor.maximumYears} years keeps customer cash flow ≥ 0 with the all-inclusive payment.`)
+      ? (it ? `Nessuna durata tra ${advisor.minimumYears} e ${advisor.maximumYears} anni mantiene il cashflow cliente ≥ 0 con canone all-inclusive. Nel Noleggio il periodo di riferimento è la durata dell'accordo servizi/contratto; il campo finanziamento separato non viene usato come periodo cliente.` : `No duration between ${advisor.minimumYears} and ${advisor.maximumYears} years keeps customer cash flow ≥ 0 with the all-inclusive payment. In Noleggio, the governing period is the service/contract duration; the separate financing field is not used as the customer contract period.`)
       : (it ? `Nessuna durata tra 1 e ${advisor.serviceYears} anni mantiene il cashflow cliente ≥ 0 includendo OPEX ricorrente.` : `No duration between 1 and ${advisor.serviceYears} years keeps customer cash flow ≥ 0 including recurring OPEX.`)}</span></div>`;
   } else {
     const minYears = minimum.durationYears;
@@ -132,7 +130,7 @@ function render() {
       ? (it ? `Anno 1: beneficio ${money(project, recommended.year1.grossBenefit)} − canone all-inclusive ${money(project, recommended.year1.allInclusivePayment)} = ${money(project, recommended.year1.netCashFlow)}.` : `Year 1: benefit ${money(project, recommended.year1.grossBenefit)} − all-inclusive payment ${money(project, recommended.year1.allInclusivePayment)} = ${money(project, recommended.year1.netCashFlow)}.`)
       : (it ? `Anno 1: beneficio ${money(project, recommended.year1.grossBenefit)} − finanziamento ${money(project, recommended.year1.financingPayment)} − OPEX ${money(project, recommended.year1.recurringOpex)} = ${money(project, recommended.year1.netCashFlow)}.` : `Year 1: benefit ${money(project, recommended.year1.grossBenefit)} − financing ${money(project, recommended.year1.financingPayment)} − OPEX ${money(project, recommended.year1.recurringOpex)} = ${money(project, recommended.year1.netCashFlow)}.`);
     const note = isNoleggio
-      ? (it ? `Nel Noleggio il canone comprende CAPEX e servizi/OPEX: l'OPEX non viene sottratto una seconda volta. Applicando una durata, contratto, CMS, analisi e Adaptive Dimming (se attivo) vengono allineati.` : `For Noleggio, the payment includes CAPEX and services/OPEX, so OPEX is not deducted twice. Applying a duration aligns contract, CMS, analysis and Adaptive Dimming (if active).`)
+      ? (it ? `Nel Noleggio il canone comprende CAPEX e servizi/OPEX: l'OPEX non viene sottratto una seconda volta. La durata applicata allinea contratto, CMS, analisi e Adaptive Dimming (se attivo). Il campo "Periodo di finanziamento" rimane visibile solo come parametro tecnico e non determina la durata cliente.` : `For Noleggio, the payment includes CAPEX and services/OPEX, so OPEX is not deducted twice. Applying a duration aligns contract, CMS, analysis and Adaptive Dimming (if active). The separate financing-period field remains visible only as a technical parameter and does not govern the customer contract duration.`)
       : (it ? `Verifica anno per anno sull'intero periodo servizi di ${advisor.serviceYears} anni.` : `Checked year by year across the full ${advisor.serviceYears}-year service period.`);
 
     root.innerHTML = `<div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap"><div style="display:grid;gap:5px"><strong style="color:#0f6fae">${title}</strong><span style="font-size:13px;color:#0f172a"><b>${it ? "Minimo" : "Minimum"}: ${minYears} ${it ? "anni" : "years"}</b> · ${it ? "cashflow annuo minimo" : "minimum annual cash flow"}: ${money(project, minimum.minAnnualCashFlow)}</span><span style="font-size:13px;color:#0f172a"><b>${it ? "Consigliato" : "Recommended"}: ${recYears} ${it ? "anni" : "years"}</b> · ${it ? "margine di sicurezza target" : "target safety margin"}: ${advisor.safetyMarginPercent}%</span><span style="font-size:12px;color:#475569">${year1Formula}</span><span style="font-size:11px;color:#64748b">${note}</span></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button type="button" data-apply-minimum class="secondary">${it ? `Applica minimo ${minYears} anni` : `Apply minimum ${minYears} years`}</button>${recommendedDifferent ? `<button type="button" data-apply-recommended class="primary">${it ? `Applica consigliato ${recYears} anni` : `Apply recommended ${recYears} years`}</button>` : ""}<small data-financing-advisor-status style="color:#64748b"></small></div></div>`;
