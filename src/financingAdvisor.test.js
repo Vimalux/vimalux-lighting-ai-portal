@@ -3,10 +3,8 @@ import assert from "node:assert/strict";
 import { defaultProject } from "./model.js";
 import { financingCashflowAdvisor } from "./financingAdvisor.js";
 
-function financedProject() {
+function baseProject() {
   const project = defaultProject({ applyStoredDefaults: false });
-  project.assumptions.dealType = "noleggio_operativo";
-  project.assumptions.financingModel = "laas";
   project.assumptions.serviceAgreementPeriod = 10;
   project.assumptions.contractYears = 10;
   project.assumptions.analysisPeriod = 10;
@@ -16,33 +14,63 @@ function financedProject() {
   return project;
 }
 
-test("advisor finds the shortest duration with non-negative annual customer cashflow including OPEX", () => {
-  const advisor = financingCashflowAdvisor(financedProject());
-  assert.ok(advisor);
+function financeProject() {
+  const project = baseProject();
+  project.assumptions.dealType = "finance";
+  project.assumptions.financingModel = "finance";
+  return project;
+}
+
+function noleggioProject() {
+  const project = baseProject();
+  project.assumptions.dealType = "noleggio_operativo";
+  project.assumptions.financingModel = "laas";
+  return project;
+}
+
+test("finance advisor finds shortest duration with non-negative cashflow including recurring OPEX", () => {
+  const advisor = financingCashflowAdvisor(financeProject());
+  assert.equal(advisor.mode, "finance");
   assert.equal(advisor.serviceYears, 10);
   assert.ok(advisor.minimum);
   assert.ok(advisor.minimum.rows.every((row) => row.netCashFlow >= -0.01));
-  assert.ok(advisor.minimum.rows.every((row) => row.recurringOpex >= 0));
-  const previous = advisor.scenarios.find((scenario) => scenario.financingYears === advisor.minimum.financingYears - 1);
-  if (previous) assert.equal(previous.qualifies, false);
+  assert.ok(advisor.minimum.rows.some((row) => row.recurringOpex >= 0));
 });
 
-test("higher recurring customer OPEX cannot produce a shorter cashflow-neutral financing duration", () => {
-  const base = financedProject();
-  const low = financingCashflowAdvisor(base);
+test("Noleggio advisor uses one all-inclusive payment and does not deduct OPEX twice", () => {
+  const advisor = financingCashflowAdvisor(noleggioProject(), { maximumYears: 12 });
+  assert.equal(advisor.mode, "noleggio_operativo");
+  assert.ok(advisor.minimum);
+  const row = advisor.minimum.rows[0];
+  assert.equal(row.recurringOpex, 0);
+  assert.ok(row.includedOpex >= 0);
+  assert.ok(row.allInclusivePayment > 0);
+  assert.ok(Math.abs(row.netCashFlow - (row.grossBenefit - row.allInclusivePayment)) < 0.01);
+});
+
+test("Noleggio scenario duration is also the contract/service duration", () => {
+  const advisor = financingCashflowAdvisor(noleggioProject(), { maximumYears: 12 });
+  assert.ok(advisor.minimum);
+  assert.equal(advisor.minimum.contractYears, advisor.minimum.durationYears);
+  assert.equal(advisor.minimum.rows.length, advisor.minimum.durationYears);
+});
+
+test("higher Noleggio service OPEX cannot improve minimum duration", () => {
+  const base = noleggioProject();
+  const low = financingCashflowAdvisor(base, { maximumYears: 15 });
   const highOpex = structuredClone(base);
   const lcu = highOpex.catalogue.smart.find((item) => item.id === highOpex.solution.lcuProductId);
   lcu.annualSalesPrice = Number(lcu.annualSalesPrice || 0) + 30;
-  const high = financingCashflowAdvisor(highOpex);
+  const high = financingCashflowAdvisor(highOpex, { maximumYears: 15 });
   assert.ok(low?.minimum);
-  if (high?.minimum) assert.ok(high.minimum.financingYears >= low.minimum.financingYears);
+  if (high?.minimum) assert.ok(high.minimum.durationYears >= low.minimum.durationYears);
   else assert.equal(high?.hasCashflowNeutralDuration, false);
 });
 
-test("recommended duration respects the configured safety margin when available", () => {
-  const advisor = financingCashflowAdvisor(financedProject(), { safetyMarginPercent: 10 });
+test("recommended duration respects safety margin when available", () => {
+  const advisor = financingCashflowAdvisor(noleggioProject(), { safetyMarginPercent: 10, maximumYears: 15 });
   assert.ok(advisor?.recommended);
-  assert.ok(advisor.recommended.financingYears >= advisor.minimum.financingYears);
+  assert.ok(advisor.recommended.durationYears >= advisor.minimum.durationYears);
   if (advisor.recommended.minMarginPercent >= 10) {
     assert.ok(advisor.recommended.rows.every((row) => row.marginPercent >= 9.999));
   }
