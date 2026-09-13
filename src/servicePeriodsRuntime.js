@@ -82,6 +82,26 @@ function syncVisibleAnalysisPeriod(cmsYears) {
   input.title = "Segue automaticamente la durata del contratto servizi";
 }
 
+function persistAnalysisHorizon(projects, index, cmsYears) {
+  const project = projects[index];
+  const currentAnalysis = Math.round(Number(project?.assumptions?.analysisPeriod) || 0);
+  const currentContract = Math.round(Number(project?.assumptions?.contractYears) || 0);
+  if (currentAnalysis === cmsYears && currentContract === cmsYears) return project;
+
+  const updated = migrateProject({
+    ...project,
+    assumptions: {
+      ...(project.assumptions || {}),
+      analysisPeriod: cmsYears,
+      contractYears: cmsYears,
+    },
+    updatedAt: new Date().toISOString(),
+  });
+  projects[index] = updated;
+  localStorage.setItem("vimalux-intelligence-projects", JSON.stringify(projects));
+  return updated;
+}
+
 function render() {
   if (document.getElementById(ROOT_ID)) return;
   const legacy = findField(/periodo\s+(?:di\s+)?accordo\s+servizi|service\s+agreement\s+period|service\s+period/i);
@@ -89,8 +109,9 @@ function render() {
   const projects = localProjects();
   const index = activeIndex(projects);
   if (index < 0) return;
-  const project = projects[index];
+  let project = projects[index];
   const cmsYears = Math.max(1, Math.round(Number(project?.assumptions?.serviceAgreementPeriod) || 10));
+  project = persistAnalysisHorizon(projects, index, cmsYears);
   const powerAidYears = Math.max(1, Math.min(cmsYears, Math.round(Number(project?.assumptions?.powerAidServicePeriod) || Math.min(10, cmsYears))));
   const powerAidEnabled = Boolean(project?.solution?.powerAidEnabled);
   const it = project?.language !== "en";
