@@ -118,8 +118,7 @@ export function calculateBusinessCase(project) {
   const legacyDealType = a.financingModel === "finance" ? "finance" : ["laas", "ppp"].includes(a.financingModel) ? "noleggio_operativo" : "cash";
   const dealType = ["cash", "noleggio_operativo", "finance"].includes(a.dealType) ? a.dealType : legacyDealType;
   const hardwareFinanced = dealType === "finance" || dealType === "noleggio_operativo";
-  // serviceAgreementPeriod is the authoritative customer-facing economic horizon.
-  // Financing may end earlier, creating a later service-only phase inside the same contract.
+  // serviceAgreementPeriod remains the backward-compatible CMS/core Smart service period.
   const serviceAgreementPeriod = Math.max(1, Math.round((positive(a.serviceAgreementPeriod) !== 10 ? positive(a.serviceAgreementPeriod) : positive(a.contractYears)) || 10));
   const requestedPowerAidServicePeriod = positive(a.powerAidServicePeriod) || serviceAgreementPeriod;
   const powerAidServicePeriod = powerAidEnabled ? Math.max(1, Math.min(serviceAgreementPeriod, Math.round(requestedPowerAidServicePeriod))) : 0;
@@ -159,9 +158,7 @@ export function calculateBusinessCase(project) {
   const totalDirectCosts = capexDirectCost + dutyCost + contractOpexCost + commissionCost + warrantyReserve + financingCost + positive(a.otherDirectCosts);
   const netProjectProfit = totalContractRevenue - totalDirectCosts;
   const netProjectMarginPercent = totalContractRevenue ? netProjectProfit / totalContractRevenue * 100 : 0;
-  // Contract/service duration governs cash-flow, NPV, lifecycle rows and all cost-evolution charts.
-  // This prevents post-service years from being presented as if they were part of the agreed solution.
-  const analysisPeriod = serviceAgreementPeriod;
+  const analysisPeriod = Math.max(1, Math.round(positive(a.analysisPeriod)));
   let cumulative = hardwareFinanced ? -positive(a.upfrontPayment) : -totalCapex, npv = cumulative;
   const cashFlowRows = [];
   const customerValueRows = [];
@@ -191,6 +188,7 @@ export function calculateBusinessCase(project) {
     const netCashFlow = benefit - serviceOpex - payment;
     const currentOperatingCost = baselineKwh * positive(a.energyPrice) * energyGrowth + totalQuantity * positive(a.existingMaintenance);
     const futureOperatingCost = Math.max(0, currentOperatingCost - benefit);
+    // Full-Smart values remain the explicit extension scenario: CMS, CLO, maintenance and PowerAiD continue.
     const fullSmartCloSaving = cmsEnabled ? cloSavingKwh * positive(a.energyPrice) * energyGrowth : 0;
     const fullSmartPowerAidGrossSaving = powerAidEnabled ? powerAidGrossSaving * energyGrowth : 0;
     const fullSmartMaintenanceSaving = cmsEnabled ? maintenanceSaving : 0;
@@ -220,7 +218,7 @@ export function calculateBusinessCase(project) {
   const customerDecisionStatus = npv > 0 && customerAnnualNetBenefit >= 0 ? "GO" : npv > 0 || customerAnnualNetBenefit >= 0 ? "REVIEW" : "NO_GO";
   const minimumMarginPercent = positive(a.minimumMarginPercent || 30);
   const decisionStatus = netProjectMarginPercent >= minimumMarginPercent && customerDecisionStatus === "GO" ? "GO" : netProjectMarginPercent >= 20 && customerDecisionStatus !== "NO_GO" ? "REVIEW" : "NO_GO";
-  return { totalQuantity, upgradedQuantity, notUpgradedQuantity: Math.max(0, totalQuantity - upgradedQuantity), smartQuantity, lcuQuantity, nominalSystemKwh, existingDimmingSavingKwh, baselineKwh, upgradedBaselineKwh, notUpgradedBaselineKwh, upgradedLedKwh, ledKwh, ledSavingKwh, cloSavingKwh, afterCloKwh, powerAidSavingKwh, finalKwh,
+  return { totalQuantity, upgradedQuantity, notUpgradedQuantity: Math.max(0, totalQuantity - upgradedQuantity), smartQuantity, lcuQuantity, nominalSystemKwh, existingDimmingSavingKwh, baselineKwh, upgradedBaselineKwh, notUpgradedBaselineKwh, upgradedLedKwh, upgradedFinalKwh, ledKwh, ledSavingKwh, cloSavingKwh, afterCloKwh, powerAidSavingKwh, finalKwh,
     ledCapex, ledCost, smartHardwareCapex, implementationCapex, gatewayCapex, antennaCapex, meterCapex, freight, baseCalculatedCapex, calculatedCapex, totalCapex, baseCalculatedAnnualRecurringRevenue, calculatedAnnualRecurringRevenue,
     additionalCosts, additionalCapexCost: additionalCosts.capexCost, additionalCapexSales: additionalCosts.capexSales, additionalAnnualOpexCost: additionalCosts.annualOpexCost, additionalAnnualOpexSales: additionalCosts.annualOpexSales,
     cmsOpex: cmsRevenue, cmsRevenue, gatewayOpex: gatewayRecurringRevenue, gatewayRecurringRevenue, powerAidFee: powerAidCustomerFee, powerAidGrossSavingEUR: powerAidGrossSaving, powerAidCustomerFee, powerAidCustomerNetBenefit, powerAidSupplierCost, powerAidVimaluxMargin, powerAidMarginPct, powerAidContractRevenue, powerAidSupplierContractCost, powerAidVimaluxContractMargin: powerAidContractRevenue - powerAidSupplierContractCost, savingsAsAServiceRevenue, recurringOpex, annualRecurringRevenue, fixedAnnualOpex, cmsDirectCost, gatewayRecurringCost, totalAnnualOpex, energySaving, energySavingWithoutPowerAid: energySaving - powerAidGrossSaving, maintenanceSaving, grossBenefit, monthlyPayment, annualPayment,
