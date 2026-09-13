@@ -31,13 +31,20 @@ export function normalizePreviewRpcName(name, preview = stagingPreview) {
   return preview && name === "list_business_cases" ? "list_business_cases_v2" : name;
 }
 
-// Staging compatibility only. Some legacy UI path can still request the pre-v2 RPC.
-// Reroute that request at the shared Supabase client boundary so the obsolete RPC is
-// never sent to PostgREST. Production behavior is intentionally untouched.
-if (stagingPreview && supabase?.rpc && !supabase.__vimaluxLegacyRpcRerouteInstalled) {
+// Staging preview must not depend on Business Case list RPC permissions.
+// Preview uses the locally stored active Business Case plus staging catalogue data.
+// Both legacy and v2 Business Case list calls are therefore resolved locally in preview.
+// Production behavior is intentionally untouched.
+if (stagingPreview && supabase?.rpc && !supabase.__vimaluxPreviewRpcIsolationInstalled) {
   const originalRpc = supabase.rpc.bind(supabase);
-  supabase.rpc = (name, args, options) => originalRpc(normalizePreviewRpcName(name, true), args, options);
-  supabase.__vimaluxLegacyRpcRerouteInstalled = true;
+  supabase.rpc = (name, args, options) => {
+    const normalized = normalizePreviewRpcName(name, true);
+    if (normalized === "list_business_cases_v2") {
+      return Promise.resolve({ data: [], error: null, count: 0, status: 200, statusText: "OK" });
+    }
+    return originalRpc(normalized, args, options);
+  };
+  supabase.__vimaluxPreviewRpcIsolationInstalled = true;
 }
 
 export async function loadStagingCatalogue() {
