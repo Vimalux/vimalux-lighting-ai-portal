@@ -125,15 +125,26 @@ function drawCostChart(doc, calculated, x, y, w, h, lang, colors) {
       cursor -= segmentH;
       doc.setFillColor(...colorsByKey[key]);
       doc.rect(phaseX, cursor, phaseW, segmentH, "F");
-      if (segmentH >= 8 && phaseW >= 32) {
+
+      // Short financing phases (often 1-2 years inside a 10-year service term)
+      // are narrow by design. Keep the economic values visible instead of
+      // suppressing every label just because the phase width is below 32 mm.
+      if (segmentH >= 8 && phaseW >= 12) {
         const pct = value / currentCost * 100;
+        const centerX = phaseX + phaseW / 2;
+        const centerY = cursor + segmentH / 2;
         doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(6.2);
-        doc.text(`${reportNumber(pct, 0, lang)}%`, phaseX + phaseW / 2, cursor + segmentH / 2 - 0.5, { align: "center" });
-        if (segmentH >= 13) {
-          doc.setFontSize(5.5);
-          doc.text(money(value), phaseX + phaseW / 2, cursor + segmentH / 2 + 4, { align: "center" });
+        if (phaseW >= 32) {
+          doc.setFontSize(6.2);
+          doc.text(`${reportNumber(pct, 0, lang)}%`, centerX, centerY - 0.5, { align: "center" });
+          if (segmentH >= 13) {
+            doc.setFontSize(5.5);
+            doc.text(money(value), centerX, centerY + 4, { align: "center" });
+          }
+        } else {
+          doc.setFontSize(4.6);
+          doc.text(money(value), centerX, centerY + 1.4, { align: "center", maxWidth: Math.max(10, phaseW - 2) });
         }
       }
     });
