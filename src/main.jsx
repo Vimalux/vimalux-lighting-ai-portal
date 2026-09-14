@@ -25,4 +25,5 @@ import "./reportHybridRuntime.js";
 import "./reportExecutiveRefinementRuntime.js";
 import "./reportLayoutFinalizerRuntime.js";
 import "./platformActivityRuntime.js";
+import "./catalogueSelectionRuntime.js";
 ReactDOM.createRoot(document.getElementById("root")).render(<React.StrictMode><App/></React.StrictMode>);
