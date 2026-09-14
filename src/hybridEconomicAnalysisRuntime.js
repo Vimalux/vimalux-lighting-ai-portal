@@ -5,6 +5,11 @@ import { getHybridSolarAutoStatus, HYBRID_SOLAR_AUTO_STATUS_EVENT } from "./hybr
 const PROJECTS_KEY = "vimalux-intelligence-projects";
 const MARKER = "data-vimalux-hybrid-economic-ui";
 
+function safe(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
 export function resolveActiveProject(projects = [], search = "") {
   const params = new URLSearchParams(search || "");
   const businessCaseId = params.get("business_case_id");
@@ -25,16 +30,28 @@ export function hybridEconomicDisplayFromResult(project, result) {
   if (!project || !result) return null;
   const hybrid = result.hybridSolar || {};
   if (!hybrid.enabled) return null;
+  const rows = Array.isArray(hybrid.rows) ? hybrid.rows : [];
+  const installedPvKwp = rows.reduce(
+    (sum, row) => sum + Math.max(0, safe(row?.quantity)) * Math.max(0, safe(row?.pvWp)) / 1000,
+    0,
+  );
+  const eligibleGridKwh = Math.max(0, safe(result.hybridEligibleGridKwh));
+  const savingKwh = Math.max(0, safe(result.hybridSolarSavingKwh));
+  const coveragePercent = eligibleGridKwh > 0
+    ? savingKwh / eligibleGridKwh * 100
+    : Math.max(0, safe(hybrid.totalContributionPercent));
   return {
     language: project.language || "it",
     currency: project.project?.currency || "EUR",
-    units: Number(hybrid.totalHybridUnits || 0),
-    pvKwh: Number(hybrid.totalPvKwh || 0),
-    usableSolarKwh: Number(hybrid.totalUsableSolarKwh || 0),
-    savingKwh: Number(result.hybridSolarSavingKwh || 0),
-    savingEur: Number(result.hybridSolarSavingEUR || 0),
-    contributionPercent: Number(hybrid.totalContributionPercent || 0),
-    finalKwh: Number(result.finalKwh || 0),
+    units: Math.max(0, safe(hybrid.totalHybridUnits)),
+    installedPvKwp,
+    annualPvKwh: Math.max(0, safe(hybrid.totalPvKwh)),
+    usableSolarKwh: Math.max(0, safe(hybrid.totalUsableSolarKwh)),
+    savingKwh,
+    savingEur: Math.max(0, safe(result.hybridSolarSavingEUR)),
+    coveragePercent,
+    finalKwh: Math.max(0, safe(result.finalKwh)),
+    location: hybrid.location?.municipality || hybrid.location?.name || hybrid.location?.label || "",
   };
 }
 
@@ -110,15 +127,19 @@ function insertBeforeTotalBenefit(card, row) {
 function makeHybridCard(display) {
   const it = display.language === "it";
   const card = document.createElement("section");
-  card.className = "card";
+  card.className = "card customer-summary-card hybrid-economic-summary";
   card.setAttribute(MARKER, "card");
   const title = document.createElement("h2");
-  title.textContent = it ? "Hybrid Solar · beneficio incluso nel Business Case" : "Hybrid Solar · benefit included in Business Case";
+  title.textContent = it ? "Hybrid Solar · contributo incluso nel Business Case" : "Hybrid Solar · contribution included in Business Case";
   const hint = document.createElement("p");
   hint.className = "hint";
   hint.textContent = display.savingKwh > 0
-    ? (it ? "Il contributo solare è applicato dopo LED, CLO e Adaptive Dimming e riduce esclusivamente il consumo degli apparecchi ibridi." : "Solar contribution is applied after LED, CLO and Adaptive Dimming and only offsets the load of hybrid luminaires.")
-    : (it ? "Apparecchi ibridi rilevati. Il beneficio resta a zero finché non è disponibile una resa solare dal Comune o inserita manualmente." : "Hybrid luminaires detected. Benefit remains zero until a municipality solar yield or manual yield is available.");
+    ? (it
+      ? `Il beneficio solare riduce esclusivamente il prelievo degli apparecchi Hybrid ed è già incluso nel risparmio netto.${display.location ? ` Profilo solare: ${display.location}.` : ""} Il dettaglio mensile è riportato nel PDF.`
+      : `Solar benefit only offsets Hybrid-luminaire grid consumption and is already included in the net saving.${display.location ? ` Solar profile: ${display.location}.` : ""} Monthly detail is included in the PDF.`)
+    : (it
+      ? "Apparecchi Hybrid rilevati. Il beneficio resta a zero finché non è disponibile una resa solare dal Comune o inserita manualmente."
+      : "Hybrid luminaires detected. Benefit remains zero until a municipality solar yield or manual yield is available.");
 
   const autoStatus = getHybridSolarAutoStatus();
   const status = document.createElement("p");
@@ -134,13 +155,14 @@ function makeHybridCard(display) {
   }
 
   const kpis = document.createElement("div");
-  kpis.className = "kpis";
+  kpis.className = "kpis customer-summary-kpis";
   const items = [
-    [it ? "Unità ibride" : "Hybrid units", formatNumber(display.units, display.language)],
-    [it ? "Solare utilizzabile" : "Usable solar", `${formatNumber(display.usableSolarKwh, display.language)} kWh`],
+    [it ? "Unità Hybrid" : "Hybrid units", formatNumber(display.units, display.language)],
+    [it ? "PV installato" : "Installed PV", `${formatNumber(display.installedPvKwp, display.language, 2)} kWp`],
+    [it ? "Produzione PV annua" : "Annual PV production", `${formatNumber(display.annualPvKwh, display.language)} kWh`],
     [it ? "Offset rete incluso BC" : "Grid offset included in BC", `${formatNumber(display.savingKwh, display.language)} kWh`],
-    [it ? "Beneficio Hybrid annuo" : "Annual Hybrid Benefit", formatMoney(display.savingEur, display.language, display.currency)],
-    [it ? "Contributo solare" : "Solar contribution", `${formatNumber(display.contributionPercent, display.language, 1)}%`],
+    [it ? "Beneficio Hybrid annuo" : "Annual Hybrid benefit", formatMoney(display.savingEur, display.language, display.currency)],
+    [it ? "Copertura solare carico Hybrid" : "Solar coverage of Hybrid load", `${formatNumber(display.coveragePercent, display.language, 1)}%`],
   ];
   for (const [label, value] of items) {
     const item = document.createElement("div");
@@ -194,7 +216,7 @@ export function renderHybridEconomicAnalysis() {
 
   const twoCol = waterfall.parentElement;
   if (twoCol?.classList.contains("two-col")) {
-    twoCol.insertAdjacentElement("afterend", makeHybridCard(display));
+    twoCol.insertAdjacentElement("beforebegin", makeHybridCard(display));
   }
 }
 
