@@ -38,7 +38,8 @@ function reconcileSelect(select) {
       continue;
     }
 
-    option.textContent = `${canonicalLabel(product)}${selectable ? "" : " · Legacy / inattivo"}`;
+    const nextLabel = `${canonicalLabel(product)}${selectable ? "" : " · Legacy / inattivo"}`;
+    if (option.textContent !== nextLabel) option.textContent = nextLabel;
   }
 }
 
@@ -58,7 +59,15 @@ async function loadMasterCatalogue() {
 }
 
 function start() {
-  const observer = new MutationObserver(() => reconcileDom());
+  let reconcileQueued = false;
+  const observer = new MutationObserver(() => {
+    if (reconcileQueued) return;
+    reconcileQueued = true;
+    queueMicrotask(() => {
+      reconcileQueued = false;
+      reconcileDom();
+    });
+  });
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
   let attempts = 0;
