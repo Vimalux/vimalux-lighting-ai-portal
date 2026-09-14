@@ -114,6 +114,7 @@ export function isCatalogueProductCompatible(product, existingCategory = "OTHER"
 }
 
 export function compatibleLedProducts(products = [], existingCategory = "OTHER", replacementRequirement = "UNKNOWN") {
-  return products.filter((product) => product?.active !== false)
+  return products
+    .filter((product) => product?.active !== false && product?.historicalOnly !== true)
     .filter((product) => isCatalogueProductCompatible(product, existingCategory, replacementRequirement));
 }
