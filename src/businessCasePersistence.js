@@ -2,9 +2,20 @@ import { calculateBusinessCase } from "./calculations.js";
 import { buildBusinessCaseSnapshot } from "./businessCaseSync.js";
 
 const stableUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const placeholderProjectNames = new Set(["nuovo progetto", "new project", "nyt projekt"]);
 
 export function isStableCloudId(value) {
   return stableUuid.test(String(value || ""));
+}
+
+export function hasMeaningfulProjectIdentity(project) {
+  const customerName = String(project?.customer?.name || "").trim();
+  const projectName = String(project?.project?.name || "").trim();
+  return Boolean(customerName && projectName && !placeholderProjectNames.has(projectName.toLowerCase()));
+}
+
+function legacyProjectId(project) {
+  return String(project?.id || project?.project?.businessCaseId || "").trim();
 }
 
 export async function persistIntelligenceProject(client, project, profile) {
@@ -50,13 +61,19 @@ export async function persistIntelligenceProject(client, project, profile) {
 
   if (!isStableCloudId(caseId)) {
     if (!canCreateLinkedCase) return null;
+    const legacyId = legacyProjectId(project);
+    if (!legacyId) return null;
+
     if (project.importedTechnical || project.importedCommercial) {
-      const createdDraft = await client.rpc("create_intelligence_draft", { legacy_id: project.id, project_payload: payload });
+      const createdDraft = await client.rpc("create_intelligence_draft", { legacy_id: legacyId, project_payload: payload });
       if (createdDraft.error) throw createdDraft.error;
       caseId = createdDraft.data;
     } else {
-      if (!String(project.customer?.name || "").trim() || !String(project.project?.name || "").trim()) return null;
-      const created = await client.rpc("create_internal_business_case", { legacy_id: project.id, project_payload: payload });
+      // A manually created project stays local while the user is still typing the
+      // placeholder identity. This avoids creating/promoting a CRM record halfway
+      // through entry and prevents the active project from changing underneath them.
+      if (!hasMeaningfulProjectIdentity(project)) return null;
+      const created = await client.rpc("create_internal_business_case", { legacy_id: legacyId, project_payload: payload });
       if (created.error) throw created.error;
       caseId = created.data;
     }
@@ -66,8 +83,7 @@ export async function persistIntelligenceProject(client, project, profile) {
   if (
     isStableCloudId(caseId) &&
     !String(crmOpportunityId || "").trim() &&
-    String(project.customer?.name || "").trim() &&
-    String(project.project?.name || "").trim()
+    hasMeaningfulProjectIdentity(project)
   ) {
     const promoted = await client.rpc("promote_intelligence_draft", {
       case_id: caseId,
