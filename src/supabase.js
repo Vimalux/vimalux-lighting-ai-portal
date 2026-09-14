@@ -4,6 +4,7 @@ import { isStableCloudId, persistIntelligenceProject } from "./businessCasePersi
 import { activeIntelligenceProjects, isArchivedProject } from "./projectVisibility.js";
 import { dedupeProjects, isSameImportedProject } from "./projectDeduplication.js";
 import { buildBusinessCaseSnapshot } from "./businessCaseSync.js";
+import { catalogueForMasterSave, catalogueWithHistoricalSelections } from "./catalogueIntegrity.js";
 import {
   createOrGetBusinessCaseForOpportunity,
   lookupBusinessCaseForOpportunity,
@@ -103,7 +104,7 @@ export async function loadCloudState(localProjects, includeLocalProjects = true)
   const masterCatalogue = catalogue ? { led: catalogue.led || [], smart: catalogue.smart || [] } : null;
   const cloudProjects = dedupeProjects(activeIntelligenceProjects((projectRows || []).map((row) => {
     const project = projectFromBusinessCaseRow(row);
-    return masterCatalogue ? { ...project, catalogue: masterCatalogue } : project;
+    return masterCatalogue ? { ...project, catalogue: catalogueWithHistoricalSelections(project, masterCatalogue) } : project;
   })));
   if (!includeLocalProjects) return cloudProjects;
   const pendingImports = (localProjects || []).filter((item) =>
@@ -114,7 +115,7 @@ export async function loadCloudState(localProjects, includeLocalProjects = true)
   );
   return dedupeProjects([
     ...cloudProjects,
-    ...pendingImports.map((item) => masterCatalogue ? { ...item, catalogue: masterCatalogue } : item),
+    ...pendingImports.map((item) => masterCatalogue ? { ...item, catalogue: catalogueWithHistoricalSelections(item, masterCatalogue) } : item),
   ]);
 }
 
@@ -123,7 +124,7 @@ export async function saveCloudState(projects) {
   const uniqueProjects = dedupeProjects(projects);
   if (!uniqueProjects.length) return [];
   const promotions = [];
-  const catalogue = uniqueProjects[0].catalogue;
+  const catalogue = catalogueForMasterSave(uniqueProjects[0].catalogue || {});
   const profile = await getCurrentProfile("id,role");
   if (["admin", "vimalux", "sales_manager"].includes(profile?.role)) {
     const { error: catalogueError } = await supabase.rpc("save_intelligence_catalogue", { catalogue_payload: catalogue });
@@ -143,11 +144,17 @@ export async function deleteCloudProject(projectId) {
 }
 
 export async function loadBusinessCase(caseId) {
-  const { data, error } = await supabase.rpc("get_business_case_v2", { case_id: caseId });
+  const [{ data, error }, { data: catalogue, error: catalogueError }] = await Promise.all([
+    supabase.rpc("get_business_case_v2", { case_id: caseId }),
+    supabase.rpc("get_intelligence_catalogue"),
+  ]);
   if (error) throw error;
+  if (catalogueError) throw catalogueError;
   if (!data?.[0]) return null;
   const project = projectFromBusinessCaseRow(data[0]);
-  return isArchivedProject(project) ? null : project;
+  if (isArchivedProject(project)) return null;
+  const masterCatalogue = catalogue ? { led: catalogue.led || [], smart: catalogue.smart || [] } : null;
+  return masterCatalogue ? { ...project, catalogue: catalogueWithHistoricalSelections(project, masterCatalogue) } : project;
 }
 
 export async function getLinkedBusinessCaseId(opportunityId) {
