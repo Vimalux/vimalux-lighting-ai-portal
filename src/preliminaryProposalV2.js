@@ -5,6 +5,7 @@ import { applyWarrantyPricing, warrantyLabel } from "./warranty.js";
 import { calculateBusinessCase } from "./calculations.js";
 import { qualityGateMessage, validateProposalQuality } from "./proposalQuality.js";
 import { transformProposalCustomerText } from "./proposalCustomerVatText.js";
+import { proposalProjectWithCatalogue } from "./proposalContext.js";
 import {
   PDF_FONT,
   alignedTable,
@@ -47,11 +48,15 @@ async function loadContext() {
     : (rows || []).find((item) => String(item.business_case_code || "").toUpperCase() === code);
   if (!row) throw new Error("Business Case not found.");
   if (!row.crm_opportunity_id) throw new Error("Business Case must be linked to CRM before a proposal can be published.");
+  const { data: catalogue, error: catalogueError } = await supabase.rpc("get_intelligence_catalogue");
+  if (catalogueError) throw catalogueError;
+  const hydratedProject = proposalProjectWithCatalogue(row, catalogue);
+  const hydratedRow = { ...row, intelligence_data: hydratedProject };
   const { data: history, error: historyError } = await supabase.rpc("get_proposal_history", { opportunity_id: row.crm_opportunity_id });
   if (historyError) throw historyError;
   const previous = (history || []).filter((item) => item.proposal_type === "preliminary" && item.source === "intelligence");
   const version = previous.reduce((max, item) => Math.max(max, Number(item.version) || 0), 0) + 1;
-  return { row, version };
+  return { row: hydratedRow, version };
 }
 
 function filename(code, version) {
@@ -102,7 +107,7 @@ function generatePdf(row, version) {
   const annualFee = Number(result.annualCustomerPayment ?? result.annualOpex) || 0;
   const maintSaving = maintenanceSaving(project);
   const energySaving = Number(result.annualEnergySavingEUR) || 0;
-  const netBenefit = Number(result.annualCustomerNetBenefit) || (energySaving + maintSaving - annualFee);
+  const netBenefit = Number(calculated.customerCashAnnualNetBenefit ?? result.annualCustomerNetBenefit) || (energySaving + maintSaving - annualFee);
   const capexBreakdown = buildCustomerCapexRows(project, Number(result.capex) || 0, lang, result.additionalCapexSales);
   const dealType = String(calculated.dealType || project.assumptions?.dealType || "cash").toLowerCase();
   const isLaaS = dealType === "noleggio_operativo";
@@ -118,6 +123,7 @@ function generatePdf(row, version) {
       ? (it ? "Pagamento annuale totale cliente" : "Total annual customer payment")
       : (it ? "OPEX annuale Smart / CMS" : "Annual Smart / CMS OPEX");
   const monthlyCustomerPayment = Math.max(0, Number(calculated.monthlyPayment) || annualFee / 12);
+  const grossMonthlyCustomerPayment = Math.max(monthlyCustomerPayment, Number(calculated.customerGrossMonthlyPayment) || monthlyCustomerPayment);
   const monthlyFinancingPayment = Math.max(0, Number(calculated.financingMonthlyPayment) || 0);
   const monthlyServiceOpex = Math.max(0, Number(calculated.totalAnnualOpex) || 0) / 12;
 
@@ -171,7 +177,7 @@ function generatePdf(row, version) {
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 8, theme: "grid",
     head: [[customerText(it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit"), it ? "Riduzione energia" : "Energy reduction", it ? "Riduzione CO2" : "CO2 reduction", isFinanced ? (it ? "Payback operativo (escl. finanziamento)" : "Operational payback (excl. financing)") : "Payback", customerText(it ? `VAN beneficio Comune (${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} anni)` : `Municipality-benefit NPV (${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} years)`) ]],
-    body: [[money(netBenefit, lang), `${number(result.energyReductionPct, 1, lang)}%`, `${number(result.co2ReductionTons, 1, lang)} t/${it ? "anno" : "yr"}`, result.paybackYears == null ? "-" : `${number(result.paybackYears, 1, lang)} ${it ? "anni" : "years"}`, money(result.npv, lang)]],
+    body: [[money(netBenefit, lang), `${number(result.energyReductionPct, 1, lang)}%`, `${number(result.co2ReductionTons, 1, lang)} t/${it ? "anno" : "yr"}`, result.paybackYears == null ? "-" : `${number(result.paybackYears, 1, lang)} ${it ? "anni" : "years"}`, money(calculated.customerCashNpv ?? result.npv, lang)]],
     headStyles: tableHead, styles: { font: "helvetica", fontSize: 7.1, cellPadding: 2 },
     ...alignedTable({ 0: "right", 1: "right", 2: "right", 3: "right", 4: "right" }),
   });
@@ -202,11 +208,13 @@ function generatePdf(row, version) {
       [annualPaymentLabel, money(annualFee, lang)],
       ...(isLaaS ? [
         [it ? "Canone mensile LaaS / Noleggio tutto incluso - netto IVA" : "Monthly all-inclusive LaaS / lease payment - excl. VAT", money(monthlyCustomerPayment, lang)],
+        [it ? "Canone mensile lordo cliente" : "Gross monthly customer payment", money(grossMonthlyCustomerPayment, lang)],
         [it ? "OPEX servizi / mese (incluso nel canone)" : "Service OPEX / month (included in payment)", money(monthlyServiceOpex, lang)],
       ] : isFinance ? [
         [it ? "Rata mensile finanziamento CAPEX" : "Monthly CAPEX financing payment", money(monthlyFinancingPayment, lang)],
         [it ? "OPEX servizi / mese" : "Service OPEX / month", money(monthlyServiceOpex, lang)],
         [it ? "Pagamento mensile totale cliente" : "Total monthly customer payment", money(monthlyCustomerPayment, lang)],
+        [it ? "Pagamento mensile lordo cliente" : "Gross monthly customer payment", money(grossMonthlyCustomerPayment, lang)],
       ] : []),
       [it ? "Durata CMS" : "CMS service term", `${contractYears} ${it ? "anni" : "years"}`],
       ...(project.solution?.powerAidEnabled ? [[it ? "Durata Adaptive Dimming" : "Adaptive Dimming service term", `${powerAidYears} ${it ? "anni" : "years"}`]] : []),

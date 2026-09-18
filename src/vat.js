@@ -82,3 +82,54 @@ export function calculateVatSummary(project = {}, result = {}) {
     municipalityNpv,
   };
 }
+
+export function applyCustomerVatCashFlow(project = {}, result = {}) {
+  const settings = vatSettings(project);
+  const unrecoverableShare = 1 - settings.recoverablePercent / 100;
+  const energyRate = pct(project.assumptions?.vatEnergyPercent ?? settings.hardwareRate);
+  const maintenanceRate = pct(settings.maintenanceRate);
+  const digitalRate = pct(settings.digitalRate);
+  const hardwareRate = pct(settings.hardwareRate);
+  const discountRate = positive(project.assumptions?.discountRate) / 100;
+  const summary = calculateVatSummary(project, result);
+  const netRows = Array.isArray(result.cashFlowRows) ? result.cashFlowRows : [];
+  const initialNet = result.dealType === "cash" ? positive(result.totalCapex) : positive(project.assumptions?.upfrontPayment);
+  const initialVat = result.dealType === "cash" ? summary.unrecoverableCapexVat : initialNet * hardwareRate * unrecoverableShare;
+  let cumulative = -(initialNet + initialVat);
+  let npv = cumulative;
+
+  const customerCashFlowRows = netRows.map((row) => {
+    const netMaintenance = positive(row.maintenanceSavingEUR);
+    const netEnergy = Math.max(0, positive(row.grossBenefit) - netMaintenance);
+    const benefitVat = (netEnergy * energyRate + netMaintenance * maintenanceRate) * unrecoverableShare;
+    const customerGrossBenefit = positive(row.grossBenefit) + benefitVat;
+    const netService = result.dealType === "noleggio_operativo" ? positive(row.opex) : positive(row.serviceOpex);
+    const netPayment = positive(row.payment);
+    const serviceWithinPayment = result.dealType === "noleggio_operativo" ? Math.min(netPayment, netService) : 0;
+    const hardwarePayment = result.dealType === "noleggio_operativo" ? Math.max(0, netPayment - serviceWithinPayment) : netPayment;
+    const billableService = result.dealType === "noleggio_operativo" ? serviceWithinPayment : netService;
+    const paymentVat = (hardwarePayment * hardwareRate + billableService * digitalRate) * unrecoverableShare;
+    const customerGrossPayment = netPayment + (result.dealType === "noleggio_operativo" ? paymentVat : hardwarePayment * hardwareRate * unrecoverableShare);
+    const customerGrossServiceOpex = result.dealType === "noleggio_operativo" ? 0 : netService * (1 + digitalRate * unrecoverableShare);
+    const customerNetCashFlow = customerGrossBenefit - customerGrossPayment - customerGrossServiceOpex;
+    cumulative += customerNetCashFlow;
+    npv += customerNetCashFlow / Math.pow(1 + discountRate, positive(row.year));
+    return { ...row, netGrossBenefit: positive(row.grossBenefit), netContractedCustomerPayment: positive(row.contractedCustomerPayment), benefitVat, paymentVat, customerGrossBenefit, customerGrossPayment, customerGrossServiceOpex, customerNetCashFlow, customerCumulative: cumulative };
+  });
+
+  const first = customerCashFlowRows[0];
+  const customerCashAnnualNetBenefit = first?.customerNetCashFlow ?? Number(result.customerAnnualNetBenefit || 0);
+  const customerCashDecisionStatus = npv > 0 && customerCashAnnualNetBenefit >= 0 ? "GO" : npv > 0 || customerCashAnnualNetBenefit >= 0 ? "REVIEW" : "NO_GO";
+  return {
+    ...result,
+    vatSummary: summary,
+    customerCashFlowRows,
+    customerGrossAnnualBenefit: first?.customerGrossBenefit ?? positive(result.grossBenefit),
+    customerGrossAnnualPayment: first ? first.customerGrossPayment + first.customerGrossServiceOpex : positive(result.customerAnnualPayment),
+    customerGrossMonthlyPayment: first ? (first.customerGrossPayment + first.customerGrossServiceOpex) / 12 : positive(result.customerMonthlyPayment),
+    customerCashAnnualNetBenefit,
+    customerCashDecisionStatus,
+    customerCashNpv: npv,
+    customerCashLifecycleResult: cumulative,
+  };
+}

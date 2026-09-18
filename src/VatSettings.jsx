@@ -32,6 +32,7 @@ export default function VatSettings({ p, r, update }) {
       <label><span>{it ? "IVA recuperabile dal cliente" : "VAT recoverable by customer"}</span><select value={a.vatRecoverability || "non_deductible"} onChange={(e) => update(["assumptions","vatRecoverability"], e.target.value)}><option value="non_deductible">{it ? "0% · Non recuperabile" : "0% · Non-recoverable"}</option><option value="deductible">{it ? "100% · Recuperabile" : "100% · Recoverable"}</option><option value="partial">{it ? "Parziale / manuale" : "Partial / manual"}</option></select></label>
       {a.vatRecoverability === "partial" && <label><span>{it ? "% IVA recuperabile" : "% recoverable VAT"}</span><Numeric value={a.vatRecoverablePercent ?? 0} onChange={(v) => update(["assumptions","vatRecoverablePercent"], v)} /></label>}
       <label><span>{it ? "IVA hardware / retrofit %" : "Hardware / retrofit VAT %"}</span><Numeric value={a.vatHardwarePercent ?? 22} onChange={(v) => update(["assumptions","vatHardwarePercent"], v)} /></label>
+      <label><span>{it ? "IVA energia %" : "Energy VAT %"}</span><Numeric value={a.vatEnergyPercent ?? 22} onChange={(v) => update(["assumptions","vatEnergyPercent"], v)} /></label>
       <label><span>{it ? "IVA software / servizi digitali %" : "Software / digital services VAT %"}</span><Numeric value={a.vatDigitalPercent ?? 22} onChange={(v) => update(["assumptions","vatDigitalPercent"], v)} /></label>
       <label><span>{it ? "IVA manutenzione %" : "Maintenance VAT %"}</span><Numeric value={a.vatMaintenancePercent ?? 22} onChange={(v) => update(["assumptions","vatMaintenancePercent"], v)} /></label>
       <label><span>{it ? "IVA opere strutturali qualificate %" : "Qualified structural works VAT %"}</span><Numeric value={a.vatStructuralPercent ?? 10} onChange={(v) => update(["assumptions","vatStructuralPercent"], v)} /></label>
@@ -55,14 +56,12 @@ export function VatSummaryCard({ p, r }) {
   const subject = customerVatSubject(p, p.language);
   const money = (value) => formatMoney(value, p.language, p.project.currency);
   const dealType = String(r.dealType || p.assumptions?.dealType || "cash").toLowerCase();
-  const unrecoverableShare = 1 - Number(summary.recoverablePercent || 0) / 100;
+  const customerCashNpv = Number(r.customerCashNpv ?? summary.municipalityNpv) || 0;
   const financingMonthly = Math.max(0, Number(r.financingMonthlyPayment) || 0);
   const serviceMonthly = Math.max(0, Number(r.totalAnnualOpex ?? r.annualOpex) || 0) / 12;
   const totalMonthlyNet = Math.max(0, Number(r.monthlyPayment) || financingMonthly + serviceMonthly);
-  const financingVatMonthly = financingMonthly * Number(summary.hardwareRate || 0) / 100 * unrecoverableShare;
-  const serviceVatMonthly = serviceMonthly * Number(summary.digitalRate || 0) / 100 * unrecoverableShare;
-  const unrecoverableMonthlyVat = financingVatMonthly + serviceVatMonthly;
-  const totalMonthlyGross = totalMonthlyNet + unrecoverableMonthlyVat;
+  const totalMonthlyGross = Math.max(totalMonthlyNet, Number(r.customerGrossMonthlyPayment) || totalMonthlyNet);
+  const unrecoverableMonthlyVat = Math.max(0, totalMonthlyGross - totalMonthlyNet);
 
   if (dealType === "noleggio_operativo") {
     return <section className="card">
@@ -72,7 +71,7 @@ export function VatSummaryCard({ p, r }) {
         <div className="kpi"><span>{it ? "IVA mensile non recuperabile" : "Unrecoverable monthly VAT"}</span><strong>{money(unrecoverableMonthlyVat)}</strong></div>
         <div className="kpi"><span>{it ? "Canone mensile lordo cliente" : "Gross monthly customer payment"}</span><strong>{money(totalMonthlyGross)}</strong></div>
         <div className="kpi"><span>{it ? "CAPEX progetto / investimento finanziato" : "Project CAPEX / financed investment"}</span><strong>{money(summary.capexNet)}</strong></div>
-        <div className="kpi"><span>{it ? `VAN ${subject}` : `${subject} NPV`}</span><strong>{money(summary.municipalityNpv)}</strong></div>
+        <div className="kpi"><span>{it ? `VAN ${subject}` : `${subject} NPV`}</span><strong>{money(customerCashNpv)}</strong></div>
       </div>
     </section>;
   }
@@ -86,7 +85,7 @@ export function VatSummaryCard({ p, r }) {
         <div className="kpi"><span>{it ? "Pagamento mensile netto totale" : "Total net monthly payment"}</span><strong>{money(totalMonthlyNet)}</strong></div>
         <div className="kpi"><span>{it ? "IVA mensile non recuperabile" : "Unrecoverable monthly VAT"}</span><strong>{money(unrecoverableMonthlyVat)}</strong></div>
         <div className="kpi"><span>{it ? "Pagamento mensile lordo totale" : "Total gross monthly payment"}</span><strong>{money(totalMonthlyGross)}</strong></div>
-        <div className="kpi"><span>{it ? `VAN ${subject}` : `${subject} NPV`}</span><strong>{money(summary.municipalityNpv)}</strong></div>
+        <div className="kpi"><span>{it ? `VAN ${subject}` : `${subject} NPV`}</span><strong>{money(customerCashNpv)}</strong></div>
       </div>
     </section>;
   }
@@ -99,7 +98,7 @@ export function VatSummaryCard({ p, r }) {
       <div className="kpi"><span>{it ? "IVA non recuperabile" : "Unrecoverable VAT"}</span><strong>{money(summary.unrecoverableCapexVat)}</strong></div>
       <div className="kpi"><span>{it ? `CAPEX lordo ${subject}` : `${subject} gross CAPEX`}</span><strong>{money(summary.municipalityCapexCash)}</strong></div>
       <div className="kpi"><span>{it ? `Payback ${subject}` : `${subject} payback`}</span><strong>{payback}</strong></div>
-      <div className="kpi"><span>{it ? `VAN ${subject}` : `${subject} NPV`}</span><strong>{money(summary.municipalityNpv)}</strong></div>
+      <div className="kpi"><span>{it ? `VAN ${subject}` : `${subject} NPV`}</span><strong>{money(customerCashNpv)}</strong></div>
     </div>
   </section>;
 }

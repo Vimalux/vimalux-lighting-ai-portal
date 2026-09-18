@@ -49,10 +49,14 @@ export function buildBusinessCaseSnapshot(project, calculatedAt = new Date().toI
     tcv: result.totalContractRevenue,
     arr: result.annualRecurringRevenue,
     mrr: result.monthlyRecurringRevenue ?? result.annualRecurringRevenue / 12,
-    annualCustomerNetBenefit: result.customerAnnualNetBenefit,
+    annualCustomerNetBenefit: result.customerCashAnnualNetBenefit ?? result.customerAnnualNetBenefit,
+    annualCustomerNetBenefitExclVat: result.customerAnnualNetBenefit,
+    annualCustomerPaymentGross: result.customerGrossAnnualPayment ?? result.customerAnnualPayment,
+    monthlyCustomerPaymentGross: result.customerGrossMonthlyPayment ?? result.customerMonthlyPayment,
     paybackYears: result.payback,
-    npv: result.npv,
-    lifecycleResult: result.lifecycleResult,
+    npv: result.customerCashNpv ?? result.npv,
+    npvExclVat: result.npv,
+    lifecycleResult: result.customerCashLifecycleResult ?? result.lifecycleResult,
 
     annualEnergyCostBefore: positive(result.baselineKwh) * energyPrice,
     annualEnergyCostAfter: positive(result.finalKwh) * energyPrice,
@@ -70,7 +74,7 @@ export function buildBusinessCaseSnapshot(project, calculatedAt = new Date().toI
     powerAidCustomerFee: result.powerAidCustomerFee,
     powerAidSupplierCost: result.powerAidSupplierCost,
     powerAidVimaluxMargin: result.powerAidVimaluxMargin,
-    goStatus: result.customerDecisionStatus,
+    goStatus: result.customerCashDecisionStatus ?? result.customerDecisionStatus,
   };
   if (!legacyKpis) return calculated;
   const imported = Object.fromEntries(Object.entries(legacyKpis).filter(([, value]) => value != null && Number.isFinite(Number(value))));
