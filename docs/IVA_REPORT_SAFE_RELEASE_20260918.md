@@ -14,8 +14,7 @@ The Feletto report error had a separate cause. `Genera PDF` used the active Busi
 
 - Added a customer VAT cash-flow layer without changing VIMALUX net prices, revenue, margin or financing calculations.
 - Added VAT-aware annual gross benefit, gross customer payment, annual net cash flow, cumulative cash flow and customer NPV.
-- Energy and avoided maintenance VAT are treated symmetrically with the customer's new payments; recoverability is applied to both sides.
-- Added a separately configurable energy VAT rate, defaulting to 22% when not stored.
+- Energy and maintenance savings remain on the Business Case's net-of-VAT basis. Only non-recoverable VAT on the customer's new payments reduces customer cash flow.
 - Kept explicit net and gross customer payment fields so LaaS/finance reports do not mix bases.
 - Updated CRM Business Case snapshots and customer PDFs to use customer cash-flow benefit/NPV while retaining net-of-VAT audit fields.
 - Hydrated the Preliminary Proposal project with the master catalogue plus selected historical products before technical quality validation.

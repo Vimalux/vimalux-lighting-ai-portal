@@ -86,8 +86,6 @@ export function calculateVatSummary(project = {}, result = {}) {
 export function applyCustomerVatCashFlow(project = {}, result = {}) {
   const settings = vatSettings(project);
   const unrecoverableShare = 1 - settings.recoverablePercent / 100;
-  const energyRate = pct(project.assumptions?.vatEnergyPercent ?? settings.hardwareRate);
-  const maintenanceRate = pct(settings.maintenanceRate);
   const digitalRate = pct(settings.digitalRate);
   const hardwareRate = pct(settings.hardwareRate);
   const discountRate = positive(project.assumptions?.discountRate) / 100;
@@ -101,9 +99,11 @@ export function applyCustomerVatCashFlow(project = {}, result = {}) {
   const customerCashFlowRows = netRows.map((row) => {
     const netMaintenance = positive(row.maintenanceSavingEUR);
     const netEnergy = Math.max(0, positive(row.grossBenefit) - netMaintenance);
-    const benefitVat = (netEnergy * energyRate + netMaintenance * maintenanceRate) * unrecoverableShare;
-    const customerGrossEnergyBenefit = netEnergy * (1 + energyRate * unrecoverableShare);
-    const customerGrossMaintenanceBenefit = netMaintenance * (1 + maintenanceRate * unrecoverableShare);
+    // Savings stay on the commercial net-of-VAT basis used by the Business Case.
+    // Only non-recoverable VAT on the customer's new payments affects cash flow.
+    const benefitVat = 0;
+    const customerGrossEnergyBenefit = netEnergy;
+    const customerGrossMaintenanceBenefit = netMaintenance;
     const customerGrossBenefit = customerGrossEnergyBenefit + customerGrossMaintenanceBenefit;
     const netService = result.dealType === "noleggio_operativo" ? positive(row.opex) : positive(row.serviceOpex);
     const netPayment = positive(row.payment);

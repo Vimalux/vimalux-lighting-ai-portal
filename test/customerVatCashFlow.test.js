@@ -22,6 +22,8 @@ test("municipality analysis uses gross customer payment and VAT-aware cash flow"
   assert.ok(result.customerGrossMonthlyPayment > result.monthlyPayment);
   assert.equal(result.customerCashFlowRows.length, result.cashFlowRows.length);
   assert.equal(result.customerCashAnnualNetBenefit, result.customerCashFlowRows[0].customerNetCashFlow);
+  assert.ok(Math.abs(result.customerGrossAnnualBenefit - result.grossBenefit) < 1e-9);
+  assert.ok(result.customerCashAnnualNetBenefit < result.customerAnnualNetBenefit);
   assert.notEqual(result.customerCashNpv, result.npv);
 });
 
@@ -39,5 +41,5 @@ test("economic analysis binds the municipality customer-cash fields", () => {
   assert.equal(analysis.customerAnnualNetBenefit, net.customerCashAnnualNetBenefit);
   assert.equal(analysis.npv, net.customerCashNpv);
   assert.equal(analysis.cashFlowRows[0].netCashFlow, net.customerCashFlowRows[0].customerNetCashFlow);
-  assert.ok(analysis.grossBenefit > net.grossBenefit);
+  assert.ok(Math.abs(analysis.grossBenefit - net.grossBenefit) < 1e-9);
 });

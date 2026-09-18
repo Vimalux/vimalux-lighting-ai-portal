@@ -130,7 +130,6 @@ const numeric = new Set([
   "minimumMarginPercent",
   "vatRecoverablePercent",
   "vatHardwarePercent",
-  "vatEnergyPercent",
   "vatDigitalPercent",
   "vatMaintenancePercent",
   "vatStructuralPercent",
