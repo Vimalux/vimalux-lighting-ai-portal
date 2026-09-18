@@ -19,6 +19,7 @@ import AdditionalCostsCard from "./AdditionalCostsCard.jsx";
 import WarrantySelector from "./WarrantySelector.jsx";
 import VatSettings, { VatSummaryCard } from "./VatSettings.jsx";
 import { applyWarrantyPricing } from "./warranty.js";
+import { customerAnalysisResult } from "./vat.js";
 import CatalogueExtended from "./CatalogueExtended.jsx";
 import ProcurementPanel from "./ProcurementPanel.jsx";
 import usePersistentNavigation from "./usePersistentNavigation.js";
@@ -173,7 +174,8 @@ export default function App() {
       favicon.setAttribute("type", "image/svg+xml");
     }
   }, [view]);
-  const result = useMemo(() => calculateBusinessCase(applyWarrantyPricing(project)), [project]);
+  const calculatedResult = useMemo(() => calculateBusinessCase(applyWarrantyPricing(project)), [project]);
+  const result = useMemo(() => ["business", "report"].includes(view) ? customerAnalysisResult(calculatedResult) : calculatedResult, [calculatedResult, view]);
   const syncedProjects = useMemo(() => projects.map((item) => syncBusinessCaseResult(item, item.updatedAt || item.createdAt)), [projects]);
   const syncedProject = syncedProjects.find((item) => item.id === project.id) || syncBusinessCaseResult(project, project.updatedAt || project.createdAt);
   useEffect(() => localStorage.setItem("vimalux-intelligence-projects", JSON.stringify(projects)), [projects]);

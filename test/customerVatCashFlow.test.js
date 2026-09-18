@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { calculateBusinessCase } from "../src/calculations.js";
 import { defaultProject } from "../src/model.js";
+import { customerAnalysisResult } from "../src/vat.js";
 
 function projectFor(customerType, recoverability) {
   const project = defaultProject({ applyStoredDefaults: false });
@@ -29,4 +30,14 @@ test("fully recoverable ESCO cash flow remains equal to net analysis", () => {
   assert.equal(result.customerGrossMonthlyPayment, result.monthlyPayment);
   assert.ok(Math.abs(result.customerCashAnnualNetBenefit - result.customerAnnualNetBenefit) < 1e-9);
   assert.ok(Math.abs(result.customerCashNpv - result.npv) < 1e-9);
+});
+
+test("economic analysis binds the municipality customer-cash fields", () => {
+  const net = calculateBusinessCase(projectFor("municipality", "non_deductible"));
+  const analysis = customerAnalysisResult(net);
+  assert.equal(analysis.monthlyPayment, net.customerGrossMonthlyPayment);
+  assert.equal(analysis.customerAnnualNetBenefit, net.customerCashAnnualNetBenefit);
+  assert.equal(analysis.npv, net.customerCashNpv);
+  assert.equal(analysis.cashFlowRows[0].netCashFlow, net.customerCashFlowRows[0].customerNetCashFlow);
+  assert.ok(analysis.grossBenefit > net.grossBenefit);
 });

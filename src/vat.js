@@ -102,7 +102,9 @@ export function applyCustomerVatCashFlow(project = {}, result = {}) {
     const netMaintenance = positive(row.maintenanceSavingEUR);
     const netEnergy = Math.max(0, positive(row.grossBenefit) - netMaintenance);
     const benefitVat = (netEnergy * energyRate + netMaintenance * maintenanceRate) * unrecoverableShare;
-    const customerGrossBenefit = positive(row.grossBenefit) + benefitVat;
+    const customerGrossEnergyBenefit = netEnergy * (1 + energyRate * unrecoverableShare);
+    const customerGrossMaintenanceBenefit = netMaintenance * (1 + maintenanceRate * unrecoverableShare);
+    const customerGrossBenefit = customerGrossEnergyBenefit + customerGrossMaintenanceBenefit;
     const netService = result.dealType === "noleggio_operativo" ? positive(row.opex) : positive(row.serviceOpex);
     const netPayment = positive(row.payment);
     const serviceWithinPayment = result.dealType === "noleggio_operativo" ? Math.min(netPayment, netService) : 0;
@@ -114,7 +116,7 @@ export function applyCustomerVatCashFlow(project = {}, result = {}) {
     const customerNetCashFlow = customerGrossBenefit - customerGrossPayment - customerGrossServiceOpex;
     cumulative += customerNetCashFlow;
     npv += customerNetCashFlow / Math.pow(1 + discountRate, positive(row.year));
-    return { ...row, netGrossBenefit: positive(row.grossBenefit), netContractedCustomerPayment: positive(row.contractedCustomerPayment), benefitVat, paymentVat, customerGrossBenefit, customerGrossPayment, customerGrossServiceOpex, customerNetCashFlow, customerCumulative: cumulative };
+    return { ...row, netGrossBenefit: positive(row.grossBenefit), netContractedCustomerPayment: positive(row.contractedCustomerPayment), benefitVat, paymentVat, customerGrossEnergyBenefit, customerGrossMaintenanceBenefit, customerGrossBenefit, customerGrossPayment, customerGrossServiceOpex, customerNetCashFlow, customerCumulative: cumulative };
   });
 
   const first = customerCashFlowRows[0];
@@ -131,5 +133,32 @@ export function applyCustomerVatCashFlow(project = {}, result = {}) {
     customerCashDecisionStatus,
     customerCashNpv: npv,
     customerCashLifecycleResult: cumulative,
+  };
+}
+
+export function customerAnalysisResult(result = {}) {
+  const first = result.customerCashFlowRows?.[0];
+  if (!first) return result;
+  const allInclusive = result.dealType === "noleggio_operativo";
+  const serviceScale = positive(result.totalAnnualOpex) > 0 ? first.customerGrossServiceOpex / positive(result.totalAnnualOpex) : 1;
+  return {
+    ...result,
+    customerMonthlyPaymentNet: positive(result.monthlyPayment),
+    customerAnnualPaymentNet: positive(result.customerAnnualPayment),
+    monthlyPayment: result.customerGrossMonthlyPayment,
+    customerMonthlyPayment: result.customerGrossMonthlyPayment,
+    customerAnnualPayment: result.customerGrossAnnualPayment,
+    allInclusiveAnnualPayment: allInclusive ? result.customerGrossAnnualPayment : result.allInclusiveAnnualPayment,
+    financingAnnualPayment: result.dealType === "finance" ? first.customerGrossPayment : result.financingAnnualPayment,
+    fixedAnnualOpex: allInclusive ? 0 : positive(result.fixedAnnualOpex) * serviceScale,
+    powerAidCustomerFee: allInclusive ? 0 : positive(result.powerAidCustomerFee) * serviceScale,
+    energySaving: first.customerGrossEnergyBenefit,
+    maintenanceSaving: first.customerGrossMaintenanceBenefit,
+    grossBenefit: first.customerGrossBenefit,
+    customerAnnualNetBenefit: result.customerCashAnnualNetBenefit,
+    npv: result.customerCashNpv,
+    lifecycleResult: result.customerCashLifecycleResult,
+    customerDecisionStatus: result.customerCashDecisionStatus,
+    cashFlowRows: result.customerCashFlowRows.map((row) => ({ ...row, grossBenefit: row.customerGrossBenefit, serviceOpex: row.customerGrossServiceOpex, opex: row.customerGrossServiceOpex, payment: row.customerGrossPayment, netCashFlow: row.customerNetCashFlow, cumulative: row.customerCumulative })),
   };
 }

@@ -59,7 +59,7 @@ export function VatSummaryCard({ p, r }) {
   const customerCashNpv = Number(r.customerCashNpv ?? summary.municipalityNpv) || 0;
   const financingMonthly = Math.max(0, Number(r.financingMonthlyPayment) || 0);
   const serviceMonthly = Math.max(0, Number(r.totalAnnualOpex ?? r.annualOpex) || 0) / 12;
-  const totalMonthlyNet = Math.max(0, Number(r.monthlyPayment) || financingMonthly + serviceMonthly);
+  const totalMonthlyNet = Math.max(0, Number(r.customerMonthlyPaymentNet ?? r.monthlyPayment) || financingMonthly + serviceMonthly);
   const totalMonthlyGross = Math.max(totalMonthlyNet, Number(r.customerGrossMonthlyPayment) || totalMonthlyNet);
   const unrecoverableMonthlyVat = Math.max(0, totalMonthlyGross - totalMonthlyNet);
 
