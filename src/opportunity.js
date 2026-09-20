@@ -165,7 +165,7 @@ export function applyOpportunityToProject(opportunity, existingProject = null) {
       dealType: commercial.financingModel || base.assumptions.dealType,
       financingPeriod: Math.max(1, Math.round(n(commercial.financingPeriodYears) || base.assumptions.financingPeriod)),
       serviceAgreementPeriod: Math.max(1, Math.round(n(commercial.serviceAgreementPeriodYears) || base.assumptions.serviceAgreementPeriod)),
-      analysisPeriod: Math.max(1, Math.round(n(commercial.analysisPeriodYears) || base.assumptions.analysisPeriod)),
+      analysisPeriod: Math.max(1, Math.round(n(commercial.serviceAgreementPeriodYears) || base.assumptions.serviceAgreementPeriod)),
     },
     crm: {
       ...base.crm,

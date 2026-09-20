@@ -33,7 +33,6 @@ const groups = [
       ["serviceAgreementPeriod", "Durata servizi CMS (anni)"],
       ["powerAidServicePeriod", "Durata Adaptive Dimming (anni)"],
       ["financingPeriod", "Periodo finanziamento (anni)"],
-      ["analysisPeriod", "Periodo di analisi (anni)"],
       ["interestRate", "Tasso interesse (%)"],
       ["upfrontPayment", "Anticipo"],
       ["energyEscalation", "Aumento energia (%)"],
@@ -111,6 +110,7 @@ function modal() {
       if (Number.isFinite(parsed)) values[key] = parsed;
     });
     values.serviceAgreementPeriod = Math.max(1, Math.round(Number(values.serviceAgreementPeriod) || 10));
+    values.analysisPeriod = values.serviceAgreementPeriod;
     values.powerAidServicePeriod = Math.max(1, Math.min(values.serviceAgreementPeriod, Math.round(Number(values.powerAidServicePeriod) || 10)));
     values.financingYears = values.financingPeriod;
     values.contractYears = values.serviceAgreementPeriod;

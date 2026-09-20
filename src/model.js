@@ -23,7 +23,7 @@ export const BASE_ASSUMPTIONS = {
   financingPeriod: 5,
   serviceAgreementPeriod: 10,
   powerAidServicePeriod: 10,
-  analysisPeriod: 20,
+  analysisPeriod: 10,
   contractYears: 10,
   financingYears: 5,
   rateProfileId: "custom",
@@ -72,6 +72,7 @@ export function readStoredDefaultAssumptions() {
     const merged = { ...BASE_ASSUMPTIONS, ...safe };
     merged.financingYears = merged.financingPeriod;
     merged.contractYears = merged.serviceAgreementPeriod;
+    merged.analysisPeriod = merged.serviceAgreementPeriod;
     merged.powerAidServicePeriod = Math.max(1, Math.min(merged.serviceAgreementPeriod, Math.round(numberValue(merged.powerAidServicePeriod) || 10)));
     merged.interestRateSnapshot = {
       profileId: merged.rateProfileId || "custom",
@@ -257,7 +258,10 @@ export function migrateProject(saved) {
   // Legacy projects did not have a separate PowerAiD duration. Keep the historic 10-year PowerAiD default,
   // while never allowing PowerAiD to outlive the CMS/core Smart service it depends on.
   project.assumptions.powerAidServicePeriod = Math.max(1, Math.min(project.assumptions.serviceAgreementPeriod, Math.round(savedPowerAidServicePeriod || Math.min(10, project.assumptions.serviceAgreementPeriod))));
-  project.assumptions.analysisPeriod = Math.max(1, Math.round(numberValue(saved?.assumptions?.analysisPeriod) || Math.max(legacyContractYears, 20)));
+  // Customer analysis, VAN, charts and reports always follow the contracted
+  // service horizon. Historical/imported standalone analysis periods are
+  // normalized here so cloud, local and CRM entry paths cannot diverge.
+  project.assumptions.analysisPeriod = project.assumptions.serviceAgreementPeriod;
   project.assumptions.financingYears = project.assumptions.financingPeriod;
   project.assumptions.contractYears = project.assumptions.serviceAgreementPeriod;
   project.crm.opportunityId = project.crm.opportunityId || "";

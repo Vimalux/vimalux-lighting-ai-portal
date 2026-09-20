@@ -78,6 +78,16 @@ test("legacy projects default PowerAiD to 10 years and clamp it to CMS duration"
   assert.equal(cms5.assumptions.powerAidServicePeriod, 5);
 });
 
+test("project migration makes analysis horizon equal the service term", () => {
+  const project = migrateProject({
+    assumptions: { serviceAgreementPeriod: 10, contractYears: 10, analysisPeriod: 20 },
+    groups: [],
+  });
+  assert.equal(project.assumptions.serviceAgreementPeriod, 10);
+  assert.equal(project.assumptions.contractYears, 10);
+  assert.equal(project.assumptions.analysisPeriod, 10);
+});
+
 test("PowerAiD contract revenue follows PowerAiD term while CMS fixed service follows CMS term", () => {
   const project = smartProject({ cmsYears: 20, powerAidYears: 10 });
   project.assumptions.opexEscalation = 0;

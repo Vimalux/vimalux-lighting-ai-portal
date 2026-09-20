@@ -52,13 +52,13 @@ test("probability weights authoritative TCV and ARR exactly once", () => {
   assert.equal(crmMetrics(project).weightedTcv, 50000);
 });
 
-test("financed periods remain 5 finance, 10 service and 20 analysis", () => {
+test("financed periods keep finance separate while analysis follows service", () => {
   const opportunity = parseOpportunityWorkbook(agentSheet(), "agent").opportunities[0];
   const project = applyOpportunityToProject(opportunity);
   assert.equal(project.assumptions.dealType, "finance");
   assert.equal(project.assumptions.financingPeriod, 5);
   assert.equal(project.assumptions.serviceAgreementPeriod, 10);
-  assert.equal(project.assumptions.analysisPeriod, 20);
+  assert.equal(project.assumptions.analysisPeriod, 10);
 });
 
 test("cash keeps upfront CAPEX and optional service separately", () => {
@@ -105,7 +105,7 @@ test("CRM Preliminary Business Case link prefills authoritative opportunity data
   assert.equal(project.groups[0].existingDimmingPercent, 20);
   assert.equal(project.assumptions.financingPeriod, 5);
   assert.equal(project.assumptions.serviceAgreementPeriod, 10);
-  assert.equal(project.assumptions.analysisPeriod, 20);
+  assert.equal(project.assumptions.analysisPeriod, 10);
 });
 
 test("authoritative Business Case sync updates only the selected opportunity", () => {
