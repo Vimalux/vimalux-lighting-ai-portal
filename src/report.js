@@ -6,6 +6,7 @@ import { aggregateReplacementRows } from "./reportSummary.js";
 import { reportCommercialContext } from "./reportCommercial.js";
 import { warrantyLabel } from "./warranty.js";
 import { contractReportResult } from "./contractReportHorizon.js";
+import { selectedPartnerEquipment } from "./partnerEquipment.js";
 
 export function generateCustomerPdf(project, result) {
   result = contractReportResult(result);
@@ -201,11 +202,16 @@ export function generateCustomerPdf(project, result) {
   });
 
   if (result.smartEnabled) {
+    const partnerHardwareRows = selectedPartnerEquipment(project).map(({ product, quantity }) => [
+      product.supplier || product.brand || (it ? "Partner" : "Partner"),
+      quantity,
+      [product.name || product.id, product.supplierSku || product.sku].filter(Boolean).join(" · "),
+    ]);
     section(it ? "Hardware Smart Lighting" : "Smart Lighting hardware", doc.lastAutoTable.finalY + 9);
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 14,
       head: [[it ? "Componente" : "Component", it ? "Quantità" : "Quantity", it ? "Prodotto" : "Product"]],
-      body: [["LCU", result.lcuQuantity, result.hardware.lcu.name || "-"], ["Gateway", result.hardware.gatewayQty, result.hardware.gateway.name || "-"], ["Antenna", result.hardware.antennaQty, result.hardware.antenna.name || "-"], [it ? "Contatore" : "Energy meter", result.hardware.meterQty, result.hardware.meter.name || "-"]].filter(([, quantity]) => quantity > 0).map(([component, quantity, product]) => [component, formatNumber(quantity, lang), product]),
+      body: [["LCU", result.lcuQuantity, result.hardware.lcu.name || "-"], ["Gateway", result.hardware.gatewayQty, result.hardware.gateway.name || "-"], ["Antenna", result.hardware.antennaQty, result.hardware.antenna.name || "-"], [it ? "Contatore" : "Energy meter", result.hardware.meterQty, result.hardware.meter.name || "-"], ...partnerHardwareRows].filter(([, quantity]) => quantity > 0).map(([component, quantity, product]) => [component, formatNumber(quantity, lang), product]),
       headStyles: { fillColor: [15, 118, 110] },
       styles: { font: "helvetica", fontSize: 8, valign: "middle" },
       columnStyles: { 0: { halign: "left" }, 1: { halign: "right", cellWidth: 32 }, 2: { halign: "left" } },
@@ -222,7 +228,10 @@ export function generateCustomerPdf(project, result) {
     columnStyles: { 0: { halign: "left" }, 1: { halign: "right" } },
   });
 
-  const additionalCostRows = (type, formatter) => (project.additionalCosts || [])
+  // The calculation result also contains virtual rows generated from selected
+  // partner equipment. Use it as the report source so visible line items always
+  // reconcile to the CAPEX/OPEX totals used by the economic analysis.
+  const additionalCostRows = (type, formatter) => (result.additionalCosts?.rows || project.additionalCosts || [])
     .filter((item) => item?.costType === type && Number(item.quantity || 0) * Number(item.unitSalesPrice || 0) > 0)
     .map((item) => {
       const quantity = Number(item.quantity || 0);
