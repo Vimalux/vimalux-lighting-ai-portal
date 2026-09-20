@@ -141,6 +141,18 @@ export function customerAnalysisResult(result = {}) {
   if (!first) return result;
   const allInclusive = result.dealType === "noleggio_operativo";
   const serviceScale = positive(result.totalAnnualOpex) > 0 ? first.customerGrossServiceOpex / positive(result.totalAnnualOpex) : 1;
+  const customerValueRows = Array.isArray(result.customerValueRows)
+    ? result.customerValueRows.map((row, index) => {
+      const customerRow = result.customerCashFlowRows?.[index];
+      if (!customerRow) return row;
+      return {
+        ...row,
+        investmentPayment: customerRow.customerGrossPayment,
+        servicePayment: customerRow.customerGrossServiceOpex,
+        customerSaving: customerRow.customerNetCashFlow,
+      };
+    })
+    : [];
   return {
     ...result,
     customerMonthlyPaymentNet: positive(result.monthlyPayment),
@@ -159,6 +171,7 @@ export function customerAnalysisResult(result = {}) {
     npv: result.customerCashNpv,
     lifecycleResult: result.customerCashLifecycleResult,
     customerDecisionStatus: result.customerCashDecisionStatus,
+    customerValueRows,
     cashFlowRows: result.customerCashFlowRows.map((row) => ({ ...row, grossBenefit: row.customerGrossBenefit, serviceOpex: row.customerGrossServiceOpex, opex: row.customerGrossServiceOpex, payment: row.customerGrossPayment, netCashFlow: row.customerNetCashFlow, cumulative: row.customerCumulative })),
   };
 }

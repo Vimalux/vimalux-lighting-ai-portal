@@ -113,8 +113,15 @@ export function appendCapexProposalPage(doc, project, options = {}) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6.8);
   doc.setTextColor(...muted);
+  const reconciliationNote = detail.adjustment
+    ? (it
+      ? `Differenza calcolata: CAPEX ufficiale ${money(detail.totalCapex, lang)} meno voci dettagliate ${money(detail.itemizedBeforeAdjustment, lang)} = ${money(detail.adjustment, lang)}. Non è una voce autonoma: deve essere allocata o confermata nell'offerta definitiva.`
+      : `Calculated difference: official CAPEX ${money(detail.totalCapex, lang)} less itemized detail ${money(detail.itemizedBeforeAdjustment, lang)} = ${money(detail.adjustment, lang)}. It is not a standalone cost and must be allocated or confirmed in the final offer.`)
+    : (it
+      ? `Verifica CAPEX: dettaglio riconciliato al totale Business Case di ${money(detail.totalCapex, lang)}.`
+      : `CAPEX check: itemized detail reconciles to the Business Case total of ${money(detail.totalCapex, lang)}.`);
   doc.text(detail.reconciles
-    ? (it ? `Verifica CAPEX: dettaglio riconciliato al totale Business Case di ${money(detail.totalCapex, lang)}.` : `CAPEX check: itemized detail reconciles to the Business Case total of ${money(detail.totalCapex, lang)}.`)
+    ? reconciliationNote
     : (it ? "Attenzione: il dettaglio CAPEX non riconcilia al totale Business Case." : "Warning: CAPEX detail does not reconcile to the Business Case total."), 14, noteY, { maxWidth: 182 });
 
   return calculated;

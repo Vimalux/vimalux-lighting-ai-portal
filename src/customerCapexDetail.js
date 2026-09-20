@@ -1,3 +1,5 @@
+import { partnerEquipmentPricingRows } from "./partnerEquipment.js";
+
 const safe = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 const positive = (value) => Math.max(0, safe(value));
 
@@ -60,7 +62,26 @@ export function buildCustomerCapexDetail(project, calculated, tolerance = 1) {
   const freight = positive(calculated?.freight);
   if (freight > 0) components.push({ category: "logistics", name: "Trasporto / logistica", quantity: 1, unit: "lotto", unitPrice: freight, total: freight });
 
+  partnerEquipmentPricingRows(project)
+    .filter((row) => row.costType === "capex")
+    .forEach((row) => {
+      const quantity = positive(row.q);
+      const total = positive(row.total);
+      if (!quantity || !total) return;
+      components.push({
+        category: "partner_equipment",
+        name: String(row.label || "Componente partner")
+          .replace(/^Partner\s*·\s*/i, "")
+          .replace(/\s*·\s*implementation$/i, " · Implementazione"),
+        quantity,
+        unit: "pz",
+        unitPrice: total / quantity,
+        total,
+      });
+    });
+
   (project?.additionalCosts || []).forEach((item) => {
+    if (item?.virtualPartnerEquipment) return;
     if (String(item?.costType || "capex").toLowerCase() !== "capex") return;
     const quantity = positive(item?.quantity);
     const unitPrice = positive(item?.unitSalesPrice);
@@ -85,7 +106,7 @@ export function buildCustomerCapexDetail(project, calculated, tolerance = 1) {
   if (Math.abs(adjustment) > tolerance) {
     components.push({
       category: "adjustment",
-      name: adjustment < 0 ? "Adeguamento commerciale / sconto offerta" : "Adeguamento commerciale / offerta ufficiale",
+      name: adjustment < 0 ? "Differenza di riconciliazione / sconto CAPEX ufficiale" : "Differenza di riconciliazione CAPEX ufficiale",
       quantity: 1,
       unit: "lotto",
       unitPrice: adjustment,
@@ -99,6 +120,7 @@ export function buildCustomerCapexDetail(project, calculated, tolerance = 1) {
     luminaires,
     components,
     luminaireSubtotal,
+    itemizedBeforeAdjustment,
     componentSubtotal,
     totalCapex,
     reconciledTotal,

@@ -70,3 +70,47 @@ test("official CAPEX differences are shown as explicit commercial adjustment", (
   assert.equal(detail.reconciles, true);
   assert.equal(detail.reconciledTotal, 950);
 });
+
+test("positive official CAPEX differences are labelled as reconciliation, not a standalone cost", () => {
+  const project = { solution: {}, catalogue: { smart: [] }, additionalCosts: [] };
+  const calculated = {
+    groupRows: [{ upgradeSelected: true, quantity: 10, configuredLedWattage: 40, salesTotal: 1000, product: { id: "lamp", name: "Lamp 40", hybrid: false } }],
+    totalCapex: 1250,
+  };
+  const detail = buildCustomerCapexDetail(project, calculated);
+  const adjustment = detail.components.find((row) => row.category === "adjustment");
+  assert.equal(detail.itemizedBeforeAdjustment, 1000);
+  assert.equal(adjustment.total, 250);
+  assert.match(adjustment.name, /riconciliazione CAPEX ufficiale/i);
+  assert.doesNotMatch(adjustment.name, /adeguamento commerciale/i);
+});
+
+test("selected partner equipment is itemized instead of hidden in a CAPEX reconciliation row", () => {
+  const project = {
+    solution: {
+      partnerEquipment: [
+        { id: "camera", productId: "camera-battery", quantity: 2 },
+        { id: "modem", productId: "lte-modem", quantity: 2 },
+      ],
+    },
+    catalogue: {
+      smart: [
+        { id: "camera-battery", name: "CAMERA SENSOR BATTERY", active: true, supplier: "FELICITY", supplierSku: "HIVE-BATTERY", partnerRoles: ["ADAPTIVE_DIMMING"], salesPrice: 500 },
+        { id: "lte-modem", name: "1xCAM, DC powered, 4G LTE Modem", active: true, supplier: "FELICITY", supplierSku: "FSI-HIVE_LTE-DC-1U", partnerRoles: ["ADAPTIVE_DIMMING"], salesPrice: 2000, implementationSalesPrice: 6 },
+      ],
+    },
+    pricing: { overrides: {} },
+    additionalCosts: [],
+  };
+  const calculated = {
+    groupRows: [{ upgradeSelected: true, quantity: 10, configuredLedWattage: 40, salesTotal: 1000, product: { id: "lamp", name: "Lamp 40", hybrid: false } }],
+    totalCapex: 6012,
+  };
+  const detail = buildCustomerCapexDetail(project, calculated);
+  assert.equal(detail.adjustment, 0);
+  assert.equal(detail.components.filter((row) => row.category === "partner_equipment").reduce((sum, row) => sum + row.total, 0), 5012);
+  assert.equal(detail.components.some((row) => /CAMERA SENSOR BATTERY/.test(row.name) && row.total === 1000), true);
+  assert.equal(detail.components.some((row) => /4G LTE Modem/.test(row.name) && row.total === 4000), true);
+  assert.equal(detail.components.some((row) => /implementazione/i.test(row.name) && row.total === 12), true);
+  assert.equal(detail.reconciles, true);
+});

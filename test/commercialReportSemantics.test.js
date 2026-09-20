@@ -10,8 +10,20 @@ const vatCard = fs.readFileSync(new URL("../src/VatSettings.jsx", import.meta.ur
 test("LaaS proposal uses all-inclusive payment semantics and non-indexed TCV wording", () => {
   assert.match(proposal, /Canone annuale LaaS \/ Noleggio tutto incluso/);
   assert.match(proposal, /Canone mensile LaaS \/ Noleggio tutto incluso/);
+  assert.match(proposal, /Canone annuale LaaS \/ Noleggio tutto incluso - lordo IVA/);
+  assert.match(proposal, /Calcolo beneficio netto/);
   assert.match(proposal, /OPEX servizi \/ mese \(incluso nel canone\)/);
   assert.doesNotMatch(proposal, /TCV \$\{contractYears\} anni, indicizzato/);
+});
+
+test("official CAPEX reconciliation is disclosed as a difference, not a standalone commercial cost", () => {
+  assert.match(capexPage, /Non è una voce autonoma/);
+  assert.match(capexPage, /CAPEX ufficiale/);
+});
+
+test("survey and geolocation are explicitly post-award or separately commissioned", () => {
+  assert.match(proposal, /Dopo l'aggiudicazione, o con incarico separato/);
+  assert.match(proposal, /Il relativo costo non è incluso nel CAPEX/);
 });
 
 test("zero-Hybrid CAPEX page switches to LED-only wording", () => {
@@ -20,7 +32,7 @@ test("zero-Hybrid CAPEX page switches to LED-only wording", () => {
 });
 
 test("LaaS cash-flow labels canone and included OPEX explicitly", () => {
-  assert.match(cashPage, /Canone LaaS \/ Noleggio/);
+  assert.match(cashPage, /Canone lordo IVA/);
   assert.match(cashPage, /OPEX servizi \(incluso\)/);
 });
 

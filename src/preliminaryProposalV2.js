@@ -124,6 +124,7 @@ function generatePdf(row, version) {
       : (it ? "OPEX annuale Smart / CMS" : "Annual Smart / CMS OPEX");
   const monthlyCustomerPayment = Math.max(0, Number(calculated.monthlyPayment) || annualFee / 12);
   const grossMonthlyCustomerPayment = Math.max(monthlyCustomerPayment, Number(calculated.customerGrossMonthlyPayment) || monthlyCustomerPayment);
+  const grossAnnualCustomerPayment = Math.max(annualFee, Number(calculated.customerGrossAnnualPayment) || annualFee);
   const monthlyFinancingPayment = Math.max(0, Number(calculated.financingMonthlyPayment) || 0);
   const monthlyServiceOpex = Math.max(0, Number(calculated.totalAnnualOpex) || 0) / 12;
 
@@ -248,24 +249,39 @@ function generatePdf(row, version) {
 
   y = doc.lastAutoTable.finalY + 6;
   section(it ? "Come si genera il beneficio annuo" : "Annual benefit bridge", y);
+  const annualBenefitRows = [
+    [it ? "Risparmio energia" : "Energy saving", money(energySaving, lang)],
+    ...(hybridBenefitEur > 0 ? [[it ? "di cui Hybrid Solar (già incluso)" : "of which Hybrid Solar (already included)", money(hybridBenefitEur, lang)]] : []),
+    [it ? "Risparmio manutenzione" : "Maintenance saving", money(maintSaving, lang)],
+    [annualPaymentLabel, isFinanced ? money(annualFee, lang) : `(${money(annualFee, lang)})`],
+    ...(isFinanced ? [[
+      isLaaS
+        ? (it ? "Canone annuale LaaS / Noleggio tutto incluso - lordo IVA" : "Annual all-inclusive LaaS / lease payment - incl. VAT")
+        : (it ? "Pagamento annuale totale cliente - lordo IVA" : "Total annual customer payment - incl. VAT"),
+      `(${money(grossAnnualCustomerPayment, lang)})`,
+    ]] : []),
+    [customerText(it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit"), money(netBenefit, lang)],
+  ];
   autoTable(doc, {
     startY: y + 4, theme: "grid", head: [[it ? "Componente" : "Component", it ? "Valore annuo" : "Annual value"]],
-    body: [
-      [it ? "Risparmio energia" : "Energy saving", money(energySaving, lang)],
-      ...(hybridBenefitEur > 0 ? [[it ? "di cui Hybrid Solar (già incluso)" : "of which Hybrid Solar (already included)", money(hybridBenefitEur, lang)]] : []),
-      [it ? "Risparmio manutenzione" : "Maintenance saving", money(maintSaving, lang)],
-      [annualPaymentLabel, `(${money(annualFee, lang)})`],
-      [customerText(it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit"), money(netBenefit, lang)],
-    ],
+    body: annualBenefitRows,
     headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.25 },
     ...alignedTable({ 0: "left", 1: "right" }),
     didParseCell: mergeTableHooks(
       alignedTable({ 0: "left", 1: "right" }).didParseCell,
-      (data) => { if (data.section === "body" && data.row.index === (hybridBenefitEur > 0 ? 4 : 3)) data.cell.styles.fontStyle = "bold"; },
+      (data) => { if (data.section === "body" && data.row.index === annualBenefitRows.length - 1) data.cell.styles.fontStyle = "bold"; },
     ),
   });
 
-  y = doc.lastAutoTable.finalY + 6;
+  if (isFinanced) {
+    doc.setFont("helvetica", "normal"); doc.setFontSize(6.7); doc.setTextColor(...muted);
+    doc.text(it
+      ? `Calcolo beneficio netto: ${money(energySaving, lang)} + ${money(maintSaving, lang)} - ${money(grossAnnualCustomerPayment, lang)} = ${money(netBenefit, lang)}.`
+      : `Net-benefit calculation: ${money(energySaving, lang)} + ${money(maintSaving, lang)} - ${money(grossAnnualCustomerPayment, lang)} = ${money(netBenefit, lang)}.`,
+    14, doc.lastAutoTable.finalY + 4, { maxWidth: 182 });
+  }
+
+  y = doc.lastAutoTable.finalY + (isFinanced ? 9 : 6);
   y = beginSection(it ? "Composizione dell'investimento" : "Investment composition", y, 22);
   autoTable(doc, {
     startY: y + 4,
@@ -310,15 +326,18 @@ function generatePdf(row, version) {
   });
 
   y = doc.lastAutoTable.finalY + 4;
-  y = beginSection(it ? "Passaggio a VIMALUX Planner" : "Transition to VIMALUX Planner", y, 18);
+  y = beginSection(it ? "Passaggio a VIMALUX Planner" : "Transition to VIMALUX Planner", y, 24);
   doc.setFont("helvetica", "normal"); doc.setFontSize(6.8); doc.setTextColor(...navy);
   doc.text(it
-    ? "Prossimo passo: censimento e geolocalizzazione - classificazione UNI 11248 - dimensionamento e ottiche - BOM/logistica - proposta ufficiale Planner."
-    : "Next step: census and geolocation - UNI 11248 classification - sizing and optics - BOM/logistics - official Planner proposal.", 14, y + 5, { maxWidth: 182 });
+    ? "Dopo l'aggiudicazione, o con incarico separato: censimento e geolocalizzazione - classificazione UNI 11248 - dimensionamento e ottiche - BOM/logistica - proposta ufficiale Planner."
+    : "After contract award, or under a separate assignment: census and geolocation - UNI 11248 classification - sizing and optics - BOM/logistics - official Planner proposal.", 14, y + 5, { maxWidth: 182 });
   doc.setFontSize(6.5); doc.setTextColor(...muted);
   doc.text(it
+    ? "Il relativo costo non è incluso nel CAPEX, salvo una voce specifica nel Business Case o nell'offerta definitiva."
+    : "The related cost is not included in CAPEX unless a specific line is included in the Business Case or final offer.", 14, y + 12, { maxWidth: 182 });
+  doc.text(it
     ? `Project ID ${lineage} resterà invariato in Intelligence, Planner e CRM, preservando Business Case, versioni e cronologia.`
-    : `Project ID ${lineage} remains unchanged across Intelligence, Planner and CRM, preserving the Business Case, versions and history.`, 14, y + 10, { maxWidth: 182 });
+    : `Project ID ${lineage} remains unchanged across Intelligence, Planner and CRM, preserving the Business Case, versions and history.`, 14, y + 18, { maxWidth: 182 });
 
   y += 15;
   y = beginSection(it ? "Condizioni e limitazioni" : "Terms & Limitations", y, 18);

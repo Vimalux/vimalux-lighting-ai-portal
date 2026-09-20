@@ -5,6 +5,7 @@ import { repairCostEvolutionProposalPage } from "./proposalCostEvolutionPage.js"
 import { transformProposalCustomerText } from "./proposalCustomerVatText.js";
 import { alignedTable, reportMoney, reportNumber } from "./reportPresentation.js";
 import { contractReportResult } from "./contractReportHorizon.js";
+import { customerAnalysisResult } from "./vat.js";
 
 const safe = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 
@@ -102,7 +103,7 @@ function appendCashFlowPage(doc, project, calculated, options = {}) {
   doc.setTextColor(...teal);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
-  doc.text(it ? `Cash flow economico netto IVA - ${calculated.analysisPeriod} anni` : `Economic cash flow excl. VAT - ${calculated.analysisPeriod} years`, 14, 20);
+  doc.text(it ? `Cash flow economico cliente - ${calculated.analysisPeriod} anni` : `Customer economic cash flow - ${calculated.analysisPeriod} years`, 14, 20);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.2);
   doc.setTextColor(...muted);
@@ -123,8 +124,8 @@ function appendCashFlowPage(doc, project, calculated, options = {}) {
     tableStartY = 76;
   } else {
     doc.text(customerText(it
-      ? "Valori economici al netto IVA. Il grafico mostra il cash flow cumulativo del Comune includendo risparmi, servizi e pagamenti previsti dal modello commerciale selezionato; l’impatto IVA è gestito separatamente nelle impostazioni cliente."
-      : "Economic values exclude VAT. The chart shows cumulative municipality cash flow including savings, services and payments under the selected commercial model; VAT impact is handled separately in the customer settings."),
+      ? "Il grafico mostra il cash flow cumulativo del Comune. I pagamenti includono l'IVA non recuperabile secondo le impostazioni cliente; i risparmi restano sulla base economica configurata nel Business Case."
+      : "The chart shows cumulative municipality cash flow. Payments include non-recoverable VAT according to the customer settings; savings remain on the economic basis configured in the Business Case."),
     14, 28, { maxWidth: 182 });
     lineChart(doc, 14, 36, 182, 83, cashRows, colors);
     tableStartY = 136;
@@ -133,7 +134,7 @@ function appendCashFlowPage(doc, project, calculated, options = {}) {
   doc.setTextColor(...teal);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
-  doc.text(it ? "Cash flow annuale netto IVA" : "Annual cash flow excl. VAT", 14, tableStartY - 6);
+  doc.text(it ? "Cash flow annuale cliente" : "Annual customer cash flow", 14, tableStartY - 6);
 
   autoTable(doc, {
     startY: tableStartY,
@@ -142,7 +143,7 @@ function appendCashFlowPage(doc, project, calculated, options = {}) {
       it ? "Anno" : "Year",
       it ? "Beneficio lordo" : "Gross benefit",
       isLaaS ? (it ? "OPEX servizi (incluso)" : "Service OPEX (included)") : (it ? "Servizi/OPEX" : "Service/OPEX"),
-      isLaaS ? (it ? "Canone LaaS / Noleggio" : "LaaS / lease payment") : isFinance ? (it ? "Rata CAPEX / finanz." : "CAPEX / finance payment") : (it ? "Investimento" : "Investment"),
+      isLaaS ? (it ? "Canone lordo IVA" : "Gross LaaS / lease payment") : isFinance ? (it ? "Rata CAPEX lorda IVA" : "Gross CAPEX / finance payment") : (it ? "Investimento" : "Investment"),
       it ? "Cash flow netto" : "Net cash flow",
       it ? "Cumulativo" : "Cumulative",
     ]],
@@ -176,7 +177,7 @@ function appendCashFlowPage(doc, project, calculated, options = {}) {
 
 export function appendFinalProposalVisualPages(doc, project, options = {}) {
   const calculated = calculateBusinessCase(applyWarrantyPricing(project));
-  const reportCalculated = contractReportResult(calculated);
+  const reportCalculated = contractReportResult(customerAnalysisResult(calculated));
 
   // Rendering-only contract horizon: the underlying economic engine remains unchanged.
   // A shorter financing term still creates the service-only phase inside this period.

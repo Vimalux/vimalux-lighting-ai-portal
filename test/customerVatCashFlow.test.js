@@ -41,5 +41,8 @@ test("economic analysis binds the municipality customer-cash fields", () => {
   assert.equal(analysis.customerAnnualNetBenefit, net.customerCashAnnualNetBenefit);
   assert.equal(analysis.npv, net.customerCashNpv);
   assert.equal(analysis.cashFlowRows[0].netCashFlow, net.customerCashFlowRows[0].customerNetCashFlow);
+  assert.equal(analysis.customerValueRows[0].investmentPayment, net.customerCashFlowRows[0].customerGrossPayment);
+  assert.equal(analysis.customerValueRows[0].servicePayment, net.customerCashFlowRows[0].customerGrossServiceOpex);
+  assert.equal(analysis.customerValueRows[0].customerSaving, net.customerCashFlowRows[0].customerNetCashFlow);
   assert.ok(Math.abs(analysis.grossBenefit - net.grossBenefit) < 1e-9);
 });
