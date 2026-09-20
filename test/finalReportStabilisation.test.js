@@ -51,6 +51,31 @@ test("customer CAPEX additions remain visible, use five report columns and recon
   assert.throws(() => buildCustomerCapexRows(project, 20000, "it", 30050), /exceeds total CAPEX/);
 });
 
+test("Felicity Solution selections reconcile immediately in preliminary proposal CAPEX", () => {
+  const project = {
+    solution: {
+      partnerEquipment: [
+        { id: "camera", partnerRole: "ADAPTIVE_DIMMING", productId: "felicity-camera", quantity: 1 },
+        { id: "battery", partnerRole: "ADAPTIVE_DIMMING", productId: "felicity-battery", quantity: 1 },
+      ],
+    },
+    catalogue: {
+      smart: [
+        { id: "felicity-camera", name: "1xCAM, DC powered, 4G LTE Modem", supplier: "FELICITY", supplierSku: "FSI-HIVE_LTE-DC-1U", active: true, salesPrice: 2000, implementationSalesPrice: 6 },
+        { id: "felicity-battery", name: "CAMERA SENSOR BATTERY", supplier: "FELICITY", supplierSku: "HIVE-BATTERY", active: true, salesPrice: 500 },
+      ],
+    },
+    pricing: { overrides: {} },
+    additionalCosts: [],
+  };
+
+  const breakdown = buildCustomerCapexRows(project, 22780, "it", 2506);
+  assert.equal(breakdown.additionsTotal, 2506);
+  assert.equal(breakdown.baseCapex, 20274);
+  assert.equal(breakdown.rows.some((row) => /4G LTE Modem/.test(row[0]) && row[4] === "2.006 €"), true);
+  assert.equal(breakdown.rows.some((row) => /CAMERA SENSOR BATTERY/.test(row[0]) && row[4] === "500 €"), true);
+});
+
 test("phase stack reconciles exactly to the current-cost baseline", () => {
   const row = {
     year: 1,
@@ -93,6 +118,8 @@ test("report renderer keeps exact active Business Case and safe Planner workflow
   assert.doesNotMatch(preliminarySource, /projects\[0\]/);
   assert.doesNotMatch(preliminarySource, /→|⇒|➜|➝/);
   assert.match(preliminarySource, /censimento e geolocalizzazione - classificazione UNI 11248/);
+  assert.match(preliminarySource, /getLiveBusinessCaseResult\(window\.location\.search\)/);
+  assert.match(preliminarySource, /result_summary: live\?\.result \|\| row\.result_summary/);
 });
 
 test("visual report derives phase values from customerValueRows and not an independent PDF calculation", () => {

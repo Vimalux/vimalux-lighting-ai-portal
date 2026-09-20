@@ -269,10 +269,19 @@ export default function App() {
   }, [cloudReady, session]);
   const update = (path, value) => setProjects((all) => {
     if (isReadOnlyAgentProject) return all;
+    // Resolve the active project inside the functional state update. This
+    // avoids dropping rapid Solution/Adaptive Dimming edits when React batches events
+    // before the outer `project` reference has re-rendered.
+    const currentProject = all.find((item) => item.id === activeId) || all[0] || project;
+    const currentReadOnly = isAgent && currentProject.crm?.agentAccessMode === "read_only";
+    if (currentReadOnly) return all;
     if (isAgent && path[0] === "pricing") return all;
     if (isAgent && path[0] === "assumptions" && !["energyPrice", "operatingHours", "dealType"].includes(path[1])) return all;
     if (isAgent && path[0] === "additionalCosts") {
       if (path.length !== 1 || !Array.isArray(value)) return all;
+      // Keep the agent sanitizer contract while sourcing the project from the
+      // current state snapshot instead of the possibly stale render closure.
+      const project = currentProject;
       value = sanitizeAgentAdditionalCosts(project.additionalCosts, value);
     }
     const changedAt = new Date().toISOString();
@@ -283,7 +292,7 @@ export default function App() {
       const projectName = isOfficial ? String(payload.projectName || "").trim() : "";
       const importedGroups = Array.isArray(payload.groups) ? payload.groups : [];
       return all.map((item) => {
-        if (item.id !== project.id) return item;
+        if (item.id !== currentProject.id) return item;
         const nextGroups = payload.mode === "append" ? [...(item.groups || []), ...importedGroups] : importedGroups;
         let next = { ...item, groups: nextGroups, updatedAt: changedAt, importedTechnical: { ...(item.importedTechnical || {}), fileName: String(payload.fileName || ""), sheetName: String(payload.sheetName || ""), importedAt: changedAt } };
         if (customerName) next.customer = { ...(item.customer || {}), name: customerName };
@@ -294,18 +303,18 @@ export default function App() {
     }
     const normalized = numeric.has(path.at(-1)) ? numberValue(value) : value;
     if (path[0] === "catalogue") {
-      const catalogue = setPath(project, path, normalized).catalogue;
+      const catalogue = setPath(currentProject, path, normalized).catalogue;
       return all.map((p) => migrateProject({ ...p, catalogue, updatedAt: changedAt }));
     }
     return all.map((p) => {
-      if (p.id !== project.id) return p;
+      if (p.id !== currentProject.id) return p;
       let next = setPath({ ...p, updatedAt: changedAt }, path, normalized);
       if (path[0] === "assumptions" && path[1] === "serviceAgreementPeriod") {
         next = setPath(next, ["assumptions", "contractYears"], normalized);
         next = setPath(next, ["assumptions", "analysisPeriod"], normalized);
       }
-      if (path[0] === "solution" && path[1] === "cmsPartner") next = { ...next, solution: changeCmsPartner(p, normalized) };
-      if (path[0] === "solution" && path[1] === "adaptiveDimmingPartner") next = { ...next, solution: changeAdaptiveDimmingPartner(p, normalized) };
+      if (path[0] === "solution" && path[1] === "cmsPartner") next = { ...next, solution: changeCmsPartner(next, normalized) };
+      if (path[0] === "solution" && path[1] === "adaptiveDimmingPartner") next = { ...next, solution: changeAdaptiveDimmingPartner(next, normalized) };
       if (path[0] === "crm" && path[1] === "status" && normalized === "won") next = setPath(next, ["crm", "closingProbability"], 100);
       if (path[0] === "assumptions" && path[1] === "rateProfileId") {
         const profile = RATE_PROFILES.find((item) => item.id === normalized);

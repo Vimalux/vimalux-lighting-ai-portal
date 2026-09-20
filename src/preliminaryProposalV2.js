@@ -6,6 +6,7 @@ import { calculateBusinessCase } from "./calculations.js";
 import { qualityGateMessage, validateProposalQuality } from "./proposalQuality.js";
 import { transformProposalCustomerText } from "./proposalCustomerVatText.js";
 import { proposalProjectWithCatalogue } from "./proposalContext.js";
+import { getLiveBusinessCaseResult } from "./liveBusinessCaseResult.js";
 import {
   PDF_FONT,
   alignedTable,
@@ -50,8 +51,17 @@ async function loadContext() {
   if (!row.crm_opportunity_id) throw new Error("Business Case must be linked to CRM before a proposal can be published.");
   const { data: catalogue, error: catalogueError } = await supabase.rpc("get_intelligence_catalogue");
   if (catalogueError) throw catalogueError;
-  const hydratedProject = proposalProjectWithCatalogue(row, catalogue);
-  const hydratedRow = { ...row, intelligence_data: hydratedProject };
+  // The React screen can be newer than Supabase during the autosave window.
+  // Prefer the active, already-calculated Business Case and hydrate it with the
+  // canonical catalogue so both report buttons use exactly what the user sees.
+  const live = getLiveBusinessCaseResult(window.location.search);
+  const sourceRow = live?.project ? { ...row, intelligence_data: live.project } : row;
+  const hydratedProject = proposalProjectWithCatalogue(sourceRow, catalogue);
+  const hydratedRow = {
+    ...row,
+    intelligence_data: hydratedProject,
+    result_summary: live?.result || row.result_summary,
+  };
   const { data: history, error: historyError } = await supabase.rpc("get_proposal_history", { opportunity_id: row.crm_opportunity_id });
   if (historyError) throw historyError;
   const previous = (history || []).filter((item) => item.proposal_type === "preliminary" && item.source === "intelligence");

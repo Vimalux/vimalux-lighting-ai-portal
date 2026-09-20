@@ -1,3 +1,5 @@
+import { projectWithPartnerEquipmentCosts } from "./partnerEquipment.js";
+
 export const PDF_FONT = "helvetica";
 
 const safeNumber = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -54,7 +56,14 @@ export function needsNewPdfPage(currentY, requiredHeight, footerStartY = 278, sa
 
 export function buildCustomerCapexRows(project, totalCapex, lang = "en", expectedAdditionalCapex = null, tolerance = 1) {
   const it = lang === "it";
-  const additions = (Array.isArray(project?.additionalCosts) ? project.additionalCosts : [])
+  // Keep proposal validation on the same normalized project used by the
+  // Business Case engine. Partner equipment is stored under Solution and is
+  // converted here to the same virtual Additional Costs used in calculation.
+  const normalizedProject = projectWithPartnerEquipmentCosts(project);
+  const normalizedAdditionalCosts = Array.isArray(normalizedProject?.additionalCosts)
+    ? normalizedProject.additionalCosts
+    : (Array.isArray(project?.additionalCosts) ? project.additionalCosts : []);
+  const additions = normalizedAdditionalCosts
     .filter((item) => String(item?.costType || "capex").toLowerCase() === "capex")
     .map((item) => {
       const quantity = Math.max(0, safeNumber(item?.quantity));
