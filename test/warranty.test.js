@@ -39,3 +39,16 @@ test('extended warranty uplift remains internal to pricing', () => {
   assert.equal(priced.catalogue.led[0].salesPrice, 118.19);
   assert.equal(warrantyLabel(project, 'it'), '10 anni');
 });
+
+test('an editable warranty term above the standard term uses the saved uplift', () => {
+  const project = {
+    solution: { warrantyYears: 12, warrantyUpliftPercentSnapshot: 18.19 },
+    catalogue: {
+      warranty: { standardYears: 5, extendedYears: 10, upliftPercent: 18.19 },
+      led: [{ sku: 'CUSTOM-12', salesPrice: 100 }],
+    },
+  };
+  const priced = applyWarrantyPricing(project);
+  assert.equal(priced.catalogue.led[0].salesPrice, 118.19);
+  assert.equal(warrantyLabel(project, 'it'), '12 anni');
+});

@@ -24,9 +24,7 @@ export function buildYearOneCustomerValueScenario(calculated = {}, row = {}) {
   const powerAidSaving = powerAidActive ? positive(firstCash?.powerAidGrossSavingEUR) : 0;
   const grossBenefit = ledSaving + hybridSolarSaving + cloSaving + maintenanceSaving + powerAidSaving;
 
-  const fixedServiceOpex = cmsActive ? positive(calculated?.fixedAnnualOpex) : 0;
-  const powerAidFee = powerAidActive ? positive(firstCash?.powerAidCustomerFee) : 0;
-  const servicePayment = calculated?.dealType === "noleggio_operativo" ? 0 : fixedServiceOpex + powerAidFee;
+  const servicePayment = positive(row?.servicePayment);
   const investmentPayment = positive(row?.investmentPayment);
   const futureOperatingCost = Math.max(0, currentOperatingCost - grossBenefit);
   const customerSaving = currentOperatingCost - futureOperatingCost - servicePayment - investmentPayment;

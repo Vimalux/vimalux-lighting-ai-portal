@@ -100,20 +100,20 @@ function generatePdf(row, version) {
   const projectName = pdfSafeText(project.project?.name || row.crm_fields?.project || customer);
   const proposalId = `PRE-${code}`;
   const date = new Date().toLocaleDateString(it ? "it-IT" : "en-GB");
-  const contractYears = Math.round(Number(result.contractYears) || Number(project.assumptions?.serviceAgreementPeriod) || 0);
+  const contractYears = Math.round(Number(calculated.serviceAgreementPeriod) || Number(result.contractYears) || Number(project.assumptions?.serviceAgreementPeriod) || 0);
   const powerAidYears = project.solution?.powerAidEnabled ? Math.max(1, Math.min(contractYears, Math.round(Number(project.assumptions?.powerAidServicePeriod) || 10))) : 0;
   const escalation = Number(project.assumptions?.opexEscalation) || 0;
   const energyEscalation = Number(project.assumptions?.energyEscalation) || 0;
-  const annualFee = Number(result.annualCustomerPayment ?? result.annualOpex) || 0;
-  const maintSaving = maintenanceSaving(project);
-  const energySaving = Number(result.annualEnergySavingEUR) || 0;
+  const annualFee = Number(calculated.customerAnnualPayment ?? result.annualCustomerPayment ?? result.annualOpex) || 0;
+  const maintSaving = Number(calculated.maintenanceSaving) || maintenanceSaving(project);
+  const energySaving = Number(calculated.energySaving ?? result.annualEnergySavingEUR) || 0;
   const netBenefit = Number(calculated.customerCashAnnualNetBenefit ?? result.annualCustomerNetBenefit) || (energySaving + maintSaving - annualFee);
-  const capexBreakdown = buildCustomerCapexRows(project, Number(result.capex) || 0, lang, result.additionalCapexSales);
+  const capexBreakdown = buildCustomerCapexRows(project, Number(calculated.totalCapex ?? result.capex) || 0, lang, calculated.additionalCapexSales ?? result.additionalCapexSales);
   const dealType = String(calculated.dealType || project.assumptions?.dealType || "cash").toLowerCase();
   const isLaaS = dealType === "noleggio_operativo";
   const isFinance = dealType === "finance";
   const isFinanced = isLaaS || isFinance;
-  const upfrontCustomerInvestment = isFinanced ? Math.max(0, Number(project.assumptions?.upfrontPayment) || 0) : Math.max(0, Number(result.capex) || 0);
+  const upfrontCustomerInvestment = isFinanced ? Math.max(0, Number(project.assumptions?.upfrontPayment) || 0) : Math.max(0, Number(calculated.totalCapex ?? result.capex) || 0);
   const projectCapexLabel = isFinanced
     ? (it ? "CAPEX progetto / investimento finanziato" : "Project CAPEX / financed investment")
     : (it ? "Investimento iniziale" : "Initial investment");
@@ -125,6 +125,16 @@ function generatePdf(row, version) {
   const monthlyCustomerPayment = Math.max(0, Number(calculated.monthlyPayment) || annualFee / 12);
   const grossMonthlyCustomerPayment = Math.max(monthlyCustomerPayment, Number(calculated.customerGrossMonthlyPayment) || monthlyCustomerPayment);
   const grossAnnualCustomerPayment = Math.max(annualFee, Number(calculated.customerGrossAnnualPayment) || annualFee);
+  const netContractValue = Math.max(0, Number(calculated.totalContractRevenue ?? result.tcv) || 0);
+  const grossContractValue = Math.max(netContractValue, Number(calculated.customerGrossContractValue) || netContractValue);
+  const summaryAnnualPaymentLabel = isLaaS
+    ? (it ? "Canone annuale LaaS / Noleggio - lordo IVA" : "Annual LaaS / lease payment - incl. VAT")
+    : isFinance
+      ? (it ? "Pagamento annuale cliente - lordo IVA" : "Annual customer payment - incl. VAT")
+      : annualPaymentLabel;
+  const summaryTcvLabel = isFinanced
+    ? (it ? `TCV cash-out cliente ${contractYears} anni` : `Customer cash-out TCV ${contractYears} years`)
+    : (it ? `TCV ${contractYears} anni` : `TCV ${contractYears} years`);
   const monthlyFinancingPayment = Math.max(0, Number(calculated.financingMonthlyPayment) || 0);
   const monthlyServiceOpex = Math.max(0, Number(calculated.totalAnnualOpex) || 0) / 12;
 
@@ -161,15 +171,15 @@ function generatePdf(row, version) {
 
   autoTable(doc, {
     startY: 86, theme: "grid",
-    head: [[projectCapexLabel, annualPaymentLabel, it ? `TCV ${contractYears} anni` : `TCV ${contractYears} years`]],
-    body: [[money(result.capex, lang), money(annualFee, lang), money(result.tcv, lang)]],
+    head: [[projectCapexLabel, summaryAnnualPaymentLabel, summaryTcvLabel]],
+    body: [[money(calculated.totalCapex ?? result.capex, lang), money(isFinanced ? grossAnnualCustomerPayment : annualFee, lang), money(isFinanced ? grossContractValue : netContractValue, lang)]],
     headStyles: tableHead, styles: { font: "helvetica", fontSize: 8, cellPadding: 2.2 },
     ...alignedTable({ 0: "right", 1: "right", 2: "right" }),
   });
   doc.setFont("helvetica", "normal"); doc.setFontSize(7.1); doc.setTextColor(...muted);
   doc.text(it
-    ? (isLaaS
-      ? "TCV = somma dei canoni contrattuali previsti nel periodo."
+    ? (isFinanced
+      ? "TCV cash-out cliente = pagamenti contrattuali comprensivi dell'IVA non recuperabile nel periodo."
       : "TCV = somma dei pagamenti contrattuali previsti nel periodo.")
     : (isLaaS
       ? "TCV = sum of the contractual LaaS / lease payments over the term."
@@ -178,7 +188,7 @@ function generatePdf(row, version) {
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 8, theme: "grid",
     head: [[customerText(it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit"), it ? "Riduzione energia" : "Energy reduction", it ? "Riduzione CO2" : "CO2 reduction", isFinanced ? (it ? "Payback operativo (escl. finanziamento)" : "Operational payback (excl. financing)") : "Payback", customerText(it ? `VAN beneficio Comune (${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} anni)` : `Municipality-benefit NPV (${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} years)`) ]],
-    body: [[money(netBenefit, lang), `${number(result.energyReductionPct, 1, lang)}%`, `${number(result.co2ReductionTons, 1, lang)} t/${it ? "anno" : "yr"}`, result.paybackYears == null ? "-" : `${number(result.paybackYears, 1, lang)} ${it ? "anni" : "years"}`, money(calculated.customerCashNpv ?? result.npv, lang)]],
+    body: [[money(netBenefit, lang), `${number(calculated.energyReductionPercent ?? result.energyReductionPct, 1, lang)}%`, `${number((Number(calculated.co2ReductionKg) || 0) / 1000 || result.co2ReductionTons, 1, lang)} t/${it ? "anno" : "yr"}`, calculated.payback == null ? "-" : `${number(calculated.payback, 1, lang)} ${it ? "anni" : "years"}`, money(calculated.customerCashNpv ?? result.npv, lang)]],
     headStyles: tableHead, styles: { font: "helvetica", fontSize: 7.1, cellPadding: 2 },
     ...alignedTable({ 0: "right", 1: "right", 2: "right", 3: "right", 4: "right" }),
   });
@@ -190,9 +200,9 @@ function generatePdf(row, version) {
     body: [
       [customerText(it ? "Cliente / Comune" : "Customer / Municipality"), customer],
       [it ? "Progetto" : "Project", projectName], ["Project ID", lineage], ["Business Case ID", code],
-      [it ? "Apparecchi esistenti" : "Existing luminaires", String(Math.round(Number(result.existingLuminaires) || 0))],
-      [it ? "Apparecchi da aggiornare" : "Upgrade luminaires", String(Math.round(Number(result.upgradeLuminaires) || 0))],
-      ["Smart connected", String(Math.round(Number(result.smartConnectedLuminaires) || 0))],
+      [it ? "Apparecchi esistenti" : "Existing luminaires", String(Math.round(Number(calculated.totalQuantity ?? result.existingLuminaires) || 0))],
+      [it ? "Apparecchi da aggiornare" : "Upgrade luminaires", String(Math.round(Number(calculated.upgradedQuantity ?? result.upgradeLuminaires) || 0))],
+      ["Smart connected", String(Math.round(Number(calculated.lcuQuantity ?? result.smartConnectedLuminaires) || 0))],
       ...(hybridUnits > 0 ? [["Hybrid Solar", `${number(hybridUnits, 0, lang)} ${it ? "apparecchi" : "luminaires"} · ${number(hybridInstalledPvKwp, 2, lang)} kWp · ${number(hybridGridOffsetKwh, 0, lang)} kWh/${it ? "anno" : "yr"} ${it ? "offset rete" : "grid offset"}`]] : []),
     ],
     styles: { font: "helvetica", fontSize: 8.5, cellPadding: 1.2 },
@@ -204,9 +214,10 @@ function generatePdf(row, version) {
   autoTable(doc, {
     startY: y + 5, theme: "grid", head: [[it ? "Voce" : "Item", it ? "Valore" : "Value"]],
     body: [
-      [projectCapexLabel, money(result.capex, lang)],
+      [projectCapexLabel, money(calculated.totalCapex ?? result.capex, lang)],
       ...(isFinanced ? [[it ? "Investimento iniziale cliente" : "Customer upfront investment", money(upfrontCustomerInvestment, lang)]] : []),
       [annualPaymentLabel, money(annualFee, lang)],
+      ...(isFinanced ? [[it ? "Pagamento annuale totale cliente - lordo IVA" : "Total annual customer payment - incl. VAT", money(grossAnnualCustomerPayment, lang)]] : []),
       ...(isLaaS ? [
         [it ? "Canone mensile LaaS / Noleggio tutto incluso - netto IVA" : "Monthly all-inclusive LaaS / lease payment - excl. VAT", money(monthlyCustomerPayment, lang)],
         [it ? "Canone mensile lordo cliente" : "Gross monthly customer payment", money(grossMonthlyCustomerPayment, lang)],
@@ -220,7 +231,8 @@ function generatePdf(row, version) {
       [it ? "Durata CMS" : "CMS service term", `${contractYears} ${it ? "anni" : "years"}`],
       ...(project.solution?.powerAidEnabled ? [[it ? "Durata Adaptive Dimming" : "Adaptive Dimming service term", `${powerAidYears} ${it ? "anni" : "years"}`]] : []),
       ...(hybridBenefitEur > 0 ? [[it ? "Beneficio Hybrid Solar annuo (incluso nel risparmio energia)" : "Annual Hybrid Solar benefit (included in energy saving)", money(hybridBenefitEur, lang)]] : []),
-      [it ? `TCV ${contractYears} anni` : `TCV ${contractYears} years`, money(result.tcv, lang)],
+      [it ? `TCV netto IVA ${contractYears} anni` : `TCV excl. VAT ${contractYears} years`, money(netContractValue, lang)],
+      ...(isFinanced ? [[it ? `TCV cash-out cliente ${contractYears} anni` : `Customer cash-out TCV ${contractYears} years`, money(grossContractValue, lang)]] : []),
       [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],
     ],
     headStyles: tableHead, styles: { font: "helvetica", fontSize: 8, cellPadding: 1.5 },
@@ -339,14 +351,15 @@ function generatePdf(row, version) {
     ? `Project ID ${lineage} resterà invariato in Intelligence, Planner e CRM, preservando Business Case, versioni e cronologia.`
     : `Project ID ${lineage} remains unchanged across Intelligence, Planner and CRM, preserving the Business Case, versions and history.`, 14, y + 18, { maxWidth: 182 });
 
-  y += 15;
-  y = beginSection(it ? "Condizioni e limitazioni" : "Terms & Limitations", y, 18);
+  y += 27;
+  y = beginSection(it ? "Condizioni e limitazioni" : "Terms & Limitations", y, 26);
   doc.setFontSize(6.5); doc.setTextColor(...muted); doc.setFont("helvetica", "normal");
   doc.text(customerText(it
     ? "Questa proposta è indicativa e non costituisce un'offerta finale vincolante. È basata sui dati disponibili e sulle voci economiche inserite nel Business Case alla data di emissione. Prezzi, quantità, installazione, logistica, imposte, finanziamento e prestazioni definitive saranno confermati nella proposta ufficiale generata da VIMALUX Planner. IVA esclusa salvo diversa indicazione."
     : "This proposal is indicative and does not constitute a final binding quotation. It is based on available data and the economic items entered in the Business Case at the issue date. Final prices, quantities, installation, logistics, taxes, financing and performance will be confirmed in the official proposal generated by VIMALUX Planner. VAT excluded unless otherwise stated."), 14, y + 5, { maxWidth: 182 });
 
   const pdfName = filename(code, version);
+  doc.__vimaluxProposalProject = project;
   doc.save(pdfName);
   return pdfName;
 }

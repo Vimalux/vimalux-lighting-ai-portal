@@ -103,7 +103,7 @@ const cloneCatalogue = (catalogue) => ({
   smart: Array.isArray(catalogue?.smart) ? catalogue.smart.map((item) => ({ ...item })) : [],
   warranty: {
     standardYears: Number(catalogue?.warranty?.standardYears) || 5,
-    extendedYears: Number(catalogue?.warranty?.extendedYears) || 10,
+    extendedYears: Number(catalogue?.warranty?.extendedYears) || 12,
     upliftPercent: Number(catalogue?.warranty?.upliftPercent) || 18.19,
   },
 });

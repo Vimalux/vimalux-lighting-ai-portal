@@ -1,4 +1,4 @@
-export const DEFAULT_WARRANTY = Object.freeze({ standardYears: 5, extendedYears: 10, upliftPercent: 18.19 });
+export const DEFAULT_WARRANTY = Object.freeze({ standardYears: 5, extendedYears: 12, upliftPercent: 18.19 });
 
 const n = (value, fallback = 0) => {
   const parsed = Number(String(value ?? "").replace(",", "."));
@@ -18,7 +18,7 @@ export function projectWarranty(project = {}) {
   const config = catalogueWarranty(project.catalogue);
   const selectedYears = Math.max(1, Math.round(n(project.solution?.warrantyYears, config.standardYears)));
   const snapshot = n(project.solution?.warrantyUpliftPercentSnapshot, config.upliftPercent);
-  const isExtended = selectedYears === config.extendedYears && config.extendedYears !== config.standardYears;
+  const isExtended = selectedYears > config.standardYears;
   return {
     ...config,
     selectedYears,

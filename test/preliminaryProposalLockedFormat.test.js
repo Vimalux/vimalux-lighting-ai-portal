@@ -41,3 +41,10 @@ test("customer proposal exposes deliberate project CAPEX additions through share
   assert.match(helperSource, /numericTotalCapex - additionsTotal/);
   assert.match(helperSource, /does not reconcile with Business Case summary/);
 });
+
+test("customer proposal labels net and gross payment plus gross customer TCV", () => {
+  assert.match(source, /Pagamento annuale totale cliente - lordo IVA/);
+  assert.match(source, /TCV netto IVA/);
+  assert.match(source, /TCV cash-out cliente/);
+  assert.match(source, /__vimaluxProposalProject = project/);
+});

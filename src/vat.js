@@ -120,6 +120,10 @@ export function applyCustomerVatCashFlow(project = {}, result = {}) {
   });
 
   const first = customerCashFlowRows[0];
+  const customerGrossContractValue = initialNet + initialVat + customerCashFlowRows.reduce(
+    (sum, row) => sum + row.customerGrossPayment + row.customerGrossServiceOpex,
+    0,
+  );
   const customerCashAnnualNetBenefit = first?.customerNetCashFlow ?? Number(result.customerAnnualNetBenefit || 0);
   const customerCashDecisionStatus = npv > 0 && customerCashAnnualNetBenefit >= 0 ? "GO" : npv > 0 || customerCashAnnualNetBenefit >= 0 ? "REVIEW" : "NO_GO";
   return {
@@ -129,6 +133,7 @@ export function applyCustomerVatCashFlow(project = {}, result = {}) {
     customerGrossAnnualBenefit: first?.customerGrossBenefit ?? positive(result.grossBenefit),
     customerGrossAnnualPayment: first ? first.customerGrossPayment + first.customerGrossServiceOpex : positive(result.customerAnnualPayment),
     customerGrossMonthlyPayment: first ? (first.customerGrossPayment + first.customerGrossServiceOpex) / 12 : positive(result.customerMonthlyPayment),
+    customerGrossContractValue,
     customerCashAnnualNetBenefit,
     customerCashDecisionStatus,
     customerCashNpv: npv,

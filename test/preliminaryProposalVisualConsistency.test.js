@@ -7,6 +7,7 @@ const pageSource = readFileSync(new URL("../src/proposalFinalVisualPages.js", im
 const costPageSource = readFileSync(new URL("../src/proposalCostEvolutionPage.js", import.meta.url), "utf8");
 
 test("preliminary visual pages never fall back to another local project", () => {
+  assert.match(autoSource, /this\.__vimaluxProposalProject \|\| currentProject\(filename\)/);
   assert.doesNotMatch(autoSource, /\|\|\s*projects\[0\]/);
   assert.match(autoSource, /businessCaseCodeFromFilename/);
   assert.match(autoSource, /businessCaseRecordId/);

@@ -77,7 +77,7 @@ if (!jsPDF.API.__vimaluxPreliminaryVisualsInstalled) {
   jsPDF.API.save = function patchedSave(filename) {
     const isPreliminary = /^VIMALUX_PRE_/i.test(String(filename || ""));
     if (isPreliminary && !this.__vimaluxVisualPagesAdded) {
-      const project = currentProject(filename);
+      const project = this.__vimaluxProposalProject || currentProject(filename);
       if (!project) {
         throw new Error("Impossibile associare il PDF al Business Case attivo. Nessun dato viene generato da un progetto diverso.");
       }

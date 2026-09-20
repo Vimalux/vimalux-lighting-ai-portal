@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { calculateBusinessCase } from "../src/calculations.js";
 import { defaultProject } from "../src/model.js";
 import { customerAnalysisResult } from "../src/vat.js";
+import { buildYearOneCustomerValuePhases } from "../src/customerValuePhases.js";
 
 function projectFor(customerType, recoverability) {
   const project = defaultProject({ applyStoredDefaults: false });
@@ -25,6 +26,11 @@ test("municipality analysis uses gross customer payment and VAT-aware cash flow"
   assert.ok(Math.abs(result.customerGrossAnnualBenefit - result.grossBenefit) < 1e-9);
   assert.ok(result.customerCashAnnualNetBenefit < result.customerAnnualNetBenefit);
   assert.notEqual(result.customerCashNpv, result.npv);
+  const expectedGrossTcv = result.customerCashFlowRows.reduce(
+    (sum, row) => sum + row.customerGrossPayment + row.customerGrossServiceOpex,
+    0,
+  );
+  assert.equal(result.customerGrossContractValue, expectedGrossTcv);
 });
 
 test("fully recoverable ESCO cash flow remains equal to net analysis", () => {
@@ -45,4 +51,6 @@ test("economic analysis binds the municipality customer-cash fields", () => {
   assert.equal(analysis.customerValueRows[0].servicePayment, net.customerCashFlowRows[0].customerGrossServiceOpex);
   assert.equal(analysis.customerValueRows[0].customerSaving, net.customerCashFlowRows[0].customerNetCashFlow);
   assert.ok(Math.abs(analysis.grossBenefit - net.grossBenefit) < 1e-9);
+  const firstPhase = buildYearOneCustomerValuePhases(analysis).phases[0].display;
+  assert.ok(Math.abs(firstPhase.customerSaving - analysis.cashFlowRows[0].netCashFlow) < 1e-9);
 });
