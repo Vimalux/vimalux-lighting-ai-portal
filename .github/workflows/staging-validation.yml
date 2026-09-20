@@ -1,9 +1,13 @@
 name: Staging validation
 on:
   push:
-    branches: [staging/felicity-procurement-safe-release]
+    branches:
+      - staging/felicity-procurement-safe-release
+      - staging/iva-report-safe-release-20260918
   pull_request:
-    branches: [staging/felicity-procurement-safe-release]
+    branches:
+      - staging/felicity-procurement-safe-release
+      - staging/iva-report-safe-release-20260918
 permissions:
   contents: read
 jobs:
