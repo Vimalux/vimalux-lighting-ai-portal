@@ -104,6 +104,9 @@ function persistAnalysisHorizon(projects, index, cmsYears) {
 
 function render() {
   if (document.getElementById(ROOT_ID)) return;
+  // Current releases render the Adaptive Dimming term directly in React.
+  // Keep this runtime only as a compatibility fallback for older bundles.
+  if (findField(/durata\s+adaptive\s+dimming|adaptive\s+dimming\s+service\s+period/i)) return;
   const legacy = findField(/periodo\s+(?:di\s+)?accordo\s+servizi|service\s+agreement\s+period|service\s+period/i);
   if (!legacy) return;
   const projects = localProjects();
