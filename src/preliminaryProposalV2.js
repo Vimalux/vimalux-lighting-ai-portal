@@ -6,7 +6,7 @@ import { calculateBusinessCase } from "./calculations.js";
 import { qualityGateMessage, validateProposalQuality } from "./proposalQuality.js";
 import { transformProposalCustomerText } from "./proposalCustomerVatText.js";
 import { proposalProjectWithCatalogue } from "./proposalContext.js";
-import { getLiveBusinessCaseResult } from "./liveBusinessCaseResult.js";
+import { getActiveBusinessCaseResult, getLiveBusinessCaseResult } from "./liveBusinessCaseResult.js";
 import {
   PDF_FONT,
   alignedTable,
@@ -54,7 +54,8 @@ async function loadContext() {
   // The React screen can be newer than Supabase during the autosave window.
   // Prefer the active, already-calculated Business Case and hydrate it with the
   // canonical catalogue so both report buttons use exactly what the user sees.
-  const live = getLiveBusinessCaseResult(window.location.search);
+  const live = getActiveBusinessCaseResult(window.location.search)
+    || getLiveBusinessCaseResult(window.location.search);
   const sourceRow = live?.project ? { ...row, intelligence_data: live.project } : row;
   const hydratedProject = proposalProjectWithCatalogue(sourceRow, catalogue);
   const hydratedRow = {
@@ -111,6 +112,7 @@ function generatePdf(row, version) {
   const proposalId = `PRE-${code}`;
   const date = new Date().toLocaleDateString(it ? "it-IT" : "en-GB");
   const contractYears = Math.round(Number(calculated.serviceAgreementPeriod) || Number(result.contractYears) || Number(project.assumptions?.serviceAgreementPeriod) || 0);
+  const analysisYears = Math.round(Number(calculated.analysisPeriod) || contractYears);
   const powerAidYears = project.solution?.powerAidEnabled ? Math.max(1, Math.min(contractYears, Math.round(Number(project.assumptions?.powerAidServicePeriod) || 10))) : 0;
   const escalation = Number(project.assumptions?.opexEscalation) || 0;
   const energyEscalation = Number(project.assumptions?.energyEscalation) || 0;
@@ -197,7 +199,7 @@ function generatePdf(row, version) {
 
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 8, theme: "grid",
-    head: [[customerText(it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit"), it ? "Riduzione energia" : "Energy reduction", it ? "Riduzione CO2" : "CO2 reduction", isFinanced ? (it ? "Payback operativo (escl. finanziamento)" : "Operational payback (excl. financing)") : "Payback", customerText(it ? `VAN beneficio Comune (${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} anni)` : `Municipality-benefit NPV (${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} years)`) ]],
+    head: [[customerText(it ? "Beneficio netto annuo Comune" : "Municipality annual net benefit"), it ? "Riduzione energia" : "Energy reduction", it ? "Riduzione CO2" : "CO2 reduction", isFinanced ? (it ? "Payback operativo (escl. finanziamento)" : "Operational payback (excl. financing)") : "Payback", customerText(it ? `VAN beneficio Comune (${analysisYears} anni)` : `Municipality-benefit NPV (${analysisYears} years)`) ]],
     body: [[money(netBenefit, lang), `${number(calculated.energyReductionPercent ?? result.energyReductionPct, 1, lang)}%`, `${number((Number(calculated.co2ReductionKg) || 0) / 1000 || result.co2ReductionTons, 1, lang)} t/${it ? "anno" : "yr"}`, calculated.payback == null ? "-" : `${number(calculated.payback, 1, lang)} ${it ? "anni" : "years"}`, money(calculated.customerCashNpv ?? result.npv, lang)]],
     headStyles: tableHead, styles: { font: "helvetica", fontSize: 7.1, cellPadding: 2 },
     ...alignedTable({ 0: "right", 1: "right", 2: "right", 3: "right", 4: "right" }),
@@ -335,7 +337,7 @@ function generatePdf(row, version) {
       [it ? "Prezzo energia" : "Energy price", `${number(project.assumptions?.energyPrice, 2, lang)} €/kWh`],
       [it ? "Indicizzazione prezzo energia" : "Energy price escalation", `${number(energyEscalation, 1, lang)}% ${it ? "annuo" : "p.a."}`],
       [it ? "Ore di funzionamento annue" : "Annual operating hours", number(project.assumptions?.operatingHours, 0, lang)],
-      [it ? "Periodo di analisi" : "Analysis period", `${Math.round(Number(project.assumptions?.analysisPeriod) || 0)} ${it ? "anni" : "years"}`],
+      [it ? "Periodo di analisi" : "Analysis period", `${analysisYears} ${it ? "anni" : "years"}`],
       [it ? "Durata CMS" : "CMS service term", `${contractYears} ${it ? "anni" : "years"}`],
       ...(project.solution?.powerAidEnabled ? [[it ? "Durata Adaptive Dimming" : "Adaptive Dimming service term", `${powerAidYears} ${it ? "anni" : "years"}`]] : []),
       [isLaaS ? (it ? "Indicizzazione interna OPEX servizi" : "Internal service OPEX escalation") : (it ? "Indicizzazione canone/OPEX" : "Service/OPEX escalation"), isLaaS ? `${number(escalation, 1, lang)}% ${it ? "annuo · canone cliente fisso" : "p.a. · customer payment fixed"}` : `${number(escalation, 1, lang)}% ${it ? "annuo" : "p.a."}`],

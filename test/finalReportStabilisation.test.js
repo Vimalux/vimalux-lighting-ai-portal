@@ -118,8 +118,10 @@ test("report renderer keeps exact active Business Case and safe Planner workflow
   assert.doesNotMatch(preliminarySource, /projects\[0\]/);
   assert.doesNotMatch(preliminarySource, /→|⇒|➜|➝/);
   assert.match(preliminarySource, /censimento e geolocalizzazione - classificazione UNI 11248/);
-  assert.match(preliminarySource, /getLiveBusinessCaseResult\(window\.location\.search\)/);
+  assert.match(preliminarySource, /getActiveBusinessCaseResult\(window\.location\.search\)[\s\S]*getLiveBusinessCaseResult\(window\.location\.search\)/);
   assert.match(preliminarySource, /result_summary: live\?\.result \|\| row\.result_summary/);
+  assert.match(preliminarySource, /const analysisYears = Math\.round\(Number\(calculated\.analysisPeriod\) \|\| contractYears\)/);
+  assert.doesNotMatch(preliminarySource, /VAN beneficio Comune \(\$\{Math\.round\(Number\(project\.assumptions\?\.analysisPeriod\)/);
 });
 
 test("visual report derives phase values from customerValueRows and not an independent PDF calculation", () => {

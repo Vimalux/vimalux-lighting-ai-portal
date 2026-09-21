@@ -54,3 +54,25 @@ test("economic analysis binds the municipality customer-cash fields", () => {
   const firstPhase = buildYearOneCustomerValuePhases(analysis).phases[0].display;
   assert.ok(Math.abs(firstPhase.customerSaving - analysis.cashFlowRows[0].netCashFlow) < 1e-9);
 });
+
+test("Feletto-style manual LaaS payment stays all-inclusive across 12-year municipality reporting", () => {
+  const project = projectFor("municipality", "non_deductible");
+  project.assumptions.serviceAgreementPeriod = 12;
+  project.assumptions.contractYears = 12;
+  project.assumptions.analysisPeriod = 12;
+  project.assumptions.financingPeriod = 12;
+  project.assumptions.financingYears = 12;
+  project.assumptions.powerAidServicePeriod = 12;
+  project.assumptions.allInclusiveAnnualPayment = 31200;
+  project.assumptions.vatHardwarePercent = 22;
+  project.assumptions.vatDigitalPercent = 22;
+
+  const result = calculateBusinessCase(project);
+  assert.equal(result.analysisPeriod, 12);
+  assert.equal(result.serviceAgreementPeriod, 12);
+  assert.equal(result.customerAnnualPayment, 31200);
+  assert.ok(Math.abs(result.customerGrossAnnualPayment - 38064) < 1e-6);
+  assert.ok(Math.abs(result.customerGrossMonthlyPayment - 3172) < 1e-6);
+  assert.ok(Math.abs(result.customerCashAnnualNetBenefit - (result.grossBenefit - 38064)) < 1e-6);
+  assert.ok(Math.abs(result.customerGrossContractValue - 38064 * 12) < 1e-6);
+});
