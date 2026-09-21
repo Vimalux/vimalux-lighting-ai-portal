@@ -62,4 +62,8 @@ export function getActiveBusinessCaseResult(search = "") {
   return requested.some((key) => allowed.has(key)) ? entry : null;
 }
 
+export function getCurrentBusinessCaseResult(search = "") {
+  return getActiveBusinessCaseResult(search) || getLiveBusinessCaseResult(search);
+}
+
 export const LIVE_BUSINESS_CASE_EVENT = EVENT_NAME;

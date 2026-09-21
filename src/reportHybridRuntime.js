@@ -1,4 +1,4 @@
-import { getLiveBusinessCaseResult, LIVE_BUSINESS_CASE_EVENT } from "./liveBusinessCaseResult.js";
+import { getCurrentBusinessCaseResult, LIVE_BUSINESS_CASE_EVENT } from "./liveBusinessCaseResult.js";
 import { buildYearOneCustomerValuePhases, customerValueSegments } from "./customerValuePhases.js";
 
 const MARKER = "data-vimalux-report-hybrid";
@@ -171,7 +171,7 @@ function repairCustomerValueChart(report, project, result) {
 
 export function renderHybridReportDashboard() {
   document.querySelectorAll(`[${MARKER}="summary"]`).forEach((node) => node.remove());
-  const live = getLiveBusinessCaseResult(window.location.search);
+  const live = getCurrentBusinessCaseResult(window.location.search);
   if (!live?.project || !live?.result) return;
   const report = document.querySelector(".report-preview");
   if (!report) return;

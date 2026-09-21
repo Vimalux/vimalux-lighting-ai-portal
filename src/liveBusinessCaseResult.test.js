@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   getActiveBusinessCaseResult,
+  getCurrentBusinessCaseResult,
   getLiveBusinessCaseResult,
   publishActiveBusinessCaseResult,
   publishLiveBusinessCaseResult,
@@ -52,6 +53,7 @@ test("active Business Case remains authoritative while background calculations p
     const active = getActiveBusinessCaseResult(route);
     assert.equal(active.project, activeProject);
     assert.equal(active.result.analysisPeriod, 12);
+    assert.equal(getCurrentBusinessCaseResult(route).result.analysisPeriod, 12);
   });
 });
 
@@ -59,5 +61,12 @@ test("active Business Case does not leak into a different route", () => {
   withFakeWindow(() => {
     publishActiveBusinessCaseResult({ id: "feletto" }, { analysisPeriod: 12 }, "?business_case_id=feletto");
     assert.equal(getActiveBusinessCaseResult("?business_case_id=another-case"), null);
+  });
+});
+
+test("current Business Case falls back to route-matched live data when no active result exists", () => {
+  withFakeWindow(() => {
+    publishLiveBusinessCaseResult({ id: "feletto" }, { analysisPeriod: 12 });
+    assert.equal(getCurrentBusinessCaseResult("?business_case_id=feletto").result.analysisPeriod, 12);
   });
 });

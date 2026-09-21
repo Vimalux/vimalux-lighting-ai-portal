@@ -1,4 +1,4 @@
-import { getLiveBusinessCaseResult, LIVE_BUSINESS_CASE_EVENT } from "./liveBusinessCaseResult.js";
+import { getCurrentBusinessCaseResult, LIVE_BUSINESS_CASE_EVENT } from "./liveBusinessCaseResult.js";
 
 const MARKER = "data-vimalux-report-executive-refinement";
 
@@ -95,7 +95,7 @@ function renderExecutiveRefinement(report, project, result) {
 }
 
 export function renderReportExecutiveRefinement() {
-  const live = getLiveBusinessCaseResult(window.location.search);
+  const live = getCurrentBusinessCaseResult(window.location.search);
   if (!live?.project || !live?.result) return;
   const report = document.querySelector(".report-preview");
   if (!report) return;

@@ -1,5 +1,5 @@
 import { calculateBusinessCase } from "./calculations.js";
-import { getLiveBusinessCaseResult, LIVE_BUSINESS_CASE_EVENT } from "./liveBusinessCaseResult.js";
+import { getCurrentBusinessCaseResult, LIVE_BUSINESS_CASE_EVENT } from "./liveBusinessCaseResult.js";
 import { getHybridSolarAutoStatus, HYBRID_SOLAR_AUTO_STATUS_EVENT } from "./hybridSolarAutoStatus.js";
 
 const PROJECTS_KEY = "vimalux-intelligence-projects";
@@ -172,7 +172,7 @@ function fallbackDisplay() {
 export function renderHybridEconomicAnalysis() {
   document.querySelectorAll(`[${MARKER}]`).forEach((node) => node.remove());
 
-  const live = getLiveBusinessCaseResult(window.location.search);
+  const live = getCurrentBusinessCaseResult(window.location.search);
   const display = live
     ? hybridEconomicDisplayFromResult(live.project, live.result)
     : fallbackDisplay();

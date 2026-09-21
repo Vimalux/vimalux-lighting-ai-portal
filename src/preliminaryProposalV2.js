@@ -6,7 +6,7 @@ import { calculateBusinessCase } from "./calculations.js";
 import { qualityGateMessage, validateProposalQuality } from "./proposalQuality.js";
 import { transformProposalCustomerText } from "./proposalCustomerVatText.js";
 import { proposalProjectWithCatalogue } from "./proposalContext.js";
-import { getActiveBusinessCaseResult, getLiveBusinessCaseResult } from "./liveBusinessCaseResult.js";
+import { getCurrentBusinessCaseResult } from "./liveBusinessCaseResult.js";
 import {
   PDF_FONT,
   alignedTable,
@@ -54,8 +54,7 @@ async function loadContext() {
   // The React screen can be newer than Supabase during the autosave window.
   // Prefer the active, already-calculated Business Case and hydrate it with the
   // canonical catalogue so both report buttons use exactly what the user sees.
-  const live = getActiveBusinessCaseResult(window.location.search)
-    || getLiveBusinessCaseResult(window.location.search);
+  const live = getCurrentBusinessCaseResult(window.location.search);
   const sourceRow = live?.project ? { ...row, intelligence_data: live.project } : row;
   const hydratedProject = proposalProjectWithCatalogue(sourceRow, catalogue);
   const hydratedRow = {

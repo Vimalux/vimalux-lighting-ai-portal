@@ -30,11 +30,26 @@ test("report dashboard runtime is loaded without changing App permissions or wor
   const runtime = read("src/reportHybridRuntime.js");
   assert.match(runtime, /report-preview/);
   assert.match(runtime, /buildYearOneCustomerValuePhases/);
+  assert.match(runtime, /getCurrentBusinessCaseResult\(window\.location\.search\)/);
+  assert.doesNotMatch(runtime, /getLiveBusinessCaseResult/);
   assert.doesNotMatch(runtime, /supabase\.auth|currentProfile|agentAllowedViews|pricing/);
   const finalizer = read("src/reportLayoutFinalizerRuntime.js");
   assert.match(finalizer, /customer-value-chart/);
   assert.match(finalizer, /data-vimalux-report-hybrid/);
   assert.doesNotMatch(finalizer, /supabase\.auth|currentProfile|agentAllowedViews|pricing|catalogue/);
+});
+
+test("all active-screen runtime overlays prefer the active Business Case result", () => {
+  for (const relative of [
+    "src/reportHybridRuntime.js",
+    "src/reportExecutiveRefinementRuntime.js",
+    "src/hybridEconomicAnalysisRuntime.js",
+    "src/hybridSolarAutoRuntime.js",
+  ]) {
+    const runtime = read(relative);
+    assert.match(runtime, /getCurrentBusinessCaseResult\(window\.location\.search\)/, relative);
+    assert.doesNotMatch(runtime, /getLiveBusinessCaseResult/, relative);
+  }
 });
 
 test("Hybrid report dashboard model exposes the Business Case grid offset and benefit", () => {

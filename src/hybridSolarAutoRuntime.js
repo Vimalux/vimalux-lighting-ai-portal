@@ -1,6 +1,6 @@
 import { calculateBusinessCase } from "./calculations.js";
 import { needsAutomaticHybridSolar, projectMunicipalityCandidates } from "./hybridSolarAuto.js";
-import { getLiveBusinessCaseResult, LIVE_BUSINESS_CASE_EVENT, publishLiveBusinessCaseResult } from "./liveBusinessCaseResult.js";
+import { getCurrentBusinessCaseResult, LIVE_BUSINESS_CASE_EVENT, publishLiveBusinessCaseResult } from "./liveBusinessCaseResult.js";
 import { resolveMunicipalitySolar } from "./solarLocation.js";
 import { publishHybridSolarAutoStatus } from "./hybridSolarAutoStatus.js";
 import { loadCurrentProfile, saveCloudState } from "./supabase.js";
@@ -26,7 +26,7 @@ async function resolveMunicipalityFromCandidates(project) {
 }
 
 async function resolveForCurrentBusinessCase() {
-  const live = getLiveBusinessCaseResult(window.location.search);
+  const live = getCurrentBusinessCaseResult(window.location.search);
   if (!live || !needsAutomaticHybridSolar(live.project, live.result)) return;
 
   const project = live.project;
