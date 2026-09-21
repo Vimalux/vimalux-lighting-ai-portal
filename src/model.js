@@ -280,6 +280,39 @@ export function migrateProject(saved) {
   return project;
 }
 
+export function updateProjectPeriod(project, key, value, updatedAt = new Date().toISOString()) {
+  const normalized = Math.max(1, Math.round(numberValue(value)));
+  const next = structuredClone(project);
+  next.updatedAt = updatedAt;
+  next.assumptions ||= {};
+
+  if (key === "serviceAgreementPeriod") {
+    // Write the canonical and legacy aliases before migration. Otherwise an
+    // explicit 10-year value can be mistaken for the old default and replaced
+    // by the previous contractYears value (for example 8).
+    next.assumptions.serviceAgreementPeriod = normalized;
+    next.assumptions.contractYears = normalized;
+    next.assumptions.analysisPeriod = normalized;
+    next.assumptions.powerAidServicePeriod = Math.max(1, Math.min(
+      normalized,
+      numberValue(next.assumptions.powerAidServicePeriod) || Math.min(10, normalized),
+    ));
+  } else if (key === "financingPeriod") {
+    // Keep the current and legacy financing fields in sync for the same reason.
+    next.assumptions.financingPeriod = normalized;
+    next.assumptions.financingYears = normalized;
+  } else if (key === "powerAidServicePeriod") {
+    next.assumptions.powerAidServicePeriod = Math.max(1, Math.min(
+      numberValue(next.assumptions.serviceAgreementPeriod) || 1,
+      normalized,
+    ));
+  } else {
+    throw new Error(`Unsupported period field: ${key}`);
+  }
+
+  return migrateProject(next);
+}
+
 export function loadProjects() {
   try {
     const raw = localStorage.getItem("vimalux-intelligence-projects");

@@ -5,11 +5,13 @@ import fs from "node:fs";
 const appSource = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 const i18nSource = fs.readFileSync(new URL("../src/i18n.js", import.meta.url), "utf8");
 const fallbackSource = fs.readFileSync(new URL("../src/servicePeriodsRuntime.js", import.meta.url), "utf8");
+const modelSource = fs.readFileSync(new URL("../src/model.js", import.meta.url), "utf8");
 
 test("Adaptive Dimming service period is a permanent controlled assumption", () => {
   assert.match(appSource, /\["serviceAgreementPeriod",t\("serviceAgreementPeriod"\)\],\["powerAidServicePeriod",t\("powerAidServicePeriod"\)\]/);
   assert.match(appSource, /"serviceAgreementPeriod",\s*\n\s*"powerAidServicePeriod",\s*\n\s*"financingPeriod"/);
-  assert.match(appSource, /path\[1\] === "powerAidServicePeriod"[\s\S]*Math\.min\(numberValue\(next\.assumptions\.serviceAgreementPeriod\)/);
+  assert.match(appSource, /updateProjectPeriod\(p, periodKey, normalized, changedAt\)/);
+  assert.match(modelSource, /key === "powerAidServicePeriod"[\s\S]*Math\.min\([\s\S]*numberValue\(next\.assumptions\.serviceAgreementPeriod\)/);
 });
 
 test("Adaptive Dimming service period has customer-language labels", () => {

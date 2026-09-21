@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { calculateBusinessCase, numberValue } from "./calculations.js";
-import { defaultProject, loadProjects, migrateProject, uid } from "./model.js";
+import { defaultProject, loadProjects, migrateProject, uid, updateProjectPeriod } from "./model.js";
 import { formatMoney, formatNumber, formatPercent, useT } from "./i18n.js";
 import { generateCustomerPdf } from "./report.js";
 import {
@@ -309,13 +309,10 @@ export default function App() {
     }
     return all.map((p) => {
       if (p.id !== currentProject.id) return p;
-      let next = setPath({ ...p, updatedAt: changedAt }, path, normalized);
-      if (path[0] === "assumptions" && path[1] === "serviceAgreementPeriod") {
-        next = setPath(next, ["assumptions", "contractYears"], normalized);
-        next = setPath(next, ["assumptions", "analysisPeriod"], normalized);
-        next = setPath(next, ["assumptions", "powerAidServicePeriod"], Math.max(1, Math.min(normalized, numberValue(next.assumptions.powerAidServicePeriod) || Math.min(10, normalized))));
-      }
-      if (path[0] === "assumptions" && path[1] === "powerAidServicePeriod") next = setPath(next, path, Math.max(1, Math.min(numberValue(next.assumptions.serviceAgreementPeriod) || 1, normalized)));
+      const periodKey = path[0] === "assumptions" && ["serviceAgreementPeriod", "financingPeriod", "powerAidServicePeriod"].includes(path[1]) ? path[1] : null;
+      let next = periodKey
+        ? updateProjectPeriod(p, periodKey, normalized, changedAt)
+        : setPath({ ...p, updatedAt: changedAt }, path, normalized);
       if (path[0] === "solution" && path[1] === "cmsPartner") next = { ...next, solution: changeCmsPartner(next, normalized) };
       if (path[0] === "solution" && path[1] === "adaptiveDimmingPartner") next = { ...next, solution: changeAdaptiveDimmingPartner(next, normalized) };
       if (path[0] === "crm" && path[1] === "status" && normalized === "won") next = setPath(next, ["crm", "closingProbability"], 100);

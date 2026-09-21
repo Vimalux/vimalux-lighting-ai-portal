@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { calculateBusinessCase } from "../src/calculations.js";
-import { defaultProject, migrateProject } from "../src/model.js";
+import { defaultProject, migrateProject, updateProjectPeriod } from "../src/model.js";
 
 function smartProject({ cmsYears = 10, powerAidYears = 10, analysisYears = 20 } = {}) {
   const project = defaultProject({ applyStoredDefaults: false });
@@ -86,6 +86,36 @@ test("project migration makes analysis horizon equal the service term", () => {
   assert.equal(project.assumptions.serviceAgreementPeriod, 10);
   assert.equal(project.assumptions.contractYears, 10);
   assert.equal(project.assumptions.analysisPeriod, 10);
+});
+
+test("service period remains editable through 12 -> 10 -> 8 -> 10", () => {
+  let project = migrateProject({
+    assumptions: {
+      serviceAgreementPeriod: 12,
+      contractYears: 12,
+      analysisPeriod: 12,
+      powerAidServicePeriod: 12,
+    },
+    groups: [],
+  });
+
+  for (const years of [10, 8, 10]) {
+    project = updateProjectPeriod(project, "serviceAgreementPeriod", years, `2026-09-21T00:00:0${years % 10}.000Z`);
+    assert.equal(project.assumptions.serviceAgreementPeriod, years);
+    assert.equal(project.assumptions.contractYears, years);
+    assert.equal(project.assumptions.analysisPeriod, years);
+    assert.ok(project.assumptions.powerAidServicePeriod <= years);
+  }
+});
+
+test("financing period accepts its five-year default after a different saved term", () => {
+  const project = migrateProject({
+    assumptions: { financingPeriod: 8, financingYears: 8 },
+    groups: [],
+  });
+  const updated = updateProjectPeriod(project, "financingPeriod", 5);
+  assert.equal(updated.assumptions.financingPeriod, 5);
+  assert.equal(updated.assumptions.financingYears, 5);
 });
 
 test("PowerAiD contract revenue follows PowerAiD term while CMS fixed service follows CMS term", () => {
