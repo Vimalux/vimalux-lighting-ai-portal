@@ -43,6 +43,23 @@ test("SAFE RELEASE: explicit stable Business Case URL remains authoritative", ()
   assert.equal(index, 0);
 });
 
+test("SAFE RELEASE: stale URL reference falls back to the rendered Business Case header", () => {
+  const index = resolveActiveProjectIndex(projects, {
+    urlBusinessCaseId: "sbg3x34t",
+    headerText: "Poggibonsi · BC-222222",
+    storedBusinessCaseId: "old-local-id",
+  });
+  assert.equal(index, 1);
+});
+
+test("SAFE RELEASE: stale URL and absent header fall back to remembered Business Case", () => {
+  const index = resolveActiveProjectIndex(projects, {
+    urlBusinessCaseId: "stale-local-id",
+    storedBusinessCaseId: "poggibonsi-local-id",
+  });
+  assert.equal(index, 1);
+});
+
 test("SAFE RELEASE: remembered Business Case is fallback only when URL and header code are absent", () => {
   const index = resolveActiveProjectIndex(projects, {
     storedBusinessCaseId: "poggibonsi-local-id",

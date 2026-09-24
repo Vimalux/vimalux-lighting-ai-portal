@@ -39,16 +39,21 @@ export function resolveActiveProjectIndex(
 
   const explicit = textValue(urlBusinessCaseId);
   if (explicit) {
-    return rows.findIndex((project) => projectMatchesBusinessCaseReference(project, explicit));
+    const explicitIndex = rows.findIndex((project) => projectMatchesBusinessCaseReference(project, explicit));
+    if (explicitIndex >= 0) return explicitIndex;
+    // A stale/local URL reference must not suppress the currently rendered
+    // Business Case. This can happen after cloud reconciliation replaces the
+    // browser-local id while the page URL still carries the old id.
   }
 
-  // The rendered Business Case code is authoritative for a newly created
-  // project whose URL has deliberately been cleared before React switches
-  // context. Header text may be "Project name · BC-123456", so parse the code
-  // rather than comparing the entire label with project.businessCaseId.
+  // The rendered Business Case code is authoritative when the URL reference
+  // is absent or no longer resolves. Header text may be
+  // "Project name · BC-123456", so parse the code rather than comparing the
+  // entire label with project.businessCaseId.
   const headerCode = businessCaseCodeFromText(headerText);
   if (headerCode) {
-    return rows.findIndex((project) => projectMatchesBusinessCaseReference(project, headerCode));
+    const headerIndex = rows.findIndex((project) => projectMatchesBusinessCaseReference(project, headerCode));
+    if (headerIndex >= 0) return headerIndex;
   }
 
   const remembered = textValue(storedBusinessCaseId);
