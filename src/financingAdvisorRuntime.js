@@ -1,9 +1,11 @@
 import { migrateProject } from "./model.js";
 import { saveCloudState, supabaseConfigured } from "./supabase.js";
 import { financingCashflowAdvisor } from "./financingAdvisor.js";
+import { resolveActiveProjectIndex } from "./activeBusinessCaseResolver.js";
 
 const ROOT_ID = "vimalux-financing-advisor";
 const MONTHLY_OVERRIDE_ID = "vimalux-laas-monthly-override";
+const ACTIVE_CONTEXT_KEY = "vimalux-intelligence-active-business-case";
 
 function localProjects() {
   try {
@@ -14,18 +16,17 @@ function localProjects() {
 
 function activeIdentity() {
   const params = new URLSearchParams(window.location.search);
+  let storedBusinessCaseId = "";
+  try { storedBusinessCaseId = localStorage.getItem(ACTIVE_CONTEXT_KEY) || ""; } catch (_) {}
   return {
-    caseId: params.get("business_case_id") || "",
-    visibleCode: String(document.querySelector("main header small")?.textContent || "").trim(),
+    urlBusinessCaseId: params.get("business_case_id") || "",
+    headerText: String(document.querySelector("main header small")?.textContent || "").trim(),
+    storedBusinessCaseId,
   };
 }
 
 function activeIndex(projects) {
-  const { caseId, visibleCode } = activeIdentity();
-  return projects.findIndex((project) =>
-    (caseId && [project?.id, project?.crm?.businessCaseRecordId].map(String).includes(caseId)) ||
-    (visibleCode && String(project?.project?.businessCaseId || "").trim() === visibleCode)
-  );
+  return resolveActiveProjectIndex(projects, activeIdentity());
 }
 
 function findField(pattern) {
