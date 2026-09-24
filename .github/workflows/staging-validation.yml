@@ -4,6 +4,7 @@ on:
     branches:
       - staging/felicity-procurement-safe-release
       - staging/iva-report-safe-release-20260918
+      - validation/additional-capex-safe-release-20260924
   pull_request:
     branches:
       - staging/felicity-procurement-safe-release
