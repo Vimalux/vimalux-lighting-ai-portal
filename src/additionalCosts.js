@@ -41,6 +41,22 @@ export function normalizeAdditionalCost(item = {}) {
   };
 }
 
+// Admins see both supplier/internal cost and customer sales price. To avoid a
+// silent zero-CAPEX row, a new/unchanged customer price follows unit cost until
+// the admin explicitly sets a different sales price. Once overridden, later
+// supplier-cost edits preserve the manual customer price.
+export function updateAdminAdditionalCostField(row = {}, key, value) {
+  const next = { ...row, [key]: value };
+  if (key !== "unitCost") return next;
+
+  const previousCost = positive(row.unitCost);
+  const previousSalesPrice = positive(row.unitSalesPrice);
+  const nextCost = positive(value);
+  const salesPriceWasAutomatic = previousSalesPrice <= 0 || previousSalesPrice === previousCost;
+  if (salesPriceWasAutomatic) next.unitSalesPrice = nextCost;
+  return next;
+}
+
 export function calculateAdditionalCosts(items = []) {
   const rows = (Array.isArray(items) ? items : []).map((raw) => {
     const item = normalizeAdditionalCost(raw);
