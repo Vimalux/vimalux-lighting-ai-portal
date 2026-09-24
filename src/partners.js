@@ -122,6 +122,13 @@ export function partnerProjectRows(projects = [], partner, role) {
       const supplierContractCost = cmsSupplierContractCost + adaptiveSupplierContractCost + equipmentSupplierContractCost;
       const contractMargin = customerContractValue - supplierContractCost;
 
+      // Preserve the historic partner-dashboard contract so existing views and tests
+      // do not silently change meaning. CMS historically surfaced customer CMS revenue,
+      // while Adaptive Dimming and general equipment surfaced supplier business value.
+      // New explicit fields above carry the unambiguous customer/supplier/margin split.
+      const legacyAnnualRevenue = cmsAnnualCustomerRevenue + adaptiveAnnualSupplierCost + equipmentAnnualSupplierCost;
+      const legacyContractValue = cmsCustomerContractValue + adaptiveSupplierContractCost + equipmentSupplierContractCost;
+
       return {
         ...common,
         ...(isCmsPartner ? { probability: crm.probability, pipelineTcv: crm.totalContractValue, weightedTcv: crm.weightedTcv } : {}),
@@ -133,12 +140,10 @@ export function partnerProjectRows(projects = [], partner, role) {
         supplierContractCost,
         contractMargin,
         contractMarginPercent: marginPercent(contractMargin, customerContractValue),
-        // Backward-compatible aliases. "annualRevenue" and "totalContractValue"
-        // now consistently mean VIMALUX customer sales, not supplier payable value.
-        annualRevenue: annualCustomerRevenue,
-        mrr: annualCustomerRevenue / 12,
-        arr: annualCustomerRevenue,
-        totalContractValue: customerContractValue,
+        annualRevenue: legacyAnnualRevenue,
+        mrr: legacyAnnualRevenue / 12,
+        arr: legacyAnnualRevenue,
+        totalContractValue: legacyContractValue,
         ...(isAdaptivePartner ? { customerFee: result.powerAidCustomerFee, vimaluxMargin: result.powerAidVimaluxMargin } : {}),
       };
     }
@@ -177,6 +182,8 @@ export function partnerTotals(projects, partner, role) {
   const customerContractValue = sum("customerContractValue");
   const supplierContractCost = sum("supplierContractCost");
   const contractMargin = customerContractValue - supplierContractCost;
+  const legacyAnnualRevenue = sum("annualRevenue");
+  const legacyContractValue = sum("totalContractValue");
   return {
     rows,
     municipalities,
@@ -191,11 +198,12 @@ export function partnerTotals(projects, partner, role) {
     supplierContractCost,
     contractMargin,
     contractMarginPercent: marginPercent(contractMargin, customerContractValue),
-    // Backward-compatible aggregate aliases used by existing dashboards.
-    annualRevenue: annualCustomerRevenue,
-    mrr: annualCustomerRevenue / 12,
-    arr: annualCustomerRevenue,
-    totalContractValue: customerContractValue,
+    // Existing partner cards retain their old values; new profitability surfaces use
+    // the explicit fields above.
+    annualRevenue: legacyAnnualRevenue,
+    mrr: legacyAnnualRevenue / 12,
+    arr: legacyAnnualRevenue,
+    totalContractValue: legacyContractValue,
     pipelineTcv: sum("pipelineTcv"),
     weightedTcv: sum("weightedTcv"),
   };
