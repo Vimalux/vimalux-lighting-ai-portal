@@ -1,0 +1,1 @@
+Validation-only marker for the isolated Additional CAPEX production candidate. This branch is not intended for merge. Application source is inherited unchanged from release/additional-capex-safe-release-20260924.
