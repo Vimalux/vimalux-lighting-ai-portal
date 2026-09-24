@@ -18,7 +18,10 @@ const copyAgentFields = (item = {}) =>
       .map((key) => [key, item[key]]),
   );
 
-const priceFromSupplierCost = (unitCost, markupPercent = AGENT_ADDITIONAL_COST_MARKUP_PERCENT) => {
+export const additionalCostSalesPriceFromSupplierCost = (
+  unitCost,
+  markupPercent = AGENT_ADDITIONAL_COST_MARKUP_PERCENT,
+) => {
   const cost = Number(unitCost);
   const markup = Number(markupPercent);
   if (!Number.isFinite(cost) || cost < 0) return 0;
@@ -52,8 +55,8 @@ export const sanitizeAgentAdditionalCosts = (
       ...copied,
       unitCost: nextUnitCost,
       unitSalesPrice: supplierCostChanged
-        ? priceFromSupplierCost(nextUnitCost, markupPercent)
-        : existing?.unitSalesPrice ?? priceFromSupplierCost(nextUnitCost, markupPercent),
+        ? additionalCostSalesPriceFromSupplierCost(nextUnitCost, markupPercent)
+        : existing?.unitSalesPrice ?? additionalCostSalesPriceFromSupplierCost(nextUnitCost, markupPercent),
     };
   });
 };
