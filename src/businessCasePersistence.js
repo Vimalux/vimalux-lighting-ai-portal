@@ -64,19 +64,16 @@ export async function persistIntelligenceProject(client, project, profile) {
     const legacyId = legacyProjectId(project);
     if (!legacyId) return null;
 
-    if (project.importedTechnical || project.importedCommercial) {
-      const createdDraft = await client.rpc("create_intelligence_draft", { legacy_id: legacyId, project_payload: payload });
-      if (createdDraft.error) throw createdDraft.error;
-      caseId = createdDraft.data;
-    } else {
-      // A manually created project stays local while the user is still typing the
-      // placeholder identity. This avoids creating/promoting a CRM record halfway
-      // through entry and prevents the active project from changing underneath them.
-      if (!hasMeaningfulProjectIdentity(project)) return null;
-      const created = await client.rpc("create_internal_business_case", { legacy_id: legacyId, project_payload: payload });
-      if (created.error) throw created.error;
-      caseId = created.data;
-    }
+    // Every newly created Intelligence project gets a durable Business Case draft
+    // immediately. CRM Opportunity creation is still deferred until both customer
+    // and project identity are meaningful. This prevents manual work from existing
+    // only in browser localStorage and disappearing after reload/navigation/deploy.
+    const createdDraft = await client.rpc("create_intelligence_draft", {
+      legacy_id: legacyId,
+      project_payload: payload,
+    });
+    if (createdDraft.error) throw createdDraft.error;
+    caseId = createdDraft.data;
     promotion.caseId = caseId;
   }
 

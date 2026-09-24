@@ -107,15 +107,19 @@ export async function loadCloudState(localProjects, includeLocalProjects = true)
     return masterCatalogue ? { ...project, catalogue: catalogueWithHistoricalSelections(project, masterCatalogue) } : project;
   })));
   if (!includeLocalProjects) return cloudProjects;
-  const pendingImports = (localProjects || []).filter((item) =>
+
+  // Never silently discard a browser-local project that has not yet received a
+  // stable cloud UUID. This includes manually created drafts as well as imports.
+  // Once cloud persistence succeeds the promotion replaces the local ID with the
+  // stable Business Case ID, so the draft naturally drops out of this carry-over.
+  const pendingLocalProjects = (localProjects || []).filter((item) =>
     !isArchivedProject(item) &&
     !isStableCloudId(item?.id) &&
-    (item?.importedTechnical || item?.importedCommercial) &&
     !cloudProjects.some((cloud) => cloud.id === item.id || isSameImportedProject(cloud, item))
   );
   return dedupeProjects([
     ...cloudProjects,
-    ...pendingImports.map((item) => masterCatalogue ? { ...item, catalogue: catalogueWithHistoricalSelections(item, masterCatalogue) } : item),
+    ...pendingLocalProjects.map((item) => masterCatalogue ? { ...item, catalogue: catalogueWithHistoricalSelections(item, masterCatalogue) } : item),
   ]);
 }
 
@@ -130,7 +134,11 @@ export async function saveCloudState(projects) {
     const { error: catalogueError } = await supabase.rpc("save_intelligence_catalogue", { catalogue_payload: catalogue });
     if (catalogueError) throw catalogueError;
   }
-  for (const project of uniqueProjects) {
+
+  // New/unsynced projects are saved first so a manual project gets a durable
+  // Business Case draft before the slower portfolio-wide synchronization runs.
+  const saveOrder = [...uniqueProjects].sort((a, b) => Number(isStableCloudId(a?.id)) - Number(isStableCloudId(b?.id)));
+  for (const project of saveOrder) {
     const persisted = await persistIntelligenceProject(supabase, project, profile);
     if (persisted?.promotion) promotions.push(persisted.promotion);
   }
