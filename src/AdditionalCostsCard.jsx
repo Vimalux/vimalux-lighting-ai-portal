@@ -1,5 +1,6 @@
 import React from "react";
-import { calculateAdditionalCosts } from "./additionalCosts.js";
+import { calculateAdditionalCosts, updateAdminAdditionalCostField } from "./additionalCosts.js";
+import { additionalCostSalesPriceFromSupplierCost } from "./additionalCostsAccess.js";
 
 const categories = [
   ["materiale", "Materiale"],
@@ -54,9 +55,19 @@ export default function AdditionalCostsCard({ p, update, mode = "admin" }) {
   const replaceRows = (next) => update(["additionalCosts"], next);
   const change = (index, key, value) => {
     replaceRows(
-      rows.map((row, rowIndex) =>
-        rowIndex === index ? { ...row, [key]: value } : row,
-      ),
+      rows.map((row, rowIndex) => {
+        if (rowIndex !== index) return row;
+        if (isAgent && key === "unitCost") {
+          return {
+            ...row,
+            unitCost: value,
+            // Keep the live Business Case aligned with the same 15% pricing
+            // rule enforced again when an agent project is persisted.
+            unitSalesPrice: additionalCostSalesPriceFromSupplierCost(value),
+          };
+        }
+        return updateAdminAdditionalCostField(row, key, value);
+      }),
     );
   };
   const remove = (index) => replaceRows(rows.filter((_, i) => i !== index));
@@ -69,11 +80,11 @@ export default function AdditionalCostsCard({ p, update, mode = "admin" }) {
           <p className="hint">
             {isAgent
               ? (it
-                ? "Inserisci il costo comunicato dal fornitore o subappaltatore. Il prezzo di vendita viene calcolato automaticamente secondo i parametri commerciali VIMALUX e resta riservato a VIMALUX."
-                : "Enter the cost quoted by the supplier or subcontractor. The sales price is calculated automatically using VIMALUX commercial parameters and remains visible only to VIMALUX.")
+                ? "Inserisci il costo comunicato dal fornitore o subappaltatore. Il prezzo di vendita viene calcolato automaticamente secondo i parametri commerciali VIMALUX e resta riservato a VIMALUX. La modifica aggiorna subito CAPEX/OPEX e il piano economico."
+                : "Enter the cost quoted by the supplier or subcontractor. The sales price is calculated automatically using VIMALUX commercial parameters and remains visible only to VIMALUX. The change immediately updates CAPEX/OPEX and the economic plan.")
               : (it
-                ? "Costi specifici del progetto. Le voci CAPEX entrano nell'investimento; le voci OPEX annuali entrano nei costi/ricavi ricorrenti."
-                : "Project-specific costs. CAPEX items are included in the investment; annual OPEX items are included in recurring costs/revenue.")}
+                ? "Costi specifici del progetto. Il costo unitario è il costo interno; il prezzo unitario è il CAPEX/OPEX cliente usato nel piano economico. Per una nuova voce il prezzo cliente segue inizialmente il costo, finché non viene impostato manualmente."
+                : "Project-specific costs. Unit cost is the internal cost; unit sales price is the customer CAPEX/OPEX used by the economic plan. For a new item, the customer price initially follows cost until it is manually overridden.")}
           </p>
         </div>
         <button type="button" className="primary" onClick={() => replaceRows([...rows, emptyRow()])}>
