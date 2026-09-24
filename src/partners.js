@@ -64,6 +64,9 @@ export function technologyPartnerOptions(projects = []) {
   return [...new Set(partnerReportOptions(projects).map((entry) => entry.partner))];
 }
 
+const escalatingTotal = (annual, ratePercent, years) => Array.from({ length: Math.max(0, Math.round(Number(years) || 0)) }, (_, index) => (Number(annual) || 0) * Math.pow(1 + (Number(ratePercent) || 0) / 100, index)).reduce((sum, value) => sum + value, 0);
+const marginPercent = (margin, revenue) => revenue ? margin / revenue * 100 : 0;
+
 export function partnerProjectRows(projects = [], partner, role) {
   const normalizedPartner = partnerName(partner);
   const consolidated = normalizedPartner === "VIMALUX";
@@ -76,7 +79,9 @@ export function partnerProjectRows(projects = [], partner, role) {
     const isAdaptivePartner = roles.includes("ADAPTIVE_DIMMING");
     const result = calculateBusinessCase(project);
     const crm = crmMetrics(project);
-    const years = Math.max(1, Math.round(Number(project.assumptions.contractYears) || 1));
+    const years = Math.max(1, Math.round(Number(project.assumptions.contractYears) || Number(result.serviceAgreementPeriod) || 1));
+    const serviceYears = Math.max(1, Math.round(Number(result.serviceAgreementPeriod) || years));
+    const opexRate = Number(project.assumptions.opexEscalation || 0);
     const common = {
       id: project.id,
       municipality: project.customer.name || "-",
@@ -88,29 +93,81 @@ export function partnerProjectRows(projects = [], partner, role) {
     };
 
     if (!consolidated) {
-      const cmsContract = isCmsPartner ? Array.from({ length: years }, (_, i) => result.cmsRevenue * Math.pow(1 + Number(project.assumptions.opexEscalation || 0) / 100, i)).reduce((a, b) => a + b, 0) : 0;
       const otherRows = (project.solution?.partnerEquipment || []).flatMap((selection) => {
         const product = (project.catalogue?.smart || []).find((item) => item.id === selection.productId);
         return product && product.active !== false && roles.some((r) => r !== "CMS" && r !== "ADAPTIVE_DIMMING" && selectedEquipmentRole(selection, product) === r && productPartner(product,r) === normalizedPartner) ? [{ product, quantity: Math.max(0, Number(selection.quantity) || 0) }] : [];
       });
-      const equipmentAnnual = otherRows.reduce((sum, { product, quantity }) => sum + quantity * (Number(product.annualCost) || 0), 0);
-      const equipmentCapex = otherRows.reduce((sum, { product, quantity }) => sum + quantity * ((Number(product.costPrice) || 0) + (Number(product.implementationCost) || 0)), 0);
-      const annualRevenue = (isCmsPartner ? result.cmsRevenue : 0) + (isAdaptivePartner ? result.powerAidSupplierCost : 0) + equipmentAnnual;
+
+      const equipmentAnnualCustomerRevenue = otherRows.reduce((sum, { product, quantity }) => sum + quantity * (Number(product.annualSalesPrice) || 0), 0);
+      const equipmentAnnualSupplierCost = otherRows.reduce((sum, { product, quantity }) => sum + quantity * (Number(product.annualCost) || 0), 0);
+      const equipmentCapexCustomerValue = otherRows.reduce((sum, { product, quantity }) => sum + quantity * ((Number(product.salesPrice) || 0) + (Number(product.implementationSalesPrice) || 0)), 0);
+      const equipmentCapexSupplierCost = otherRows.reduce((sum, { product, quantity }) => sum + quantity * ((Number(product.costPrice) || 0) + (Number(product.implementationCost) || 0)), 0);
+
+      const cmsAnnualCustomerRevenue = isCmsPartner ? Number(result.cmsRevenue) || 0 : 0;
+      const cmsAnnualSupplierCost = isCmsPartner ? Number(result.cmsDirectCost) || 0 : 0;
+      const adaptiveAnnualCustomerRevenue = isAdaptivePartner ? Number(result.powerAidCustomerFee) || 0 : 0;
+      const adaptiveAnnualSupplierCost = isAdaptivePartner ? Number(result.powerAidSupplierCost) || 0 : 0;
+
+      const annualCustomerRevenue = cmsAnnualCustomerRevenue + adaptiveAnnualCustomerRevenue + equipmentAnnualCustomerRevenue;
+      const annualSupplierCost = cmsAnnualSupplierCost + adaptiveAnnualSupplierCost + equipmentAnnualSupplierCost;
+      const annualVimaluxMargin = annualCustomerRevenue - annualSupplierCost;
+
+      const cmsCustomerContractValue = isCmsPartner ? escalatingTotal(cmsAnnualCustomerRevenue, opexRate, serviceYears) : 0;
+      const cmsSupplierContractCost = isCmsPartner ? escalatingTotal(cmsAnnualSupplierCost, opexRate, serviceYears) : 0;
+      const adaptiveCustomerContractValue = isAdaptivePartner ? Number(result.powerAidContractRevenue) || 0 : 0;
+      const adaptiveSupplierContractCost = isAdaptivePartner ? Number(result.powerAidSupplierContractCost) || 0 : 0;
+      const equipmentCustomerContractValue = equipmentCapexCustomerValue + escalatingTotal(equipmentAnnualCustomerRevenue, opexRate, serviceYears);
+      const equipmentSupplierContractCost = equipmentCapexSupplierCost + escalatingTotal(equipmentAnnualSupplierCost, opexRate, serviceYears);
+      const customerContractValue = cmsCustomerContractValue + adaptiveCustomerContractValue + equipmentCustomerContractValue;
+      const supplierContractCost = cmsSupplierContractCost + adaptiveSupplierContractCost + equipmentSupplierContractCost;
+      const contractMargin = customerContractValue - supplierContractCost;
+
+      // Preserve the historic partner-dashboard contract so existing views and tests
+      // do not silently change meaning. CMS historically surfaced customer CMS revenue,
+      // while Adaptive Dimming and general equipment surfaced supplier business value.
+      // New explicit fields above carry the unambiguous customer/supplier/margin split.
+      const legacyAnnualRevenue = cmsAnnualCustomerRevenue + adaptiveAnnualSupplierCost + equipmentAnnualSupplierCost;
+      const legacyContractValue = cmsCustomerContractValue + adaptiveSupplierContractCost + equipmentSupplierContractCost;
+
       return {
         ...common,
         ...(isCmsPartner ? { probability: crm.probability, pipelineTcv: crm.totalContractValue, weightedTcv: crm.weightedTcv } : {}),
-        annualRevenue, mrr: annualRevenue / 12, arr: annualRevenue,
+        annualCustomerRevenue,
+        annualSupplierCost,
+        annualVimaluxMargin,
+        annualMarginPercent: marginPercent(annualVimaluxMargin, annualCustomerRevenue),
+        customerContractValue,
+        supplierContractCost,
+        contractMargin,
+        contractMarginPercent: marginPercent(contractMargin, customerContractValue),
+        annualRevenue: legacyAnnualRevenue,
+        mrr: legacyAnnualRevenue / 12,
+        arr: legacyAnnualRevenue,
+        totalContractValue: legacyContractValue,
         ...(isAdaptivePartner ? { customerFee: result.powerAidCustomerFee, vimaluxMargin: result.powerAidVimaluxMargin } : {}),
-        totalContractValue: cmsContract + (isAdaptivePartner ? result.powerAidSupplierContractCost : 0) + equipmentCapex + Array.from({ length: years }, (_, i) => equipmentAnnual * Math.pow(1 + Number(project.assumptions.opexEscalation || 0) / 100, i)).reduce((a,b) => a+b,0),
       };
     }
 
+    const annualCustomerRevenue = Number(result.annualRecurringRevenue) || 0;
+    const annualSupplierCost = (Number(result.annualOpexDirectCost) || 0) + (Number(result.powerAidSupplierCost) || 0);
+    const annualVimaluxMargin = annualCustomerRevenue - annualSupplierCost;
+    const customerContractValue = Number(result.totalContractRevenue) || 0;
+    const supplierContractCost = Number(result.totalDirectCosts) || 0;
+    const contractMargin = Number(result.netProjectProfit) || (customerContractValue - supplierContractCost);
     return {
       ...common,
-      annualRevenue: result.annualRecurringRevenue,
-      mrr: result.annualRecurringRevenue / 12,
-      arr: result.annualRecurringRevenue,
-      totalContractValue: result.totalContractRevenue,
+      annualCustomerRevenue,
+      annualSupplierCost,
+      annualVimaluxMargin,
+      annualMarginPercent: marginPercent(annualVimaluxMargin, annualCustomerRevenue),
+      customerContractValue,
+      supplierContractCost,
+      contractMargin,
+      contractMarginPercent: marginPercent(contractMargin, customerContractValue),
+      annualRevenue: annualCustomerRevenue,
+      mrr: annualCustomerRevenue / 12,
+      arr: annualCustomerRevenue,
+      totalContractValue: customerContractValue,
     };
   });
 }
@@ -119,16 +176,34 @@ export function partnerTotals(projects, partner, role) {
   const rows = partnerProjectRows(projects, partner, role);
   const sum = (key) => rows.reduce((total, row) => total + (Number(row[key]) || 0), 0);
   const municipalities = new Set(rows.map((row) => row.municipality).filter((value) => value !== "-")).size;
+  const annualCustomerRevenue = sum("annualCustomerRevenue");
+  const annualSupplierCost = sum("annualSupplierCost");
+  const annualVimaluxMargin = annualCustomerRevenue - annualSupplierCost;
+  const customerContractValue = sum("customerContractValue");
+  const supplierContractCost = sum("supplierContractCost");
+  const contractMargin = customerContractValue - supplierContractCost;
+  const legacyAnnualRevenue = sum("annualRevenue");
+  const legacyContractValue = sum("totalContractValue");
   return {
     rows,
     municipalities,
     projects: rows.length,
     luminaires: sum("luminaires"),
     lcus: sum("lcus"),
-    annualRevenue: sum("annualRevenue"),
-    mrr: sum("mrr"),
-    arr: sum("arr"),
-    totalContractValue: sum("totalContractValue"),
+    annualCustomerRevenue,
+    annualSupplierCost,
+    annualVimaluxMargin,
+    annualMarginPercent: marginPercent(annualVimaluxMargin, annualCustomerRevenue),
+    customerContractValue,
+    supplierContractCost,
+    contractMargin,
+    contractMarginPercent: marginPercent(contractMargin, customerContractValue),
+    // Existing partner cards retain their old values; new profitability surfaces use
+    // the explicit fields above.
+    annualRevenue: legacyAnnualRevenue,
+    mrr: legacyAnnualRevenue / 12,
+    arr: legacyAnnualRevenue,
+    totalContractValue: legacyContractValue,
     pipelineTcv: sum("pipelineTcv"),
     weightedTcv: sum("weightedTcv"),
   };
