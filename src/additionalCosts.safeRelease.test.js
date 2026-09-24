@@ -74,7 +74,7 @@ test("SAFE RELEASE: additional-cost UI wires admin and agent cost changes into c
   const source = fs.readFileSync(new URL("./AdditionalCostsCard.jsx", import.meta.url), "utf8");
   assert.match(source, /updateAdminAdditionalCostField\(row, key, value\)/);
   assert.match(source, /additionalCostSalesPriceFromSupplierCost\(value\)/);
-  assert.match(source, /Customer unit price/);
+  assert.match(source, /Unit sales price/);
 });
 
 test("SAFE RELEASE: additional CAPEX propagates through financing, customer payment, TCV and customer economics", () => {
