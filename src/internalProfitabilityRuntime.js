@@ -18,6 +18,10 @@ function money(value, language = "it", currency = "EUR") {
   return new Intl.NumberFormat(localeFor(language), { style: "currency", currency, maximumFractionDigits: 0 }).format(numberValue(value));
 }
 
+function moneyPrecise(value, language = "it", currency = "EUR") {
+  return new Intl.NumberFormat(localeFor(language), { style: "currency", currency, minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(numberValue(value));
+}
+
 function percent(value, language = "it") {
   return `${new Intl.NumberFormat(localeFor(language), { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(numberValue(value))}%`;
 }
@@ -27,7 +31,7 @@ function labels(language) {
     title: "VIMALUX projektrentabilitet",
     subtitle: "Intern økonomi opdelt i CAPEX/hardware, tilbagevendende OPEX, Adaptive Dimming og samlet projektbidrag.",
     hardware: "CAPEX / hardware",
-    recurring: "Tilbagevendende OPEX",
+    recurring: "Tilbagevendende OPEX i alt (ekskl. Adaptive Dimming)",
     cms: "DATEK CMS",
     gateway: "Gateway / connectivity",
     otherOpex: "Øvrig OPEX",
@@ -58,7 +62,7 @@ function labels(language) {
     title: "VIMALUX project profitability",
     subtitle: "Internal economics split into CAPEX/hardware, recurring OPEX, Adaptive Dimming and total project contribution.",
     hardware: "CAPEX / hardware",
-    recurring: "Recurring OPEX",
+    recurring: "Total recurring OPEX (excl. Adaptive Dimming)",
     cms: "DATEK CMS",
     gateway: "Gateway / connectivity",
     otherOpex: "Other OPEX",
@@ -89,7 +93,7 @@ function labels(language) {
     title: "Redditività progetto VIMALUX",
     subtitle: "Economia interna separata tra CAPEX/hardware, OPEX ricorrente, Adaptive Dimming e contributo complessivo del progetto.",
     hardware: "CAPEX / hardware",
-    recurring: "OPEX ricorrente",
+    recurring: "OPEX ricorrente totale (escluso Adaptive Dimming)",
     cms: "DATEK CMS",
     gateway: "Gateway / connectivity",
     otherOpex: "Altri OPEX",
@@ -245,9 +249,9 @@ function renderInternal() {
         [t.marginPct, percent(m.otherOpex.marginPercent, language), positiveClass(m.otherOpex.marginAnnual)],
       ])}
       ${box(t.adaptive, [
-        [t.customerSales + " · " + t.annual, money(m.adaptive.revenueAnnual, language, currency)],
-        [t.supplierCost + " · " + t.annual, money(m.adaptive.costAnnual, language, currency)],
-        [t.margin + " · " + t.annual, money(m.adaptive.marginAnnual, language, currency), positiveClass(m.adaptive.marginAnnual)],
+        [t.customerSales + " · " + t.annual, moneyPrecise(m.adaptive.revenueAnnual, language, currency)],
+        [t.supplierCost + " · " + t.annual, moneyPrecise(m.adaptive.costAnnual, language, currency)],
+        [t.margin + " · " + t.annual, moneyPrecise(m.adaptive.marginAnnual, language, currency), positiveClass(m.adaptive.marginAnnual)],
         [t.marginPct, percent(m.adaptive.marginPercent, language), positiveClass(m.adaptive.marginAnnual)],
         [t.margin + " · " + t.contract, money(m.adaptive.contractMargin, language, currency), positiveClass(m.adaptive.contractMargin)],
       ])}
