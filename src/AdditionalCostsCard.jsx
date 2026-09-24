@@ -108,8 +108,8 @@ export default function AdditionalCostsCard({ p, update, mode = "admin" }) {
                 <th>{it ? "Unità" : "Unit"}</th>
                 <th>{it ? "Costo unitario" : "Unit cost"}</th>
                 <th>{it ? "Costo totale" : "Total cost"}</th>
-                {showSalesPrices && <th>{it ? "Prezzo unitario cliente" : "Customer unit price"}</th>}
-                {showSalesPrices && <th>{it ? "Prezzo totale cliente" : "Customer total"}</th>}
+                {showSalesPrices && <th>{it ? "Prezzo unitario" : "Unit sales price"}</th>}
+                {showSalesPrices && <th>{it ? "Prezzo totale" : "Total sales"}</th>}
                 <th>{it ? "Note" : "Notes"}</th>
                 <th />
               </tr>
