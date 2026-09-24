@@ -1,3 +1,5 @@
+import { businessCaseCodeFromText, resolveProjectByReference } from "./activeBusinessCaseResolver.js";
+
 const STORAGE_KEY = "vimalux-intelligence-active-business-case";
 const PROJECTS_KEY = "vimalux-intelligence-projects";
 
@@ -8,22 +10,14 @@ function currentParams() {
 function storedProjects() {
   try {
     const rows = JSON.parse(localStorage.getItem(PROJECTS_KEY) || "[]");
-    return Array.isArray(rows) ? rows : [];
+    return Array.isArray(rows) ? rows : (Array.isArray(rows?.projects) ? rows.projects : []);
   } catch (_) {
     return [];
   }
 }
 
 function projectForBusinessCase(ref) {
-  const value = String(ref || "").trim();
-  if (!value) return null;
-  const upper = value.toUpperCase();
-  return storedProjects().find((item) => {
-    const ids = [item?.id, item?.crm?.businessCaseRecordId].map((entry) => String(entry || "").trim());
-    const codes = [item?.project?.businessCaseId, item?.crm?.businessCase?.businessCaseId]
-      .map((entry) => String(entry || "").trim().toUpperCase());
-    return ids.includes(value) || codes.includes(upper);
-  }) || null;
+  return resolveProjectByReference(storedProjects(), ref);
 }
 
 function stableRecordId(ref) {
@@ -78,20 +72,23 @@ function updateHeaderContext() {
   if (!small) return;
 
   const urlRef = String(currentParams().get("business_case_id") || "").trim();
-  const renderedCode = String(small.textContent || "").match(/BC-[A-Z0-9-]+/i)?.[0] || "";
+  const renderedCode = businessCaseCodeFromText(small.textContent);
   const ref = urlRef || renderedCode;
   if (!ref) return;
 
   // An explicit Business Case link is authoritative while cloud data loads.
-  // The temporary header may still describe a different/default project.
+  // Without an explicit URL, the rendered BC code is the authoritative React
+  // context for a newly created project and must replace any remembered older
+  // project context.
   const match = urlRef ? projectForBusinessCase(urlRef) : projectForBusinessCase(renderedCode);
   if (urlRef && !match) return;
+  if (!urlRef && renderedCode && !match) return;
   const stable = String(match?.crm?.businessCaseRecordId || match?.id || ref).trim();
   const code = String(match?.project?.businessCaseId || match?.crm?.businessCase?.businessCaseId || renderedCode || ref).trim();
   const projectName = String(match?.project?.name || match?.name || match?.customer?.name || "").trim();
 
   rememberBusinessCaseId(stable);
-  if (urlRef && stable && stable !== urlRef) replaceBusinessCaseInUrl(stable);
+  if (stable && stable !== urlRef) replaceBusinessCaseInUrl(stable);
 
   const desired = projectName ? `${projectName} · ${code}` : code;
   if (desired && small.textContent !== desired) small.textContent = desired;
@@ -104,7 +101,7 @@ function bindProjectSelection() {
     button.addEventListener("click", () => {
       const rendered = String(button.querySelector("small")?.textContent || "").trim();
       if (!rendered) return;
-      const code = rendered.match(/BC-[A-Z0-9-]+/i)?.[0] || rendered;
+      const code = businessCaseCodeFromText(rendered) || rendered;
       const stable = stableRecordId(code);
       rememberBusinessCaseId(stable);
       replaceBusinessCaseInUrl(stable);
