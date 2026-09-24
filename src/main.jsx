@@ -27,4 +27,5 @@ import "./reportLayoutFinalizerRuntime.js";
 import "./platformActivityRuntime.js";
 import "./catalogueSelectionRuntime.js";
 import "./newProjectContextGuard.js";
+import "./internalProfitabilityRuntime.js";
 ReactDOM.createRoot(document.getElementById("root")).render(<React.StrictMode><App/></React.StrictMode>);
