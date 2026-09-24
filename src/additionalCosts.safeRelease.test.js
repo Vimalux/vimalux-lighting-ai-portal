@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { calculateBusinessCase } from "./calculations.js";
 import { defaultProject } from "./model.js";
 import { updateAdminAdditionalCostField } from "./additionalCosts.js";
@@ -67,6 +68,13 @@ test("SAFE RELEASE: admin supplier cost gets a non-zero customer CAPEX price by 
   const laterCostChange = updateAdminAdditionalCostField(manuallyPriced, "unitCost", 5200);
   assert.equal(laterCostChange.unitCost, 5200);
   assert.equal(laterCostChange.unitSalesPrice, 6500);
+});
+
+test("SAFE RELEASE: additional-cost UI wires admin and agent cost changes into customer pricing", () => {
+  const source = fs.readFileSync(new URL("./AdditionalCostsCard.jsx", import.meta.url), "utf8");
+  assert.match(source, /updateAdminAdditionalCostField\(row, key, value\)/);
+  assert.match(source, /additionalCostSalesPriceFromSupplierCost\(value\)/);
+  assert.match(source, /Customer unit price/);
 });
 
 test("SAFE RELEASE: additional CAPEX propagates through financing, customer payment, TCV and customer economics", () => {
