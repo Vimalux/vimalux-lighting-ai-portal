@@ -112,23 +112,33 @@ export function generateCustomerPdf(project, result) {
 
   section(it ? "Sintesi Esecutiva" : "Executive Summary", 52);
   const paybackLabel = it ? "Payback operativo (escl. finanziamento)" : "Operational payback (excl. financing)";
+  const roiLabel = it ? "ROI operativo (escl. finanziamento)" : "Operational ROI (excl. financing)";
+  const cashDeal = result.dealType === "cash";
+  const cashBreakEvenYear = result.cashBreakEvenYear ?? result.cashFlowRows?.find((row) => Number(row.cumulative) >= 0)?.year ?? null;
+  const cashBreakEvenValue = cashBreakEvenYear == null ? t("notAvailable") : `${it ? "Anno" : "Year"} ${cashBreakEvenYear}`;
+  const firstYearCashPositive = Number(result.cashFlowRows?.[0]?.cumulative || 0) >= 0;
+  const customerInitialInvestment = cashDeal ? result.totalCapex : Number(project.assumptions.upfrontPayment || 0);
   const paymentLabel = result.dealType === "noleggio_operativo"
-    ? (it ? "Canone mensile" : "Monthly canone")
-    : result.dealType === "finance"
-      ? (it ? "Rata mensile finanziamento CAPEX" : "Monthly CAPEX financing payment")
-      : t("monthlyPayment");
-  const paymentValue = result.dealType === "finance"
-    ? result.financingMonthlyPayment
-    : result.monthlyPayment;
+    ? (it ? "Canone mensile cliente" : "Customer monthly canone")
+    : (it ? "Pagamento mensile totale cliente" : "Total monthly customer payment");
+  const opexLabel = result.dealType === "noleggio_operativo"
+    ? (it ? "OPEX mensile (incluso nel canone)" : "Monthly OPEX (included in payment)")
+    : (it ? "OPEX mensile" : "Monthly OPEX");
+  const executiveHead = cashDeal
+    ? [t("preliminary"), it ? "Investimento iniziale" : "Initial investment", opexLabel, `${t("annualNet")}*`, roiLabel, paybackLabel, it ? "Break-even cash cumulato" : "Cumulative cash break-even"]
+    : [t("preliminary"), it ? "CAPEX iniziale cliente" : "Customer upfront CAPEX", paymentLabel, opexLabel, `${t("annualNet")}*`, it ? "Cash flow positivo dal primo anno" : "Positive cash flow from year one", t("npv")];
+  const executiveBody = cashDeal
+    ? [(result.customerCashDecisionStatus ?? result.customerDecisionStatus).replace("_", "-"), money(customerInitialInvestment), money2(result.totalAnnualOpex / 12), money(result.customerCashAnnualNetBenefit ?? result.customerAnnualNetBenefit), percent(result.roiPercent), result.payback == null ? t("notAvailable") : `${formatNumber(result.payback, lang, 1)} ${t("years")}`, cashBreakEvenValue]
+    : [(result.customerCashDecisionStatus ?? result.customerDecisionStatus).replace("_", "-"), money(customerInitialInvestment), money2(result.customerGrossMonthlyPayment ?? result.monthlyPayment), money2(result.totalAnnualOpex / 12), money(result.customerCashAnnualNetBenefit ?? result.customerAnnualNetBenefit), firstYearCashPositive ? (it ? "Sì" : "Yes") : (it ? "No" : "No"), money(result.npv)];
   autoTable(doc, {
     startY: 57,
     theme: "grid",
-    head: [[t("preliminary"), it ? "Investimento iniziale (CAPEX)" : "Initial investment (CAPEX)", paymentLabel, result.dealType === "noleggio_operativo" ? (it ? "OPEX mensile (incluso nel canone)" : "Monthly OPEX (included in payment)") : (it ? "OPEX mensile" : "Monthly OPEX"), `${t("annualNet")}*`, t("roi"), paybackLabel]],
-    body: [[(result.customerCashDecisionStatus ?? result.customerDecisionStatus).replace("_", "-"), money(result.totalCapex), money2(result.customerGrossMonthlyPayment ?? paymentValue), money2(result.totalAnnualOpex / 12), money(result.customerCashAnnualNetBenefit ?? result.customerAnnualNetBenefit), percent(result.roiPercent), result.payback == null ? t("notAvailable") : `${formatNumber(result.payback, lang, 1)} ${t("years")}`]],
+    head: [executiveHead],
+    body: [executiveBody],
     headStyles: { fillColor: [15, 118, 110] },
-    styles: { font: "helvetica", fontSize: 6.9, cellPadding: 1.8, valign: "middle" },
-    columnStyles: { 0: { halign: "left" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
-    didParseCell: alignTableHeaders("left", "right", "right", "right", "right", "right"),
+    styles: { font: "helvetica", fontSize: 6.4, cellPadding: 1.6, valign: "middle" },
+    columnStyles: { 0: { halign: "left" }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" } },
+    didParseCell: alignTableHeaders("left", "right", "right", "right", "right", "right", "right"),
   });
   doc.setFontSize(10);
   doc.text(t(result.customerDecisionStatus), 14, doc.lastAutoTable.finalY + 8, { maxWidth: 182 });
@@ -136,13 +146,19 @@ export function generateCustomerPdf(project, result) {
   doc.setFontSize(7.5);
   doc.setTextColor(71, 85, 105);
   doc.text(commercial.annualNetFootnote, 14, doc.lastAutoTable.finalY + 14, { maxWidth: 182 });
+  if (!cashDeal) {
+    doc.text(`${it ? "Metriche tecniche del progetto - indipendenti dal finanziamento" : "Technical project metrics - independent of financing"}: ${paybackLabel} ${result.payback == null ? t("notAvailable") : `${formatNumber(result.payback, lang, 1)} ${t("years")}`} · ${roiLabel} ${percent(result.roiPercent)}`, 14, doc.lastAutoTable.finalY + 19, { maxWidth: 182 });
+  }
   doc.setFont("helvetica", "normal");
-  doc.text(`${t("energyReduction")}: ${percent(result.energyReductionPercent)}   |   ${it ? "Riduzione CO2" : "CO2 reduction"}: ${formatNumber(result.co2ReductionKg / 1000, lang, 1)} t/${it ? "anno" : "year"}`, 14, doc.lastAutoTable.finalY + 19, { maxWidth: 182 });
+  const energySummaryY = doc.lastAutoTable.finalY + (cashDeal ? 19 : 24);
+  doc.text(`${t("energyReduction")}: ${percent(result.energyReductionPercent)}   |   ${it ? "Riduzione CO2" : "CO2 reduction"}: ${formatNumber(result.co2ReductionKg / 1000, lang, 1)} t/${it ? "anno" : "year"}`, 14, energySummaryY, { maxWidth: 182 });
   doc.setTextColor(15, 23, 42);
 
-  section(it ? "Cliente e progetto" : "Customer and project", doc.lastAutoTable.finalY + 33);
+  const customerSectionOffset = cashDeal ? 33 : 38;
+  const customerSectionTableOffset = cashDeal ? 38 : 43;
+  section(it ? "Cliente e progetto" : "Customer and project", doc.lastAutoTable.finalY + customerSectionOffset);
   autoTable(doc, {
-    startY: doc.lastAutoTable.finalY + 38,
+    startY: doc.lastAutoTable.finalY + customerSectionTableOffset,
     theme: "plain",
     body: rows([[it ? "Cliente" : "Customer", project.customer.name], [it ? "Provincia" : "Province", project.customer.province], [it ? "Regione" : "Region", project.customer.region], [it ? "Contatto" : "Contact", project.customer.contact], ["Email", project.customer.email], [it ? "Telefono" : "Telephone", project.customer.telephone], [it ? "Progetto" : "Project", project.project.name], [it ? "Consulente" : "Consultant", project.project.consultant], [it ? "Data" : "Date", project.project.date], [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)]]),
     columnStyles: { 0: { fontStyle: "bold", cellWidth: 48 } },
