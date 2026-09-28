@@ -146,6 +146,8 @@ export function customerAnalysisResult(result = {}) {
   if (!first) return result;
   const allInclusive = result.dealType === "noleggio_operativo";
   const serviceScale = positive(result.totalAnnualOpex) > 0 ? first.customerGrossServiceOpex / positive(result.totalAnnualOpex) : 1;
+  const unrecoverableShare = 1 - positive(result.vatSummary?.recoverablePercent) / 100;
+  const digitalVatScale = 1 + positive(result.vatSummary?.digitalRate) / 100 * unrecoverableShare;
   const customerValueRows = Array.isArray(result.customerValueRows)
     ? result.customerValueRows.map((row, index) => {
       const customerRow = result.customerCashFlowRows?.[index];
@@ -168,7 +170,11 @@ export function customerAnalysisResult(result = {}) {
     allInclusiveAnnualPayment: allInclusive ? result.customerGrossAnnualPayment : result.allInclusiveAnnualPayment,
     financingAnnualPayment: result.dealType === "finance" ? first.customerGrossPayment : result.financingAnnualPayment,
     fixedAnnualOpex: allInclusive ? 0 : positive(result.fixedAnnualOpex) * serviceScale,
-    powerAidCustomerFee: allInclusive ? 0 : positive(result.powerAidCustomerFee) * serviceScale,
+    // Adaptive Dimming remains a real customer fee in every commercial model.
+    // In Noleggio it is included in the all-inclusive payment rather than zeroed out.
+    // Use the digital-service VAT treatment directly so the displayed fee is deal-type independent.
+    powerAidCustomerFee: positive(result.powerAidCustomerFee) * digitalVatScale,
+    powerAidCustomerFeeIncludedInPayment: allInclusive,
     energySaving: first.customerGrossEnergyBenefit,
     maintenanceSaving: first.customerGrossMaintenanceBenefit,
     grossBenefit: first.customerGrossBenefit,
