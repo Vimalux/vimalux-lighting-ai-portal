@@ -3,6 +3,11 @@ const NEW_PROJECT_CONTEXT_KEY = "vimalux-intelligence-new-project-context";
 
 function clearBusinessCaseContext() {
   const url = new URL(window.location.href);
+  let previousBusinessCase = String(url.searchParams.get("business_case_id") || "").trim();
+  if (!previousBusinessCase) {
+    try { previousBusinessCase = String(localStorage.getItem(ACTIVE_CASE_STORAGE_KEY) || "").trim(); } catch (_) {}
+  }
+
   const managedKeys = ["business_case_id", "opportunity_id"];
   let changed = false;
   for (const key of managedKeys) {
@@ -17,9 +22,15 @@ function clearBusinessCaseContext() {
   }
 
   // A new project must never inherit the previously viewed Business Case.
-  // Keep this presentation/context reset separate from project data.
+  // The previous reference is retained only inside a short-lived context lock,
+  // so the runtime can refuse to restore it while the new draft receives its UUID.
   try { localStorage.removeItem(ACTIVE_CASE_STORAGE_KEY); } catch (_) {}
-  try { sessionStorage.setItem(NEW_PROJECT_CONTEXT_KEY, String(Date.now())); } catch (_) {}
+  try {
+    sessionStorage.setItem(NEW_PROJECT_CONTEXT_KEY, JSON.stringify({
+      startedAt: Date.now(),
+      previousBusinessCase,
+    }));
+  } catch (_) {}
 }
 
 function isNewProjectButton(target) {
