@@ -50,6 +50,18 @@ test("Adaptive Dimming customer fee is deal-type independent when configuration 
   assert.ok(Math.abs(values[0] - values[2]) < 1e-9);
 });
 
+test("zero Adaptive Dimming fee is only the configured zero-fee case, not a LaaS side effect", () => {
+  const project = defaultProject({ applyStoredDefaults: false });
+  project.solution.powerAidEnabled = true;
+  project.assumptions.dealType = "noleggio_operativo";
+  project.assumptions.powerAidCustomerFeePercent = 0;
+  const result = calculateBusinessCase(project);
+  assert.ok(result.powerAidGrossSavingEUR > 0);
+  assert.equal(result.powerAidCustomerFee, 0);
+  project.assumptions.powerAidCustomerFeePercent = 40;
+  assert.ok(calculateBusinessCase(project).powerAidCustomerFee > 0);
+});
+
 test("PDF Executive Summary uses model-specific semantics and retains technical metrics only as secondary information for financed deals", () => {
   const source = fs.readFileSync(new URL("../src/report.js", import.meta.url), "utf8");
   assert.match(source, /const executiveHead = cashDeal/);
