@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { calculateBusinessCase } from "../src/calculations.js";
 import { defaultProject } from "../src/model.js";
+import { customerAnalysisResult } from "../src/vat.js";
 
 test("cashBreakEvenYear equals first full year with non-negative cumulative customer cash flow", () => {
   const project = defaultProject({ applyStoredDefaults: false });
@@ -41,7 +42,7 @@ test("Adaptive Dimming customer fee is deal-type independent when configuration 
     project.assumptions.powerAidSupplierSharePercent = 70;
     project.assumptions.dealType = dealType;
     project.assumptions.allInclusiveAnnualPayment = 0;
-    const result = calculateBusinessCase(project);
+    const result = customerAnalysisResult(calculateBusinessCase(project));
     assert.ok(result.powerAidGrossSavingEUR > 0, dealType);
     assert.ok(result.powerAidCustomerFee > 0, dealType);
     values.push(result.powerAidCustomerFee);
@@ -50,16 +51,34 @@ test("Adaptive Dimming customer fee is deal-type independent when configuration 
   assert.ok(Math.abs(values[0] - values[2]) < 1e-9);
 });
 
+test("LaaS keeps Adaptive Dimming fee visible while including it in the all-inclusive payment", () => {
+  const project = defaultProject({ applyStoredDefaults: false });
+  project.solution.powerAidEnabled = true;
+  project.assumptions.powerAidCustomerFeePercent = 40;
+  project.assumptions.powerAidSupplierSharePercent = 70;
+  project.assumptions.dealType = "noleggio_operativo";
+  project.assumptions.allInclusiveAnnualPayment = 0;
+  const raw = calculateBusinessCase(project);
+  const result = customerAnalysisResult(raw);
+  const unrecoverableShare = 1 - Number(raw.vatSummary.recoverablePercent || 0) / 100;
+  const expected = raw.powerAidCustomerFee * (1 + Number(raw.vatSummary.digitalRate || 0) / 100 * unrecoverableShare);
+  assert.ok(raw.powerAidCustomerFee > 0);
+  assert.ok(result.powerAidCustomerFee > 0);
+  assert.ok(Math.abs(result.powerAidCustomerFee - expected) < 1e-9);
+  assert.equal(result.powerAidCustomerFeeIncludedInPayment, true);
+  assert.ok(result.allInclusiveAnnualPayment >= result.powerAidCustomerFee);
+});
+
 test("zero Adaptive Dimming fee is only the configured zero-fee case, not a LaaS side effect", () => {
   const project = defaultProject({ applyStoredDefaults: false });
   project.solution.powerAidEnabled = true;
   project.assumptions.dealType = "noleggio_operativo";
   project.assumptions.powerAidCustomerFeePercent = 0;
-  const result = calculateBusinessCase(project);
-  assert.ok(result.powerAidGrossSavingEUR > 0);
-  assert.equal(result.powerAidCustomerFee, 0);
+  const zeroResult = customerAnalysisResult(calculateBusinessCase(project));
+  assert.ok(zeroResult.powerAidGrossSavingEUR > 0);
+  assert.equal(zeroResult.powerAidCustomerFee, 0);
   project.assumptions.powerAidCustomerFeePercent = 40;
-  assert.ok(calculateBusinessCase(project).powerAidCustomerFee > 0);
+  assert.ok(customerAnalysisResult(calculateBusinessCase(project)).powerAidCustomerFee > 0);
 });
 
 test("PDF Executive Summary uses model-specific semantics and retains technical metrics only as secondary information for financed deals", () => {
