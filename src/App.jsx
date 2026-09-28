@@ -480,6 +480,11 @@ function Kpis({ p, r, t, money, num }) {
   const breakEvenValue = r.cashBreakEvenYear == null ? t("notAvailable") : `${it ? "Anno" : "Year"} ${r.cashBreakEvenYear}`;
   const firstYearCashPositive = Number(r.cashFlowRows?.[0]?.cumulative || 0) >= 0;
   const customerInitialInvestment = cashDeal ? r.totalCapex : Number(p.assumptions.upfrontPayment || 0);
+  const adaptiveDimmingFeeLabel = allInclusive
+    ? (it ? "Adaptive Dimming service fee annua (inclusa nel canone)" : "Annual Adaptive Dimming service fee (included in payment)")
+    : r.dealType === "finance"
+      ? (it ? "Adaptive Dimming service fee annua (inclusa nell'OPEX servizi)" : "Annual Adaptive Dimming service fee (included in service OPEX)")
+      : (it ? "Adaptive Dimming service fee annua" : "Annual Adaptive Dimming service fee");
   const paymentKpis = allInclusive
     ? [[it ? "Canone mensile LaaS / Noleggio tutto incluso" : "Monthly LaaS / all-inclusive payment", money2(r.monthlyPayment)], [it ? "OPEX servizi / mese (incluso nel canone)" : "Service OPEX / month (included in payment)", money2(serviceOpexMonthly)], [it ? "Canone mensile per apparecchio" : "Monthly payment per luminaire", money2(r.monthlyPayment / luminaires)]]
     : r.dealType === "finance"
@@ -489,7 +494,7 @@ function Kpis({ p, r, t, money, num }) {
     [cashDeal ? t("capex") : customerInitialInvestmentLabel, money(customerInitialInvestment)],
     ...paymentKpis,
     [it ? "OPEX annuo per apparecchio" : "Annual OPEX per luminaire", money2(r.totalAnnualOpex / luminaires)],
-    ...(r.powerAidEnabled ? [[it ? "Adaptive Dimming service fee annua" : "Annual Adaptive Dimming service fee", money2(r.powerAidCustomerFee)], [it ? "Beneficio netto cliente Adaptive Dimming" : "Customer net Adaptive Dimming benefit", money2(r.powerAidCustomerNetBenefit), "positive"]] : []),
+    ...(r.powerAidEnabled ? [[adaptiveDimmingFeeLabel, money2(r.powerAidCustomerFee)], [it ? "Beneficio netto cliente Adaptive Dimming" : "Customer net Adaptive Dimming benefit", money2(r.powerAidCustomerNetBenefit), "positive"]] : []),
     [t("annualNet"), money(r.customerAnnualNetBenefit)],
     ...(cashDeal
       ? [[operationalPaybackLabel, r.payback == null ? t("notAvailable") : `${num(r.payback, 1)} ${t("years")}`], [operationalRoiLabel, formatPercent(r.roiPercent, p.language)], [cashBreakEvenLabel, breakEvenValue]]

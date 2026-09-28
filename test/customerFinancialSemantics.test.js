@@ -22,6 +22,8 @@ test("Economic Analysis separates Cash from Finance and LaaS customer semantics"
   assert.match(source, /Break-even cash cumulato/);
   assert.match(source, /Cash flow cliente positivo dal primo anno/);
   assert.match(source, /Metriche tecniche del progetto/);
+  assert.match(source, /Adaptive Dimming service fee annua \(inclusa nel canone\)/);
+  assert.match(source, /Adaptive Dimming service fee annua \(inclusa nell\'OPEX servizi\)/);
   assert.match(source, /indipendenti dalla struttura di finanziamento/);
 });
 
