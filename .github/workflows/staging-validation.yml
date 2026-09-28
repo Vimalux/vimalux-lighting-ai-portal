@@ -1,18 +1,26 @@
-name: Staging validation
+name: Release validation
+
 on:
-  push:
-    branches:
-      - staging/felicity-procurement-safe-release
-      - staging/iva-report-safe-release-20260918
   pull_request:
     branches:
-      - staging/felicity-procurement-safe-release
-      - staging/iva-report-safe-release-20260918
+      - main
+  push:
+    branches:
+      - main
+      - "staging/**"
+  workflow_dispatch:
+
 permissions:
   contents: read
+
+concurrency:
+  group: release-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,7 +30,24 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm test
-      - run: npm run build
+      - name: Run full regression suite
+        run: npm test
+      - name: Build production bundle
+        run: npm run build
+      - name: Smoke-test built application
+        run: |
+          npx vite preview --host 127.0.0.1 --port 4173 > /tmp/vimalux-preview.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://127.0.0.1:4173/ > /tmp/vimalux-index.html; then
+              test -s /tmp/vimalux-index.html
+              grep -q '<div id="root"></div>' /tmp/vimalux-index.html
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/vimalux-preview.log
+          exit 1
       - name: Verify committed source is unchanged
         run: git diff --exit-code HEAD
