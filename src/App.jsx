@@ -139,6 +139,8 @@ const numeric = new Set([
   "totalContractValue",
 ]);
 
+const ACTIVE_UI_PROJECT_KEY = "vimalux-intelligence-active-ui-project";
+
 export default function App() {
   const hadStoredProjects = useMemo(() => Boolean(localStorage.getItem("vimalux-intelligence-projects")), []);
   const initial = useMemo(loadProjects, []);
@@ -146,7 +148,11 @@ export default function App() {
   const [projects, setProjects] = useState(initial);
   const [activeId, setActiveId] = useState(() => {
     const requestedId = new URLSearchParams(window.location.search).get("business_case_id");
-    return findLinkedProject(initial, requestedId)?.id || initial[0].id;
+    const requestedProject = findLinkedProject(initial, requestedId);
+    if (requestedProject) return requestedProject.id;
+    let rememberedId = "";
+    try { rememberedId = String(localStorage.getItem(ACTIVE_UI_PROJECT_KEY) || "").trim(); } catch (_) {}
+    return initial.some((item) => item.id === rememberedId) ? rememberedId : initial[0]?.id || "";
   });
   const [session, setSession] = useState(null);
   const [currentProfile, setCurrentProfile] = useState(stagingPreview ? { id: "staging-preview", role: "admin", email: "staging@vimalux.local", full_name: "Staging Preview" } : null);
@@ -183,6 +189,10 @@ export default function App() {
   const syncedProjects = useMemo(() => projects.map((item) => syncBusinessCaseResult(item, item.updatedAt || item.createdAt)), [projects]);
   const syncedProject = syncedProjects.find((item) => item.id === project.id) || syncBusinessCaseResult(project, project.updatedAt || project.createdAt);
   useEffect(() => localStorage.setItem("vimalux-intelligence-projects", JSON.stringify(projects)), [projects]);
+  useEffect(() => {
+    if (!activeId) return;
+    try { localStorage.setItem(ACTIVE_UI_PROJECT_KEY, activeId); } catch (_) {}
+  }, [activeId]);
   useEffect(() => { if (isAgent && !isAgentViewAllowed(view, agentAllowedViews)) setView("customer"); }, [isAgent, view]);
   useEffect(() => {
     if (!stagingPreview) return;
