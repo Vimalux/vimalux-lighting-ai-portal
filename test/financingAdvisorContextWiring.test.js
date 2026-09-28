@@ -23,8 +23,11 @@ test("SAFE RELEASE: financing advisor resolves the same active Business Case con
   assert.match(activeContextRuntime, /businessCaseCodeFromText/);
 });
 
-test("SAFE RELEASE: newly rendered Business Case replaces stale remembered context", () => {
-  assert.match(activeContextRuntime, /if \(stable && stable !== urlRef\) replaceBusinessCaseInUrl\(stable\)/);
+test("SAFE RELEASE: newly rendered stable Business Case replaces stale remembered context", () => {
+  assert.match(activeContextRuntime, /if \(stableCloudId !== urlRef\) replaceBusinessCaseInUrl\(stableCloudId\)/);
+  assert.match(activeContextRuntime, /rememberBusinessCaseId\(stableCloudId\)/);
+  assert.match(activeContextRuntime, /readNewProjectContext\(\)/);
   assert.match(newProjectGuard, /business_case_id/);
+  assert.match(newProjectGuard, /localStorage\.removeItem\(ACTIVE_CASE_STORAGE_KEY\)/);
   assert.match(newProjectGuard, /capture phase/i);
 });
