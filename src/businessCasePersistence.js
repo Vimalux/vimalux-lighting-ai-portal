@@ -1,5 +1,6 @@
 import { calculateBusinessCase } from "./calculations.js";
 import { buildBusinessCaseSnapshot } from "./businessCaseSync.js";
+import { buildCrmInternalFinancials } from "./crmInternalFinancials.js";
 
 const stableUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const placeholderProjectNames = new Set(["nuovo progetto", "new project", "nyt projekt"]);
@@ -29,6 +30,7 @@ export async function persistIntelligenceProject(client, project, profile) {
   const result = calculateBusinessCase(project);
   const calculatedAt = project.updatedAt || new Date().toISOString();
   const businessCase = buildBusinessCaseSnapshot(project, calculatedAt);
+  const internalFinancial = buildCrmInternalFinancials(project, result);
   const probability = project.crm?.status === "won" ? 100 : Math.min(100, Math.max(0, Number(project.crm?.closingProbability) || 0));
   const commercialSnapshot = {
     schemaVersion: 1,
@@ -54,7 +56,12 @@ export async function persistIntelligenceProject(client, project, profile) {
     powerAidAnnualRevenue: result.savingsAsAServiceRevenue,
     co2ReductionTons: result.co2ReductionKg / 1000,
   };
-  let payload = { ...project, crm: { ...(project.crm || {}), goStatus: businessCase.goStatus, businessCase }, commercialSnapshot };
+  let payload = {
+    ...project,
+    crm: { ...(project.crm || {}), goStatus: businessCase.goStatus, businessCase },
+    commercialSnapshot,
+    internalFinancial,
+  };
   let caseId = project.crm?.businessCaseRecordId || project.id;
   let crmOpportunityId = project.crm?.opportunityId || "";
   const promotion = { legacyId: project.id };

@@ -40,6 +40,9 @@ test("placeholder manual project is persisted immediately as a cloud draft witho
   const creation = calls.find((call) => call.name === "create_intelligence_draft");
   assert.equal(creation.args.legacy_id, project.id);
   assert.ok(creation.args.project_payload);
+  assert.ok(creation.args.project_payload.internalFinancial);
+  assert.equal(typeof creation.args.project_payload.internalFinancial.total_direct_costs, "number");
+  assert.equal(Object.hasOwn(creation.args.project_payload.internalFinancial, "bonus"), false);
 });
 
 test("meaningful manual project creates a durable draft, promotes it, and saves the same Business Case", async () => {
@@ -68,4 +71,6 @@ test("meaningful manual project creates a durable draft, promotes it, and saves 
   const saved = calls.at(-1);
   assert.equal(saved.args.case_id, draftCaseId);
   assert.equal(saved.args.project_payload.crm.opportunityId, opportunityId);
+  assert.ok(saved.args.project_payload.internalFinancial);
+  assert.equal(saved.args.project_payload.internalFinancial.source, "VIMALUX Intelligence calculation engine");
 });
