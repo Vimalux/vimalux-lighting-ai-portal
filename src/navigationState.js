@@ -10,15 +10,14 @@ export function navigationKey(userId, projectId) {
 }
 
 export function findLinkedProject(projects, businessCaseId, opportunityId) {
-  return projects.find((item) =>
-    (businessCaseId && [
+  if (businessCaseId) return projects.find((item) => [
       item.id,
       item.crm?.businessCaseRecordId,
       item.crm?.legacyIntelligenceId,
       item.project?.businessCaseId,
-    ].includes(businessCaseId)) ||
-    (opportunityId && [item.crm?.opportunityId, item.crm?.uniqueProjectId].includes(opportunityId)),
-  );
+    ].includes(businessCaseId));
+  return opportunityId ? projects.find((item) =>
+    [item.crm?.opportunityId, item.crm?.uniqueProjectId].includes(opportunityId)) : undefined;
 }
 
 export function readNavigation(storage, key, allowedViews) {

@@ -1,3 +1,4 @@
+import { SOLAR_LOCATION_EVENT } from "./projectContext.js";
 import { calculateBusinessCase } from "./calculations.js";
 import { needsAutomaticHybridSolar, projectMunicipalityCandidates } from "./hybridSolarAuto.js";
 import { getLiveBusinessCaseResult, LIVE_BUSINESS_CASE_EVENT, publishLiveBusinessCaseResult } from "./liveBusinessCaseResult.js";
@@ -58,6 +59,14 @@ async function resolveForCurrentBusinessCase() {
 
     const location = await resolveMunicipalityFromCandidates(project);
 
+    if (document.body?.hasAttribute("data-project-context")) {
+      window.dispatchEvent(new CustomEvent(SOLAR_LOCATION_EVENT, { detail: {
+        projectId: project.id, updatedAt: project.updatedAt, location,
+        userId: profile.id === "staging-preview" ? "local" : profile.id,
+      } }));
+      publishHybridSolarAutoStatus({ state: "ready", municipality: location.resolvedName || primary, role, message: "Solar location resolved" });
+      return;
+    }
     project.assumptions = {
       ...(project.assumptions || {}),
       hybridSolarLocation: location,

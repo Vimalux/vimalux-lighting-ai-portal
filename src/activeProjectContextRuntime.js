@@ -110,9 +110,10 @@ function bindProjectSelection() {
   });
 }
 
-restoreBusinessCaseIdIntoUrl();
+const reactOwnsProjectContext = typeof document !== "undefined" && document.body?.hasAttribute("data-project-context");
+if (!reactOwnsProjectContext) restoreBusinessCaseIdIntoUrl();
 
-if (typeof document !== "undefined") {
+if (typeof document !== "undefined" && !reactOwnsProjectContext) {
   const refresh = () => {
     bindProjectSelection();
     updateHeaderContext();

@@ -16,7 +16,7 @@ test("same active Business Case keeps its workflow view when URL match rehydrate
 });
 
 test("same active Business Case keeps its workflow view when loaded from Supabase", () => {
-  const loadBranch = source.slice(source.indexOf("loadBusinessCase(businessCaseId)"), source.indexOf("This legacy CRM link"));
+  const loadBranch = source.slice(source.indexOf("loadBusinessCase(businessCaseId)"), source.indexOf("} else if (supabaseConfigured)"));
   assert.match(loadBranch, /setActiveId\(migrated.id\)/);
   assert.doesNotMatch(loadBranch, /setView/);
 });
