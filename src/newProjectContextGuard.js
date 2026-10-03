@@ -21,6 +21,7 @@ function isNewProjectButton(target) {
 }
 
 function start() {
+  if (document.body?.hasAttribute("data-project-context")) return;
   // Capture phase runs before React's onClick, so the newly created local project
   // cannot inherit a stable Business Case / Opportunity URL from the project
   // the user was previously viewing.
