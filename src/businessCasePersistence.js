@@ -3,6 +3,7 @@ import { buildBusinessCaseSnapshot } from "./businessCaseSync.js";
 import { buildCrmInternalFinancials } from "./crmInternalFinancials.js";
 
 const stableUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const humanBusinessCaseCode = /^BC-[A-Z0-9-]+$/i;
 const placeholderProjectNames = new Set(["nuovo progetto", "new project", "nyt projekt"]);
 
 export function isStableCloudId(value) {
@@ -15,8 +16,17 @@ export function hasMeaningfulProjectIdentity(project) {
   return Boolean(customerName && projectName && !placeholderProjectNames.has(projectName.toLowerCase()));
 }
 
-function legacyProjectId(project) {
-  return String(project?.id || project?.project?.businessCaseId || "").trim();
+export function legacyProjectId(project) {
+  // Draft idempotency must use an immutable local/legacy project id, never the
+  // human-readable BC code. Treating BC-xxxx as a legacy id can create a second
+  // cloud Business Case for the same project when UI context changes mid-save.
+  const candidates = [project?.crm?.legacyIntelligenceId, project?.id];
+  for (const candidate of candidates) {
+    const value = String(candidate || "").trim();
+    if (!value || isStableCloudId(value) || humanBusinessCaseCode.test(value)) continue;
+    return value;
+  }
+  return "";
 }
 
 export async function persistIntelligenceProject(client, project, profile) {
