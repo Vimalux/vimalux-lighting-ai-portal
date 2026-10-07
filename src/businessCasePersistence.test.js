@@ -74,3 +74,30 @@ test("meaningful manual project creates a durable draft, promotes it, and saves 
   assert.ok(saved.args.project_payload.internalFinancial);
   assert.equal(saved.args.project_payload.internalFinancial.source, "VIMALUX Intelligence calculation engine");
 });
+
+
+test("stale post-promotion project reuses immutable legacy identity instead of creating a duplicate", async () => {
+  const project = defaultProject();
+  project.id = "BC-473640";
+  project.customer.name = "Comune di Vicopisano";
+  project.project.name = "Vicopisano";
+  project.project.businessCaseId = "BC-473640";
+  project.crm.legacyIntelligenceId = "q23sv30y";
+
+  const calls = [];
+  const client = {
+    rpc: async (name, args) => {
+      calls.push({ name, args });
+      if (name === "create_intelligence_draft") return { data: draftCaseId, error: null };
+      if (name === "promote_intelligence_draft") return { data: opportunityId, error: null };
+      if (name === "save_business_case_intelligence") return { data: true, error: null };
+      throw new Error(`Unexpected RPC ${name}`);
+    },
+  };
+
+  await persistIntelligenceProject(client, project, { role: "admin", id: "admin" });
+
+  const creation = calls.find((call) => call.name === "create_intelligence_draft");
+  assert.equal(creation.args.legacy_id, "q23sv30y");
+  assert.notEqual(creation.args.legacy_id, project.id);
+});
