@@ -54,6 +54,7 @@ import {
   supabaseConfigured,
 } from "./supabase.js";
 import { isStableBusinessCaseLink } from "./businessCaseTransport.js";
+import { dedupeProjects } from "./projectDeduplication.js";
 import "./styles.css";
 import "./business-case.css";
 import "./disabled-fields.css";
@@ -301,10 +302,10 @@ export default function App() {
       if (accountRef.current !== savingUser) return;
       if (promotions.length) {
         promotions.forEach(({ legacyId, caseId }) => migrateProjectNavigation(localStorage, userId, legacyId, caseId, isAgent ? agentAllowedViews : ADMIN_VIEWS));
-        setProjects((current) => current.map((item) => {
+        setProjects((current) => dedupeProjects(current.map((item) => {
           const promotion = promotions.find((entry) => entry.legacyId === item.id);
           return promotion ? { ...item, id: promotion.caseId, crm: { ...(item.crm || {}), legacyIntelligenceId: item.crm?.legacyIntelligenceId || item.id, businessCaseRecordId: promotion.caseId } } : item;
-        }));
+        })));
         setActiveId((current) => promotions.find((entry) => entry.legacyId === current)?.caseId || current);
       }
       setSyncState("saved");
@@ -450,7 +451,10 @@ export default function App() {
     const remaining = projects.filter((item) => item.id !== id); const next = remaining.length ? remaining : [defaultProject()]; setProjects(next); if (id === activeId) activateProject(next[0], "projects"); else setView("projects");
   };
   const activateImportedProject = (importedProject, nextView = "existing") => {
-    setProjects((all) => { const withoutDuplicate = all.filter((item) => item.id !== importedProject.id); return [...withoutDuplicate, importedProject]; });
+    setProjects((all) => dedupeProjects([
+      importedProject,
+      ...all.filter((item) => item.id !== importedProject.id),
+    ]));
     activateProject(importedProject, nextView);
   };
   const importProjectFile = async (file) => {
