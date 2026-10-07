@@ -16,7 +16,16 @@ export function hasMeaningfulProjectIdentity(project) {
 }
 
 function legacyProjectId(project) {
-  return String(project?.id || project?.project?.businessCaseId || "").trim();
+  // Keep the original browser-local identity immutable across promotion/reconciliation.
+  // A stale render can temporarily carry the display Business Case code as project.id;
+  // preferring crm.legacyIntelligenceId makes create_intelligence_draft idempotent and
+  // prevents a second cloud Business Case / CRM Opportunity from being created.
+  return String(
+    project?.crm?.legacyIntelligenceId
+      || project?.id
+      || project?.project?.businessCaseId
+      || ""
+  ).trim();
 }
 
 export async function persistIntelligenceProject(client, project, profile) {
