@@ -115,7 +115,17 @@ export async function loadCloudState(localProjects, includeLocalProjects = true)
   const pendingLocalProjects = (localProjects || []).filter((item) =>
     !isArchivedProject(item) &&
     !isStableCloudId(item?.id) &&
-    !cloudProjects.some((cloud) => cloud.id === item.id || isSameImportedProject(cloud, item))
+    !isStableCloudId(item?.crm?.businessCaseRecordId) &&
+    !cloudProjects.some((cloud) =>
+      cloud.id === item.id
+      || cloud.crm?.businessCaseRecordId === item?.crm?.businessCaseRecordId
+      || (
+        String(cloud.project?.businessCaseId || "").trim().toUpperCase()
+        && String(cloud.project?.businessCaseId || "").trim().toUpperCase()
+          === String(item?.project?.businessCaseId || "").trim().toUpperCase()
+      )
+      || isSameImportedProject(cloud, item)
+    )
   );
   return dedupeProjects([
     ...cloudProjects,
