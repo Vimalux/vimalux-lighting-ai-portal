@@ -6,6 +6,7 @@ import { transformProposalCustomerText } from "./proposalCustomerVatText.js";
 import { alignedTable, reportMoney, reportNumber } from "./reportPresentation.js";
 import { contractReportResult } from "./contractReportHorizon.js";
 import { customerAnalysisResult } from "./vat.js";
+import { getActiveBusinessCaseResult, getLiveBusinessCaseResult } from "./liveBusinessCaseResult.js";
 
 const safe = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 
@@ -76,6 +77,47 @@ function summaryCard(doc, x, y, w, label, value, colors) {
   doc.line(x + 4, y + 22.5, x + w - 4, y + 22.5);
 }
 
+export function reconciledProposalCashFlowRows(calculated = {}) {
+  const cashRows = Array.isArray(calculated.cashFlowRows) ? calculated.cashFlowRows : [];
+  if (!cashRows.length) return [];
+
+  const normalizedDealType = String(calculated.dealType || "").toLowerCase();
+  if (normalizedDealType !== "cash") {
+    const openingCash = safe(cashRows[0]?.cumulative) - safe(cashRows[0]?.netCashFlow);
+    const initialOutlay = Math.max(0, -openingCash);
+    return [
+      { year: 0, grossBenefit: 0, serviceOpex: 0, payment: initialOutlay, netCashFlow: -initialOutlay, cumulative: openingCash },
+      ...cashRows,
+    ];
+  }
+
+  // For a direct purchase, the report must start from the exact customer cash-out
+  // used by the Business Case. Do not infer it backwards from a potentially stale
+  // cumulative value. municipalityCapexCash also preserves non-recoverable VAT when
+  // relevant; otherwise it is equal to totalCapex.
+  const authoritativeInitialOutlay = Math.max(
+    0,
+    safe(calculated.vatSummary?.municipalityCapexCash ?? calculated.totalCapex),
+  );
+  let cumulative = -authoritativeInitialOutlay;
+  const annualRows = cashRows.map((row) => {
+    cumulative += safe(row.netCashFlow);
+    return { ...row, cumulative };
+  });
+
+  return [
+    {
+      year: 0,
+      grossBenefit: 0,
+      serviceOpex: 0,
+      payment: authoritativeInitialOutlay,
+      netCashFlow: -authoritativeInitialOutlay,
+      cumulative: -authoritativeInitialOutlay,
+    },
+    ...annualRows,
+  ];
+}
+
 function appendCashFlowPage(doc, project, calculated, options = {}) {
   const lang = options.lang === "it" ? "it" : "en";
   const it = lang === "it";
@@ -88,12 +130,7 @@ function appendCashFlowPage(doc, project, calculated, options = {}) {
   };
   const { teal, navy, muted, light } = colors;
   const cashRows = Array.isArray(calculated.cashFlowRows) ? calculated.cashFlowRows : [];
-  const openingCash = cashRows.length ? safe(cashRows[0].cumulative) - safe(cashRows[0].netCashFlow) : 0;
-  const initialOutlay = Math.max(0, -openingCash);
-  const cashTableRows = [
-    { year: 0, grossBenefit: 0, serviceOpex: 0, payment: initialOutlay, netCashFlow: -initialOutlay, cumulative: openingCash },
-    ...cashRows,
-  ];
+  const cashTableRows = reconciledProposalCashFlowRows(calculated);
   const normalizedDealType = String(calculated.dealType || "").toLowerCase();
   const isCashDeal = normalizedDealType === "cash";
   const isLaaS = normalizedDealType === "noleggio_operativo";
@@ -176,7 +213,12 @@ function appendCashFlowPage(doc, project, calculated, options = {}) {
 }
 
 export function appendFinalProposalVisualPages(doc, project, options = {}) {
-  const calculated = calculateBusinessCase(applyWarrantyPricing(project));
+  // Prefer the already-calculated active Business Case so the generated proposal
+  // uses the exact same CAPEX, savings and cash-flow inputs currently shown on screen.
+  // Fall back to a fresh calculation only when no matching live result exists.
+  const search = typeof window !== "undefined" ? window.location?.search || "" : "";
+  const live = getActiveBusinessCaseResult(search) || getLiveBusinessCaseResult(search);
+  const calculated = live?.result || calculateBusinessCase(applyWarrantyPricing(project));
   const reportCalculated = contractReportResult(customerAnalysisResult(calculated));
 
   // Rendering-only contract horizon: the underlying economic engine remains unchanged.
