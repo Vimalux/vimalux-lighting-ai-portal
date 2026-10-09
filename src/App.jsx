@@ -55,6 +55,7 @@ import {
 } from "./supabase.js";
 import { isStableBusinessCaseLink } from "./businessCaseTransport.js";
 import { dedupeProjects } from "./projectDeduplication.js";
+import { isArchivedProject } from "./projectVisibility.js";
 import "./styles.css";
 import "./business-case.css";
 import "./disabled-fields.css";
@@ -73,7 +74,6 @@ const workflow = [
   ["business", "business"],
   ["report", "report"],
 ];
-const isArchivedProject = (project) => ["archived","lost"].includes(String(project?.crm?.status || "").toLowerCase());
 const agentWorkflow = workflow.filter(([id]) => id !== "pricing");
 const agentAllowedViews = new Set([...agentWorkflow.map(([id]) => id), "projects"]);
 const RATE_PROFILES = [
