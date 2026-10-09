@@ -67,6 +67,9 @@ if (stagingPreview && supabase?.rpc && !supabase.__vimaluxPreviewRpcIsolationIns
     if (normalized === "list_business_cases_v2") {
       return Promise.resolve({ data: previewBusinessCaseRows(), error: null, count: null, status: 200, statusText: "OK" });
     }
+    if (normalized === "list_archived_business_cases_v2") {
+      return Promise.resolve({ data: [], error: null, count: 0, status: 200, statusText: "OK" });
+    }
     if (normalized === "get_proposal_history") {
       return Promise.resolve({ data: [], error: null, count: 0, status: 200, statusText: "OK" });
     }
@@ -95,14 +98,20 @@ async function getCurrentProfile(fields = "id,email,full_name,role") {
 }
 
 export async function loadCloudState(localProjects, includeLocalProjects = true) {
-  const [{ data: projectRows, error: projectError }, { data: catalogue, error: catalogueError }] = await Promise.all([
+  const [
+    { data: projectRows, error: projectError },
+    { data: archivedRows, error: archivedError },
+    { data: catalogue, error: catalogueError }
+  ] = await Promise.all([
     supabase.rpc("list_business_cases_v2"),
+    supabase.rpc("list_archived_business_cases_v2"),
     supabase.rpc("get_intelligence_catalogue"),
   ]);
   if (projectError) throw projectError;
+  if (archivedError) throw archivedError;
   if (catalogueError) throw catalogueError;
   const masterCatalogue = catalogue ? { led: catalogue.led || [], smart: catalogue.smart || [] } : null;
-  const allCloudProjects = dedupeProjects((projectRows || []).map((row) => {
+  const allCloudProjects = dedupeProjects([...(projectRows || []), ...(archivedRows || [])].map((row) => {
     const project = projectFromBusinessCaseRow(row);
     return masterCatalogue ? { ...project, catalogue: catalogueWithHistoricalSelections(project, masterCatalogue) } : project;
   }));
