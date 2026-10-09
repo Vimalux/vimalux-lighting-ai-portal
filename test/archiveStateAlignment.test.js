@@ -19,3 +19,12 @@ test("Intelligence keeps archived/lost cases as read-only history",()=>{
   assert.match(transport,/archiveReason:/);
   assert.match(transport,/archivedAt:/);
 });
+
+
+test("cloud loading retains archived history but cloud save never persists archived cases",()=>{
+  const source=fs.readFileSync(new URL("../src/supabase.js",import.meta.url),"utf8");
+  assert.match(source,/const archivedCloudProjects = allCloudProjects\.filter\(isArchivedProject\)/);
+  assert.match(source,/const cloudProjects = \[\.\.\.activeCloudProjects, \.\.\.archivedCloudProjects\]/);
+  assert.match(source,/dedupeProjects\(projects\)\.filter\(\(project\) => !isArchivedProject\(project\)\)/);
+  assert.doesNotMatch(source,/if \(isArchivedProject\(project\)\) return null/);
+});
