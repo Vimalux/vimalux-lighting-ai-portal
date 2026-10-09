@@ -170,7 +170,7 @@ test("display copy uses Adaptive Dimming while retaining persisted internal fiel
 test("Intelligence still withholds delete callbacks and controls from agents", () => {
   const source = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
   assert.match(source, /remove=\{isAgent \? undefined : removeProject\}/);
-  assert.match(source, /\{remove && <button className="danger project-delete"/);
+  assert.match(source, /\{!archivedSection && remove && <button className="danger project-delete"/);
   assert.match(source, /if \(isReadOnlyAgentProject\) return all;/);
   assert.match(source, /if \(isAgent && path\[0\] === "pricing"\) return all;/);
 });

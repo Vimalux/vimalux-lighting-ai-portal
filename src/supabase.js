@@ -102,10 +102,13 @@ export async function loadCloudState(localProjects, includeLocalProjects = true)
   if (projectError) throw projectError;
   if (catalogueError) throw catalogueError;
   const masterCatalogue = catalogue ? { led: catalogue.led || [], smart: catalogue.smart || [] } : null;
-  const cloudProjects = dedupeProjects(activeIntelligenceProjects((projectRows || []).map((row) => {
+  const allCloudProjects = dedupeProjects((projectRows || []).map((row) => {
     const project = projectFromBusinessCaseRow(row);
     return masterCatalogue ? { ...project, catalogue: catalogueWithHistoricalSelections(project, masterCatalogue) } : project;
-  })));
+  }));
+  const activeCloudProjects = activeIntelligenceProjects(allCloudProjects);
+  const archivedCloudProjects = allCloudProjects.filter(isArchivedProject);
+  const cloudProjects = [...activeCloudProjects, ...archivedCloudProjects];
   if (!includeLocalProjects) return cloudProjects;
 
   // Never silently discard a browser-local project that has not yet received a
@@ -135,7 +138,7 @@ export async function loadCloudState(localProjects, includeLocalProjects = true)
 
 export async function saveCloudState(projects) {
   if (stagingPreview) return [];
-  const uniqueProjects = dedupeProjects(projects);
+  const uniqueProjects = dedupeProjects(projects).filter((project) => !isArchivedProject(project));
   if (!uniqueProjects.length) return [];
   const promotions = [];
   const catalogue = catalogueForMasterSave(uniqueProjects[0].catalogue || {});
@@ -170,7 +173,6 @@ export async function loadBusinessCase(caseId) {
   if (catalogueError) throw catalogueError;
   if (!data?.[0]) return null;
   const project = projectFromBusinessCaseRow(data[0]);
-  if (isArchivedProject(project)) return null;
   const masterCatalogue = catalogue ? { led: catalogue.led || [], smart: catalogue.smart || [] } : null;
   return masterCatalogue ? { ...project, catalogue: catalogueWithHistoricalSelections(project, masterCatalogue) } : project;
 }
