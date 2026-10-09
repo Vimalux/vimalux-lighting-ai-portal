@@ -28,3 +28,11 @@ test("cloud loading retains archived history but cloud save never persists archi
   assert.match(source,/dedupeProjects\(projects\)\.filter\(\(project\) => !isArchivedProject\(project\)\)/);
   assert.doesNotMatch(source,/if \(isArchivedProject\(project\)\) return null/);
 });
+
+
+test("production hydration requests archived Business Cases separately from the active list",()=>{
+  const source=fs.readFileSync(new URL("../src/supabase.js",import.meta.url),"utf8");
+  assert.match(source,/supabase\.rpc\("list_business_cases_v2"\)/);
+  assert.match(source,/supabase\.rpc\("list_archived_business_cases_v2"\)/);
+  assert.match(source,/\.\.\.\(projectRows \|\| \[\]\), \.\.\.\(archivedRows \|\| \[\]\)/);
+});
