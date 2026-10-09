@@ -6,7 +6,7 @@ const app=fs.readFileSync(new URL("../src/App.jsx",import.meta.url),"utf8");
 const transport=fs.readFileSync(new URL("../src/businessCaseTransport.js",import.meta.url),"utf8");
 
 test("Intelligence excludes archived/lost cases from active forecasts",()=>{
-  assert.match(app,/const isArchivedProject/);
+  assert.match(app,/import \{ isArchivedProject \} from "\.\/projectVisibility\.js"/);
   assert.match(app,/activeSyncedProjects/);
   assert.match(app,/CmsPartnerDashboard projects=\{activeSyncedProjects\}/);
   assert.match(app,/PartnerReports projects=\{activeSyncedProjects\}/);
