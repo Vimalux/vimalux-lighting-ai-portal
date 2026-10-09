@@ -1,5 +1,6 @@
 import { calculateBusinessCase } from "./calculations.js";
 import { crmMetrics } from "./crm.js";
+import { buildCmsPartnerCommercial } from "./businessCaseSync.js";
 
 import { PARTNER_ROLES, normalizePartner as partnerName, partnerOptions, productPartner, productRoles, selectedEquipmentRole } from "./partnerRoles.js";
 
@@ -90,6 +91,10 @@ export function partnerProjectRows(projects = [], partner, role) {
       lcus: result.lcuQuantity,
       contractYears: years,
       partnerRole: consolidated ? "VIMALUX" : roles.join(" + "),
+      stage: project.crm?.status || "lead",
+      expectedSigningDate: project.crm?.expectedCloseDate || "",
+      nextAction: project.crm?.nextAction || "",
+      signingDatePostponedCount: Number(project.crm?.signingDatePostponedCount) || 0,
     };
 
     if (!consolidated) {
@@ -129,9 +134,19 @@ export function partnerProjectRows(projects = [], partner, role) {
       const legacyAnnualRevenue = cmsAnnualCustomerRevenue + adaptiveAnnualSupplierCost + equipmentAnnualSupplierCost;
       const legacyContractValue = cmsCustomerContractValue + adaptiveSupplierContractCost + equipmentSupplierContractCost;
 
+      const cmsCommercial = isCmsPartner ? buildCmsPartnerCommercial(project, result, project.updatedAt || new Date().toISOString()) : null;
       return {
         ...common,
-        ...(isCmsPartner ? { probability: crm.probability, pipelineTcv: crm.totalContractValue, weightedTcv: crm.weightedTcv } : {}),
+        ...(isCmsPartner ? {
+          probability: crm.probability,
+          pipelineTcv: crm.totalContractValue,
+          weightedTcv: crm.weightedTcv,
+          products: cmsCommercial?.products || [],
+          oneOffRevenue: Number(cmsCommercial?.oneOffRevenue) || 0,
+          partnerAnnualRevenue: Number(cmsCommercial?.annualRevenue) || 0,
+          partnerContractValue: Number(cmsCommercial?.contractValue) || 0,
+          cmsPartnerCommercial: cmsCommercial,
+        } : {}),
         annualCustomerRevenue,
         annualSupplierCost,
         annualVimaluxMargin,
@@ -206,6 +221,9 @@ export function partnerTotals(projects, partner, role) {
     totalContractValue: legacyContractValue,
     pipelineTcv: sum("pipelineTcv"),
     weightedTcv: sum("weightedTcv"),
+    oneOffRevenue: sum("oneOffRevenue"),
+    partnerAnnualRevenue: sum("partnerAnnualRevenue"),
+    partnerContractValue: sum("partnerContractValue"),
   };
 }
 
