@@ -20,9 +20,15 @@ export function generatePartnerPdf(partner, projects, language = "it", currency 
   const pct = value => formatPercent(value, language);
   const it = language === "it";
 
+  const reportDate = new Date().toLocaleDateString(it ? "it-IT" : "en-GB");
   doc.setFillColor(15, 23, 42); doc.rect(0, 0, 297, 38, "F");
-  doc.setTextColor(255); doc.setFontSize(18); doc.text(`${label} Partner Report`, 14, 18);
-  doc.setFontSize(10); doc.text(projectLevel ? `${projects[0].customer.name || projects[0].project.name} · ${projects[0].project.businessCaseId}` : `VIMALUX Intelligence · ${new Date().toISOString().slice(0,10)}`, 14, 28);
+  doc.setTextColor(255); doc.setFontSize(18);
+  doc.text(isCmsPartner
+    ? `${label} · ${it ? "Report Partner" : "Partner Report"}`
+    : `${label} ${it ? "Report Partner" : "Partner Report"}`, 14, 18);
+  doc.setFontSize(10);
+  doc.text(projectLevel ? `${projects[0].customer.name || projects[0].project.name} · ${projects[0].project.businessCaseId}` : "VIMALUX Intelligence", 14, 28);
+  doc.text(`${it ? "Data report" : "Report date"}: ${reportDate}`, 283, 28, { align: "right" });
   doc.setTextColor(15,23,42);
 
   const formatDate = value => {
@@ -85,13 +91,13 @@ export function generatePartnerPdf(partner, projects, language = "it", currency 
         it ? "Comune" : "Municipality",
         it ? "Progetto" : "Project",
         it ? "Firma prevista" : "Expected signing",
-        "Stage",
+        it ? "Fase" : "Stage",
         it ? "Probabilità" : "Probability",
         it ? "Prodotti / quantità" : "Products / quantity",
         it ? "Ricavi una tantum" : "One-off revenue",
         "ARR",
         it ? "Anni contratto" : "Contract years",
-        "Partner TCV",
+        it ? "TCV partner" : "Partner TCV",
         it ? "Prossima azione" : "Next action",
       ]
     : [
