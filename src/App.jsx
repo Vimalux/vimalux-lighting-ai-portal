@@ -56,6 +56,7 @@ import {
 import { isStableBusinessCaseLink } from "./businessCaseTransport.js";
 import { dedupeProjects } from "./projectDeduplication.js";
 import { isArchivedProject } from "./projectVisibility.js";
+import { changedProjects } from "./projectAutosave.js";
 import "./styles.css";
 import "./business-case.css";
 import "./disabled-fields.css";
@@ -154,6 +155,9 @@ export default function App() {
   const requests = useRef(createRequestRevision()).current;
   const projectsRef = useRef(projects);
   projectsRef.current = projects;
+  const observedProjectsRef = useRef(initial);
+  const pendingSaveRef = useRef(new Map());
+  const saveQueueRef = useRef(Promise.resolve());
   const accountRef = useRef("");
   const [session, setSession] = useState(null);
   const [currentProfile, setCurrentProfile] = useState(stagingPreview ? { id: "staging-preview", role: "admin", email: "staging@vimalux.local", full_name: "Staging Preview" } : null);
@@ -285,6 +289,8 @@ export default function App() {
       const migrated = rows.map(migrateProject);
       const merged = reconcileHydration(projectsRef.current, migrated, baseline);
       projectsRef.current = merged;
+      observedProjectsRef.current = merged;
+      pendingSaveRef.current.clear();
       setCurrentProfile(profile);
       setProjects(merged);
       if (requests.accepts(revision)) {
@@ -298,23 +304,65 @@ export default function App() {
   }, [userId]);
   useEffect(() => {
     if (!supabaseConfigured || stagingPreview || !session || !cloudReady) return;
-    setSyncState("saving");
+
+    const dirty = changedProjects(observedProjectsRef.current, projects)
+      .filter((item) => !isArchivedProject(item));
+    observedProjectsRef.current = projects;
+
+    dirty.forEach((item) => pendingSaveRef.current.set(item.id, item));
+    if (!pendingSaveRef.current.size) return;
+
     const savingUser = userId;
-    const timer = setTimeout(() => saveCloudState(projects).then((promotions = []) => {
-      if (accountRef.current !== savingUser) return;
-      if (promotions.length) {
-        promotions.forEach(({ legacyId, caseId }) => migrateProjectNavigation(localStorage, userId, legacyId, caseId, isAgent ? agentAllowedViews : ADMIN_VIEWS));
-        setProjects((current) => dedupeProjects(current.map((item) => {
-          const promotion = promotions.find((entry) => entry.legacyId === item.id);
-          return promotion ? { ...item, id: promotion.caseId, crm: { ...(item.crm || {}), legacyIntelligenceId: item.crm?.legacyIntelligenceId || item.id, businessCaseRecordId: promotion.caseId } } : item;
-        })));
-        setActiveId((current) => promotions.find((entry) => entry.legacyId === current)?.caseId || current);
-      }
-      setSyncState("saved");
-      setSyncError("");
-    }).catch((error) => { if (accountRef.current === savingUser) { setSyncState("error"); setSyncError(error.message); } }), 800);
+    setSyncState("saving");
+    const timer = setTimeout(() => {
+      const batch = [...pendingSaveRef.current.values()];
+      pendingSaveRef.current.clear();
+
+      saveQueueRef.current = saveQueueRef.current
+        .catch(() => {})
+        .then(() => saveCloudState(batch))
+        .then((promotions = []) => {
+          if (accountRef.current !== savingUser) return;
+          if (promotions.length) {
+            promotions.forEach(({ legacyId, caseId }) => migrateProjectNavigation(localStorage, userId, legacyId, caseId, isAgent ? agentAllowedViews : ADMIN_VIEWS));
+            setProjects((current) => dedupeProjects(current.map((item) => {
+              const promotion = promotions.find((entry) => entry.legacyId === item.id);
+              if (!promotion) return item;
+              return {
+                ...item,
+                id: promotion.caseId,
+                crm: {
+                  ...(item.crm || {}),
+                  legacyIntelligenceId: item.crm?.legacyIntelligenceId || item.id,
+                  businessCaseRecordId: promotion.caseId,
+                  agentId: item.crm?.agentId || (isAgent ? userId : ""),
+                  agentAccessMode: item.crm?.agentAccessMode || (isAgent ? "owner" : ""),
+                },
+              };
+            })));
+            setActiveId((current) => promotions.find((entry) => entry.legacyId === current)?.caseId || current);
+          }
+          setSyncState(pendingSaveRef.current.size ? "saving" : "saved");
+          setSyncError("");
+        })
+        .catch((error) => {
+          if (accountRef.current !== savingUser) return;
+          // Keep the latest in-memory version queued so the next edit retries it.
+          batch.forEach((savedProject) => {
+            const latest = projectsRef.current.find((item) =>
+              item.id === savedProject.id
+              || item.crm?.legacyIntelligenceId === savedProject.id
+              || item.crm?.businessCaseRecordId === savedProject.id
+            );
+            if (latest && !isArchivedProject(latest)) pendingSaveRef.current.set(latest.id, latest);
+          });
+          setSyncState("error");
+          setSyncError(error.message);
+        });
+    }, 800);
+
     return () => clearTimeout(timer);
-  }, [projects, userId, cloudReady]);
+  }, [projects, userId, cloudReady, session, isAgent]);
   useEffect(() => {
     if (!cloudReady || !roleVerified) return;
     const params = new URLSearchParams(window.location.search);
