@@ -101,3 +101,37 @@ test("stale post-promotion project reuses immutable legacy identity instead of c
   assert.equal(creation.args.legacy_id, "q23sv30y");
   assert.notEqual(creation.args.legacy_id, project.id);
 });
+
+
+test("assigned agent can save a promoted cloud case even before local agentId is hydrated", async () => {
+  const project = defaultProject();
+  project.id = draftCaseId;
+  project.crm.businessCaseRecordId = draftCaseId;
+  project.crm.agentId = "";
+  project.crm.agentAccessMode = "owner";
+  project.customer.name = "Comune di Verzuolo";
+  project.project.name = "Verzuolo";
+  const calls = [];
+  const client = {
+    rpc: async (name, args) => {
+      calls.push({ name, args });
+      if (name === "promote_intelligence_draft") return { data: opportunityId, error: null };
+      if (name === "save_business_case_intelligence") return { data: 12, error: null };
+      throw new Error(`Unexpected RPC ${name}`);
+    },
+  };
+
+  const persisted = await persistIntelligenceProject(client, project, { role: "agent", id: "agent-1" });
+  assert.ok(persisted);
+  assert.equal(calls.some((call) => call.name === "save_business_case_intelligence"), true);
+});
+
+test("read-only agent project is never persisted by the browser", async () => {
+  const project = defaultProject();
+  project.id = draftCaseId;
+  project.crm.businessCaseRecordId = draftCaseId;
+  project.crm.agentAccessMode = "read_only";
+  const client = { rpc: async () => { throw new Error("RPC must not be called"); } };
+  const persisted = await persistIntelligenceProject(client, project, { role: "agent", id: "agent-2" });
+  assert.equal(persisted, null);
+});
