@@ -33,7 +33,7 @@ export async function persistIntelligenceProject(client, project, profile) {
   if (
     profile?.role === "agent" &&
     isStableCloudId(project?.id) &&
-    String(project?.crm?.agentId || "") !== String(profile?.id || "")
+    String(project?.crm?.agentAccessMode || "").toLowerCase() === "read_only"
   ) return null;
 
   const result = calculateBusinessCase(project);
