@@ -384,7 +384,7 @@ export default function App() {
       setActiveId(preferred.id);
       if (params.get("view")) setStoredView(params.get("view"), stableProjectId(preferred));
       if (preferred.id !== match.id) {
-        writeProjectRoute(window, preferred, params.get("view") || view || "customer", true);
+        writeProjectRoute(window, preferred, params.get("view") || "customer", true);
         rememberProject(localStorage, userId, preferred);
       }
       return;
