@@ -380,10 +380,12 @@ export default function App() {
     if (!opportunityId && !businessCaseId) return;
     const match = findLinkedProject(projectsRef.current, businessCaseId, opportunityId);
     if (match) {
+      setActiveId(match.id);
+      if (params.get("view")) setStoredView(params.get("view"), stableProjectId(match));
       const preferred = preferredProject(projectsRef.current, match);
-      setActiveId(preferred.id);
-      if (params.get("view")) setStoredView(params.get("view"), stableProjectId(preferred));
       if (preferred.id !== match.id) {
+        setActiveId(preferred.id);
+        if (params.get("view")) setStoredView(params.get("view"), stableProjectId(preferred));
         writeProjectRoute(window, preferred, params.get("view") || "customer", true);
         rememberProject(localStorage, userId, preferred);
       }
