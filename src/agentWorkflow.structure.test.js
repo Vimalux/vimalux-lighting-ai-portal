@@ -37,3 +37,13 @@ test("agent additional-cost card accepts supplier cost without exposing sales pr
 test("agent update path is explicitly accepted and sanitized", () => {
   assert.match(appSource, /if \(isAgent && path\[0\] === "additionalCosts"\) \{[\s\S]*sanitizeAgentAdditionalCosts\(project\.additionalCosts, value\)/);
 });
+
+
+test("agents can edit governed financing and service periods without internal finance controls", () => {
+  assert.match(appSource, /"financingPeriod", "serviceAgreementPeriod", "powerAidServicePeriod"/);
+  assert.match(appSource, /Durata finanziamento \(anni\)/);
+  assert.match(appSource, /Durata servizi CMS \/ contratto \(anni\)/);
+  assert.match(appSource, /Durata Adaptive Dimming \(anni\)/);
+  assert.match(appSource, /Periodo di analisi \(automatico\)/);
+  assert.doesNotMatch(appSource.slice(appSource.indexOf("function AgentAssumptions"), appSource.indexOf("function Customer")), /Tasso di interesse|interestRate|rateProfile/);
+});
