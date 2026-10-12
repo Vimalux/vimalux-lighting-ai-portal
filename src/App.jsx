@@ -543,12 +543,12 @@ export default function App() {
         p.customer.name = imported.customerName; p.project.name = imported.projectName; p.name = imported.projectName; if (imported.quotationId) p.project.businessCaseId = imported.quotationId;
         p.groups = [{ ...p.groups[0], name: "Imported luminaires", quantity: imported.lamps }];
         p.assumptions = { ...p.assumptions, dealType: "noleggio_operativo", financingModel: "laas", contractYears: imported.contractYears, financingYears: imported.financingYears, interestRate: imported.interestRate, rateProfileId: "custom", interestRateSnapshot: { profileId: "custom", annualRate: imported.interestRate, capturedAt: new Date().toISOString() }, allInclusiveAnnualPayment: imported.allInclusiveAnnualPayment, officialOfferCapex: imported.capex, officialAnnualOpex: imported.annualOpex };
-        p.crm = { ...p.crm, status: "proposal", closingProbability: 25, totalContractValue: null }; p.importedCommercial = { ...imported, fileName: file.name, importedAt: new Date().toISOString() }; p.updatedAt = new Date().toISOString(); activateImportedProject(migrateProject(p), "assumptions"); return;
+        p.crm = { ...p.crm, status: "proposal", closingProbability: 25, totalContractValue: null }; p.importedCommercial = { ...imported, fileName: file.name, importedAt: new Date().toISOString() }; p.updatedAt = new Date().toISOString(); activateImportedProject(migrateProject(p, { reconcileIdentity: true }), "assumptions"); return;
       }
       if (type === "planner") {
         const imported = parsePlannerWorkbook(sheets, p.catalogue.led, file.name); const mix = imported.productMix.map((item) => `${item.code}: ${item.quantity}`).join("\n"); const warning = imported.warnings.length ? `\n\nWarnings:\n- ${imported.warnings.join("\n- ")}` : "";
         if (!confirm(`${imported.projectName}\nPlanner technical project\nLuminaires: ${imported.totalQuantity}\n\nProduct mix:\n${mix}${warning}\n\nImport and continue with pricing?`)) return;
-        p.customer.name = imported.customerName; p.project.name = imported.projectName; p.name = imported.projectName; p.groups = imported.groups; p.crm = { ...p.crm, status: "lead", closingProbability: 25, totalContractValue: null }; p.importedTechnical = { ...imported, fileName: file.name, importedAt: new Date().toISOString() }; p.updatedAt = new Date().toISOString(); activateImportedProject(migrateProject(p), "existing"); return;
+        p.customer.name = imported.customerName; p.project.name = imported.projectName; p.name = imported.projectName; p.groups = imported.groups; p.crm = { ...p.crm, status: "lead", closingProbability: 25, totalContractValue: null }; p.importedTechnical = { ...imported, fileName: file.name, importedAt: new Date().toISOString() }; p.updatedAt = new Date().toISOString(); activateImportedProject(migrateProject(p, { reconcileIdentity: true }), "existing"); return;
       }
       const sheet = sheets[0]; const mapping = guessLightingMapping(sheet.headers);
       if (mapping.wattage === "") throw new Error("Could not identify a wattage column. Use the import mapping under Existing Lighting.");
@@ -556,7 +556,7 @@ export default function App() {
       if (!imported.groups.length) throw new Error("No valid luminaires were found.");
       if (!confirm(`${file.name}\nGeneric lighting file\n${imported.message}\n\nImport as a new project?`)) return;
       const importedProjectName = String(sheet.projectIdCellC6 || "").trim() || file.name.replace(/\.(xlsx?|csv)$/i, "");
-      p.project.name = importedProjectName; p.name = importedProjectName; p.groups = imported.groups; p.importedTechnical = { type: "lighting", source: sheet.name, fileName: file.name, totalQuantity: imported.totalQuantity, importedAt: new Date().toISOString() }; activateImportedProject(migrateProject(p), "existing");
+      p.project.name = importedProjectName; p.name = importedProjectName; p.groups = imported.groups; p.importedTechnical = { type: "lighting", source: sheet.name, fileName: file.name, totalQuantity: imported.totalQuantity, importedAt: new Date().toISOString() }; activateImportedProject(migrateProject(p, { reconcileIdentity: true }), "existing");
     } catch (error) { alert(`Import failed: ${error.message}`); }
   };
   const reset = () => { if (confirm(project.language === "it" ? "Eliminare tutti i dati locali e ripristinare i valori iniziali?" : "Delete all local data and restore defaults?")) { const p = defaultProject(); localStorage.removeItem("vimalux-intelligence-projects"); setProjects([p]); activateProject(p); } };
