@@ -9,13 +9,45 @@ export function navigationKey(userId, projectId) {
   return `${PREFIX}:${encodeURIComponent(userId)}:${encodeURIComponent(projectId)}`;
 }
 
+function isArchived(project) {
+  return String(project?.crm?.status || "").toLowerCase() === "archived" || Boolean(project?.crm?.archivedAt);
+}
+
+function normalizeIdentity(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^comune\s+di\s+/i, "")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function activeSuccessor(projects, matched) {
+  if (!matched || !isArchived(matched)) return matched;
+  const predecessorCode = String(matched?.project?.businessCaseId || "").trim().toUpperCase();
+  if (!predecessorCode) return matched;
+
+  const customer = normalizeIdentity(matched?.customer?.name);
+  const projectName = normalizeIdentity(matched?.project?.name || matched?.name);
+
+  return projects.find((item) => {
+    if (!item || item.id === matched.id || isArchived(item)) return false;
+    if (String(item?.crm?.legacyIntelligenceId || "").trim().toUpperCase() !== predecessorCode) return false;
+    const sameCustomer = !customer || normalizeIdentity(item?.customer?.name) === customer;
+    const sameProject = !projectName || normalizeIdentity(item?.project?.name || item?.name) === projectName;
+    return sameCustomer && sameProject;
+  }) || matched;
+}
+
 export function findLinkedProject(projects, businessCaseId, opportunityId) {
-  if (businessCaseId) return projects.find((item) => [
+  if (businessCaseId) {
+    const matched = projects.find((item) => [
       item.id,
       item.crm?.businessCaseRecordId,
       item.crm?.legacyIntelligenceId,
       item.project?.businessCaseId,
     ].includes(businessCaseId));
+    return activeSuccessor(projects, matched);
+  }
   return opportunityId ? projects.find((item) =>
     [item.crm?.opportunityId, item.crm?.uniqueProjectId].includes(opportunityId)) : undefined;
 }
