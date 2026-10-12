@@ -226,8 +226,13 @@ const merge = (base, saved) => {
   return saved == null ? base : saved;
 };
 
-export function migrateProject(saved) {
-  const reconciled = reconcileReimportIdentity(saved, storedProjectsForReimport());
+export function migrateProject(saved, { reconcileIdentity = false } = {}) {
+  // Migration must be a pure shape/default normalization. Never let browser-local
+  // projects rebind the identity/status of a cloud Business Case during hydration.
+  // Identity reconciliation is reserved for an explicit project-file re-import.
+  const reconciled = reconcileIdentity
+    ? reconcileReimportIdentity(saved, storedProjectsForReimport())
+    : saved;
   saved = reconciled;
   const previousUpdatedAt = saved?.updatedAt || saved?.createdAt || "";
   const project = merge(defaultProject({ applyStoredDefaults: false }), saved && typeof saved === "object" ? saved : {});
