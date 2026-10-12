@@ -15,9 +15,11 @@ test("same active Business Case keeps its workflow view when URL match rehydrate
   assert.doesNotMatch(matchBranch, /setView/);
 });
 
-test("same active Business Case keeps its workflow view when loaded from Supabase", () => {
+test("fetched Business Case keeps workflow view while preferring an active successor", () => {
   const loadBranch = source.slice(source.indexOf("loadBusinessCase(businessCaseId)"), source.indexOf("} else if (supabaseConfigured)"));
-  assert.match(loadBranch, /setActiveId\(migrated.id\)/);
+  assert.match(loadBranch, /const preferred = preferredProject\(candidates, migrated\)/);
+  assert.match(loadBranch, /setActiveId\(preferred.id\)/);
+  assert.match(loadBranch, /writeProjectRoute\(window, preferred/);
   assert.doesNotMatch(loadBranch, /setView/);
 });
 
