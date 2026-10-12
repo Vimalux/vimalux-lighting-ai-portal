@@ -38,3 +38,43 @@ test("invalid or unavailable storage cannot break navigation", () => {
   assert.doesNotThrow(() => writeNavigation(broken, "key", "report", ADMIN_VIEWS));
   assert.equal(readNavigation({getItem:()=>"unknown"}, "key", ADMIN_VIEWS), "customer");
 });
+
+
+test("old archived Business Case UUID resolves directly to active successor", () => {
+  const archived = {
+    id: "24979dc1-125f-4694-9203-6edf101e5864",
+    project: { name: "Vicopisano", businessCaseId: "BC-473640" },
+    customer: { name: "Comune di Vicopisano" },
+    crm: {
+      businessCaseRecordId: "24979dc1-125f-4694-9203-6edf101e5864",
+      status: "archived",
+      archivedAt: "2026-10-07T10:46:55Z",
+      legacyIntelligenceId: "q23sv30y",
+    },
+  };
+  const active = {
+    id: "92b86ffa-6a8f-41e5-910d-e2c92ed697d1",
+    project: { name: "Vicopisano", businessCaseId: "BC-FE90ABAE" },
+    customer: { name: "Comune di Vicopisano" },
+    crm: {
+      businessCaseRecordId: "92b86ffa-6a8f-41e5-910d-e2c92ed697d1",
+      status: "lead",
+      archivedAt: "",
+      legacyIntelligenceId: "BC-473640",
+    },
+  };
+  assert.equal(
+    findLinkedProject([active, archived], archived.id, null),
+    active
+  );
+});
+
+test("archived Business Case without a matching successor remains historical", () => {
+  const archived = {
+    id: "old-only",
+    project: { name: "Old project", businessCaseId: "BC-OLD" },
+    customer: { name: "Comune di Old" },
+    crm: { status: "archived", archivedAt: "2026-10-01T00:00:00Z" },
+  };
+  assert.equal(findLinkedProject([archived], "old-only", null), archived);
+});
