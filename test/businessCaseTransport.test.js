@@ -109,3 +109,58 @@ test("production rejects legacy querystring payloads as authoritative", () => {
   assert.ok(productionGuard > stableLoad);
   assert.ok(legacyImport > productionGuard);
 });
+
+
+test("cloud Vicopisano hydration cannot inherit archived identity from browser cache", () => {
+  const previousLocalStorage = globalThis.localStorage;
+  const archivedLocal = {
+    id: "24979dc1-125f-4694-9203-6edf101e5864",
+    customer: { name: "Comune di Vicopisano" },
+    project: { name: "Vicopisano", businessCaseId: "BC-473640" },
+    crm: {
+      businessCaseRecordId: "24979dc1-125f-4694-9203-6edf101e5864",
+      opportunityId: "f5c230c0-c090-413b-9d59-7336e1913231",
+      status: "archived",
+      archivedAt: "2026-10-07T10:46:55Z",
+    },
+    updatedAt: "2026-10-09T08:49:05Z",
+  };
+  globalThis.localStorage = {
+    getItem(key) {
+      if (key === "vimalux-intelligence-projects") return JSON.stringify([archivedLocal]);
+      return null;
+    },
+  };
+
+  try {
+    const project = projectFromBusinessCaseRow({
+      id: "92b86ffa-6a8f-41e5-910d-e2c92ed697d1",
+      business_case_code: "BC-FE90ABAE",
+      legacy_intelligence_id: "BC-473640",
+      crm_opportunity_id: "9b577380-729b-46a9-80d2-91b66988823a",
+      crm_fields: {
+        customer: "Comune di Vicopisano",
+        project: "Vicopisano",
+        stage: "lead",
+        probability: 0,
+      },
+      source_payload: {},
+      intelligence_data: {
+        customer: { name: "Comune di Vicopisano" },
+        project: { name: "Vicopisano", businessCaseId: "BC-FE90ABAE" },
+        crm: { status: "lead", archivedAt: "" },
+        importedTechnical: { fileName: "VML_Inputsheet_Intelligence_Vicopisano.xlsx" },
+      },
+      result_summary: { existingLuminaires: 1334 },
+    });
+
+    assert.equal(project.id, "92b86ffa-6a8f-41e5-910d-e2c92ed697d1");
+    assert.equal(project.project.businessCaseId, "BC-FE90ABAE");
+    assert.equal(project.crm.status, "lead");
+    assert.equal(project.crm.archivedAt, "");
+    assert.equal(project.crm.businessCaseRecordId, "92b86ffa-6a8f-41e5-910d-e2c92ed697d1");
+  } finally {
+    if (previousLocalStorage === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = previousLocalStorage;
+  }
+});
