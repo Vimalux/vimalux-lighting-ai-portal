@@ -56,6 +56,7 @@ import {
 import { isStableBusinessCaseLink } from "./businessCaseTransport.js";
 import { dedupeProjects } from "./projectDeduplication.js";
 import { isArchivedProject } from "./projectVisibility.js";
+import { preferredProject, supersededByLabel } from "./projectSuccessor.js";
 import { changedProjects } from "./projectAutosave.js";
 import "./styles.css";
 import "./business-case.css";
@@ -294,7 +295,15 @@ export default function App() {
       setCurrentProfile(profile);
       setProjects(merged);
       if (requests.accepts(revision)) {
-        setActiveId(initialProjectId(merged, window.location.search, readActiveProject(localStorage, userId)));
+        const requestedId = initialProjectId(merged, window.location.search, readActiveProject(localStorage, userId));
+        const requestedProject = merged.find((item) => item.id === requestedId) || null;
+        const preferred = preferredProject(merged, requestedProject);
+        setActiveId(preferred?.id || requestedId);
+        if (preferred && requestedProject && preferred.id !== requestedProject.id) {
+          const requestedView = new URLSearchParams(window.location.search).get("view") || readNavigation(localStorage, navigationKey(userId, preferred.id), isAgent ? agentAllowedViews : ADMIN_VIEWS);
+          writeProjectRoute(window, preferred, requestedView || "customer", true);
+          rememberProject(localStorage, userId, preferred);
+        }
       }
       setCloudReady(true);
       setSyncState("saved");
@@ -373,6 +382,13 @@ export default function App() {
     if (match) {
       setActiveId(match.id);
       if (params.get("view")) setStoredView(params.get("view"), stableProjectId(match));
+      const preferred = preferredProject(projectsRef.current, match);
+      if (preferred.id !== match.id) {
+        setActiveId(preferred.id);
+        if (params.get("view")) setStoredView(params.get("view"), stableProjectId(preferred));
+        writeProjectRoute(window, preferred, params.get("view") || "customer", true);
+        rememberProject(localStorage, userId, preferred);
+      }
       return;
     }
     setActiveId("");
@@ -675,16 +691,17 @@ function Projects({ list, activeId, select, remove, create, importProjectFile, t
     if (reason === "lost") return language === "it" ? "Perso" : language === "da" ? "Tabt" : "Lost";
     return language === "it" ? "Archiviato" : language === "da" ? "Arkiveret" : "Archived";
   };
-  const rows = (items, archivedSection = false) => <div className="project-list">{items.map((p) =>
-    <div key={p.id} className={`project-row ${p.id === activeId ? "selected" : ""}`}>
+  const rows = (items, archivedSection = false) => <div className="project-list">{items.map((p) => {
+    const successorCode = archivedSection ? supersededByLabel(list, p) : "";
+    return <div key={p.id} className={`project-row ${p.id === activeId ? "selected" : ""}`}>
       <button className="project-select" onClick={() => select(p.id)}>
         <strong>{p.project.name}</strong>
         <span>{p.customer.name || "—"}</span>
-        <small>{p.project.businessCaseId}{archivedSection ? ` · ${archiveLabel(p)}` : ""}</small>
+        <small>{p.project.businessCaseId}{archivedSection ? ` · ${archiveLabel(p)}` : ""}{successorCode ? ` · ${language === "it" ? "sostituito da" : language === "da" ? "erstattet af" : "superseded by"} ${successorCode}` : ""}</small>
       </button>
       {!archivedSection && remove && <button className="danger project-delete" onClick={() => remove(p.id)} aria-label={language === "it" ? `Elimina ${p.project.name}` : `Delete ${p.project.name}`}>{language === "it" ? "Elimina" : "Delete"}</button>}
-    </div>
-  )}</div>;
+    </div>;
+  })}</div>;
   return <Card title={t("projects")}>
     {rows(active)}
     {archived.length > 0 && <>
