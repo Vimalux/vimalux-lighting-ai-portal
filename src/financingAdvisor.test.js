@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { defaultProject } from "./model.js";
 import { financingCashflowAdvisor } from "./financingAdvisor.js";
+import { advisorPreviousPeriods, applyAdvisorDuration, restoreAdvisorDuration } from "./financingAdvisorPeriods.js";
 
 function baseProject() {
   const project = defaultProject({ applyStoredDefaults: false });
@@ -74,4 +75,57 @@ test("recommended duration respects safety margin when available", () => {
   if (advisor.recommended.minMarginPercent >= 10) {
     assert.ok(advisor.recommended.rows.every((row) => row.marginPercent >= 9.999));
   }
+});
+
+
+test("advisor duration keeps the first pre-analysis periods and can restore them", () => {
+  const project = noleggioProject();
+  project.assumptions.financingPeriod = 7;
+  project.assumptions.financingYears = 7;
+  project.assumptions.serviceAgreementPeriod = 10;
+  project.assumptions.contractYears = 10;
+  project.assumptions.analysisPeriod = 10;
+  project.assumptions.powerAidServicePeriod = 8;
+  project.solution.powerAidEnabled = true;
+
+  const applied = applyAdvisorDuration(project, 6, "noleggio_operativo");
+  assert.equal(applied.assumptions.financingPeriod, 6);
+  assert.equal(applied.assumptions.serviceAgreementPeriod, 6);
+  assert.equal(applied.assumptions.analysisPeriod, 6);
+  assert.equal(applied.assumptions.powerAidServicePeriod, 6);
+  assert.deepEqual(advisorPreviousPeriods(applied), {
+    financingPeriod: 7,
+    financingYears: 7,
+    serviceAgreementPeriod: 10,
+    contractYears: 10,
+    analysisPeriod: 10,
+    powerAidServicePeriod: 8,
+  });
+
+  const appliedAgain = applyAdvisorDuration(applied, 5, "noleggio_operativo");
+  assert.equal(appliedAgain.assumptions.serviceAgreementPeriod, 5);
+  assert.equal(advisorPreviousPeriods(appliedAgain).serviceAgreementPeriod, 10);
+
+  const restored = restoreAdvisorDuration(appliedAgain);
+  assert.equal(restored.assumptions.financingPeriod, 7);
+  assert.equal(restored.assumptions.serviceAgreementPeriod, 10);
+  assert.equal(restored.assumptions.analysisPeriod, 10);
+  assert.equal(restored.assumptions.powerAidServicePeriod, 8);
+  assert.equal(advisorPreviousPeriods(restored), null);
+});
+
+test("finance advisor duration changes financing only and restores service horizon unchanged", () => {
+  const project = financeProject();
+  project.assumptions.financingPeriod = 5;
+  project.assumptions.serviceAgreementPeriod = 12;
+  project.assumptions.powerAidServicePeriod = 10;
+
+  const applied = applyAdvisorDuration(project, 8, "finance");
+  assert.equal(applied.assumptions.financingPeriod, 8);
+  assert.equal(applied.assumptions.serviceAgreementPeriod, 12);
+  assert.equal(applied.assumptions.powerAidServicePeriod, 10);
+
+  const restored = restoreAdvisorDuration(applied);
+  assert.equal(restored.assumptions.financingPeriod, 5);
+  assert.equal(restored.assumptions.serviceAgreementPeriod, 12);
 });

@@ -446,7 +446,7 @@ export default function App() {
     const currentReadOnly = isAgent && currentProject.crm?.agentAccessMode === "read_only";
     if (currentReadOnly) return all;
     if (isAgent && path[0] === "pricing") return all;
-    if (isAgent && path[0] === "assumptions" && !["energyPrice", "operatingHours", "dealType"].includes(path[1])) return all;
+    if (isAgent && path[0] === "assumptions" && !["energyPrice", "operatingHours", "dealType", "financingPeriod", "serviceAgreementPeriod", "powerAidServicePeriod"].includes(path[1])) return all;
     if (isAgent && path[0] === "additionalCosts") {
       if (path.length !== 1 || !Array.isArray(value)) return all;
       // Keep the agent sanitizer contract while sourcing the project from the
@@ -577,7 +577,29 @@ const Field = ({ label, value, onChange, type = "text", children, disabled = fal
 const Toggle = ({ label, value, onChange, disabled = false, title = "" }) => <label className={`toggle ${disabled ? "field-disabled" : ""}`} title={title}><input type="checkbox" checked={Boolean(value)} disabled={disabled} onChange={(e) => onChange(e.target.checked)} /><span>{label}</span></label>;
 const Card = ({ title, children, className = "" }) => <section className={`card ${className}`.trim()}><h2>{title}</h2>{children}</section>;
 
-function AgentAssumptions({ p, update }) { const it = p.language === "it"; return <Card title={it ? "Assunzioni progetto" : "Project assumptions"}><div className="form-grid"><Field label={it ? "Prezzo energia (EUR/kWh)" : "Energy price (EUR/kWh)"} value={p.assumptions.energyPrice} onChange={(v) => update(["assumptions","energyPrice"],v)} /><Field label={it ? "Ore operative annue" : "Annual operating hours"} value={p.assumptions.operatingHours} onChange={(v) => update(["assumptions","operatingHours"],v)} /><Field label={it ? "Soluzione commerciale" : "Commercial solution"} value={p.assumptions.dealType || "cash"} onChange={(v) => update(["assumptions","dealType"],v)}><option value="cash">{it ? "Acquisto diretto" : "Direct purchase"}</option><option value="finance">{it ? "Finanziamento ESCO" : "ESCO financing"}</option><option value="noleggio_operativo">Noleggio Operativo / LaaS</option></Field></div><p className="muted">{it ? "L’agente può modificare solo i parametri specifici del progetto. Prezzi, margini, aliquote IVA e parametri finanziari interni restano gestiti da VIMALUX." : "The agent can only change project-specific inputs. Prices, margins, VAT rates and internal financing assumptions remain controlled by VIMALUX."}</p></Card>; }
+function AgentAssumptions({ p, update }) {
+  const it = p.language === "it";
+  const type = p.assumptions.dealType || "cash";
+  const adaptive = Boolean(p.solution?.powerAidEnabled);
+  return <Card title={it ? "Assunzioni progetto" : "Project assumptions"}>
+    <div className="form-grid">
+      <Field label={it ? "Prezzo energia (EUR/kWh)" : "Energy price (EUR/kWh)"} value={p.assumptions.energyPrice} onChange={(v) => update(["assumptions","energyPrice"],v)} />
+      <Field label={it ? "Ore operative annue" : "Annual operating hours"} value={p.assumptions.operatingHours} onChange={(v) => update(["assumptions","operatingHours"],v)} />
+      <Field label={it ? "Soluzione commerciale" : "Commercial solution"} value={type} onChange={(v) => update(["assumptions","dealType"],v)}>
+        <option value="cash">{it ? "Acquisto diretto" : "Direct purchase"}</option>
+        <option value="finance">{it ? "Finanziamento ESCO" : "ESCO financing"}</option>
+        <option value="noleggio_operativo">Noleggio Operativo / LaaS</option>
+      </Field>
+      {type === "finance" && <Field label={it ? "Durata finanziamento (anni)" : "Financing period (years)"} value={p.assumptions.financingPeriod} onChange={(v) => update(["assumptions","financingPeriod"],v)} />}
+      <Field label={it ? "Durata servizi CMS / contratto (anni)" : "CMS / contract service period (years)"} value={p.assumptions.serviceAgreementPeriod} onChange={(v) => update(["assumptions","serviceAgreementPeriod"],v)} />
+      {adaptive && <Field label={it ? "Durata Adaptive Dimming (anni)" : "Adaptive Dimming period (years)"} value={p.assumptions.powerAidServicePeriod} onChange={(v) => update(["assumptions","powerAidServicePeriod"],v)} />}
+      <Field label={it ? "Periodo di analisi (automatico)" : "Analysis period (automatic)"} value={p.assumptions.serviceAgreementPeriod} disabled onChange={() => {}} />
+    </div>
+    <p className="muted">{it
+      ? "L’agente può modificare le durate specifiche del progetto. La durata Adaptive Dimming non può superare la durata servizi CMS/contratto e il periodo di analisi segue automaticamente la durata servizi. Prezzi, margini, aliquote IVA, tassi e parametri finanziari interni restano gestiti da VIMALUX."
+      : "The agent can change project-specific durations. Adaptive Dimming cannot exceed the CMS/contract service period and the analysis period follows the service period automatically. Prices, margins, VAT, rates and internal financing assumptions remain controlled by VIMALUX."}</p>
+  </Card>;
+}
 function Customer({ p, update }) { const c = [["name", p.language === "it" ? "Comune / cliente" : "Municipality / customer"],["province", p.language === "it" ? "Provincia" : "Province"],["region", p.language === "it" ? "Regione" : "Region"],["country", p.language === "it" ? "Paese" : "Country"],["contact", p.language === "it" ? "Referente" : "Contact person"],["title", p.language === "it" ? "Ruolo" : "Position / title"],["email", "Email"],["telephone", p.language === "it" ? "Telefono" : "Telephone"]]; const q = [["name", p.language === "it" ? "Nome progetto" : "Project name"],["businessCaseId", "Business Case ID"],["consultant", p.language === "it" ? "Consulente commerciale" : "Sales consultant"],["date", p.language === "it" ? "Data" : "Date"],["currency", p.language === "it" ? "Valuta" : "Currency"]]; return <div className="two-col"><Card title={p.language === "it" ? "Cliente" : "Customer"}><div className="form-grid">{c.map(([k,l]) => <Field key={k} label={l} value={p.customer[k]} onChange={(v) => update(["customer", k], v)} />)}</div></Card><Card title={p.language === "it" ? "Progetto" : "Project"}><div className="form-grid">{q.map(([k,l]) => <Field key={k} label={l} type={k === "date" ? "date" : "text"} value={p.project[k]} onChange={(v) => update(["project", k], v)} />)}</div></Card></div>; }
 
 function Existing({ p, update, t, readOnly = false }) {

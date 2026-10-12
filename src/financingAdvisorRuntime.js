@@ -2,6 +2,7 @@ import { migrateProject } from "./model.js";
 import { saveCloudState, supabaseConfigured } from "./supabase.js";
 import { financingCashflowAdvisor } from "./financingAdvisor.js";
 import { resolveActiveProjectIndex } from "./activeBusinessCaseResolver.js";
+import { advisorPreviousPeriods, applyAdvisorDuration, restoreAdvisorDuration } from "./financingAdvisorPeriods.js";
 
 const ROOT_ID = "vimalux-financing-advisor";
 const MONTHLY_OVERRIDE_ID = "vimalux-laas-monthly-override";
@@ -34,7 +35,7 @@ function findField(pattern) {
 }
 
 function dealTypeFromUi(project) {
-  const label = findField(/tipo\s+di\s+accordo|deal\s+type/i);
+  const label = findField(/tipo\s+di\s+accordo|soluzione\s+commerciale|deal\s+type|commercial\s+solution/i);
   const select = label?.control || (label?.htmlFor ? document.getElementById(label.htmlFor) : null) || label?.nextElementSibling || label?.parentElement?.querySelector("select");
   const value = String(select?.value || "").toLowerCase();
   const optionText = String(select?.selectedOptions?.[0]?.textContent || "").toLowerCase();
@@ -72,29 +73,37 @@ function parseLocalizedNumber(value) {
   return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
 }
 
-async function persistProjects(projects) {
+async function persistProjects(projects, updatedProject) {
   localStorage.setItem("vimalux-intelligence-projects", JSON.stringify(projects));
-  if (supabaseConfigured) await saveCloudState(projects);
+  // Persist only the Business Case changed by this advisor. Agents can see
+  // read-only collaborator projects, and portfolio-wide saves must never try
+  // to write those unrelated rows.
+  if (supabaseConfigured && updatedProject) await saveCloudState([updatedProject]);
 }
 
 async function applyDuration(projects, index, duration, root, mode) {
   const project = projects[index];
-  const assumptions = {
-    ...(project.assumptions || {}),
-    financingPeriod: duration,
-    financingYears: duration,
-  };
-  if (mode === "noleggio_operativo") {
-    assumptions.serviceAgreementPeriod = duration;
-    assumptions.contractYears = duration;
-    assumptions.analysisPeriod = duration;
-    if (project?.solution?.powerAidEnabled) assumptions.powerAidServicePeriod = duration;
-  }
-  const updated = migrateProject({ ...project, assumptions, updatedAt: new Date().toISOString() });
+  const updated = migrateProject({
+    ...applyAdvisorDuration(project, duration, mode),
+    updatedAt: new Date().toISOString(),
+  });
   projects[index] = updated;
   const status = root.querySelector("[data-financing-advisor-status]");
   if (status) status.textContent = project?.language === "it" ? "Salvataggio..." : "Saving...";
-  await persistProjects(projects);
+  await persistProjects(projects, updated);
+  window.location.reload();
+}
+
+async function restoreDuration(projects, index, root) {
+  const project = projects[index];
+  const restored = migrateProject({
+    ...restoreAdvisorDuration(project),
+    updatedAt: new Date().toISOString(),
+  });
+  projects[index] = restored;
+  const status = root.querySelector("[data-financing-advisor-status]");
+  if (status) status.textContent = project?.language === "it" ? "Ripristino..." : "Restoring...";
+  await persistProjects(projects, restored);
   window.location.reload();
 }
 
@@ -107,7 +116,7 @@ async function applyMonthlyOverride(projects, index, monthlyValue, statusNode) {
   };
   projects[index] = migrateProject({ ...project, assumptions, updatedAt: new Date().toISOString() });
   if (statusNode) statusNode.textContent = project?.language === "it" ? "Salvataggio..." : "Saving...";
-  await persistProjects(projects);
+  await persistProjects(projects, projects[index]);
   window.location.reload();
 }
 
@@ -179,6 +188,7 @@ function render() {
 
   const minimum = advisor.minimum;
   const recommended = advisor.recommended;
+  const previousPeriods = advisorPreviousPeriods(project);
   const root = document.createElement("div");
   root.id = ROOT_ID;
   root.dataset.mode = advisor.mode;
@@ -203,7 +213,7 @@ function render() {
       ? (it ? `Nel Noleggio il canone comprende CAPEX e servizi/OPEX: l'OPEX non viene sottratto una seconda volta. La durata applicata allinea contratto, CMS, analisi e Adaptive Dimming (se attivo).` : `For Noleggio, the payment includes CAPEX and services/OPEX, so OPEX is not deducted twice. Applying a duration aligns contract, CMS, analysis and Adaptive Dimming (if active).`)
       : (it ? `Verifica anno per anno sull'intero periodo servizi di ${advisor.serviceYears} anni.` : `Checked year by year across the full ${advisor.serviceYears}-year service period.`);
 
-    root.innerHTML = `<div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap"><div style="display:grid;gap:5px"><strong style="color:#0f6fae">${title}</strong><span style="font-size:13px;color:#0f172a"><b>${it ? "Minimo" : "Minimum"}: ${minYears} ${it ? "anni" : "years"}</b> · ${it ? "cashflow annuo minimo" : "minimum annual cash flow"}: ${money(project, minimum.minAnnualCashFlow)}</span><span style="font-size:13px;color:#0f172a"><b>${it ? "Consigliato" : "Recommended"}: ${recYears} ${it ? "anni" : "years"}</b> · ${it ? "margine di sicurezza target" : "target safety margin"}: ${advisor.safetyMarginPercent}%</span><span style="font-size:12px;color:#475569">${year1Formula}</span><span style="font-size:11px;color:#64748b">${note}</span></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button type="button" data-apply-minimum class="secondary">${it ? `Applica minimo ${minYears} anni` : `Apply minimum ${minYears} years`}</button>${recommendedDifferent ? `<button type="button" data-apply-recommended class="primary">${it ? `Applica consigliato ${recYears} anni` : `Apply recommended ${recYears} years`}</button>` : ""}<small data-financing-advisor-status style="color:#64748b"></small></div></div>`;
+    root.innerHTML = `<div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap"><div style="display:grid;gap:5px"><strong style="color:#0f6fae">${title}</strong><span style="font-size:13px;color:#0f172a"><b>${it ? "Minimo" : "Minimum"}: ${minYears} ${it ? "anni" : "years"}</b> · ${it ? "cashflow annuo minimo" : "minimum annual cash flow"}: ${money(project, minimum.minAnnualCashFlow)}</span><span style="font-size:13px;color:#0f172a"><b>${it ? "Consigliato" : "Recommended"}: ${recYears} ${it ? "anni" : "years"}</b> · ${it ? "margine di sicurezza cashflow cliente target" : "target customer cash-flow safety margin"}: ${advisor.safetyMarginPercent}%</span><span style="font-size:12px;color:#475569">${year1Formula}</span><span style="font-size:11px;color:#64748b">${note} ${it ? "L'applicazione salva le nuove durate; puoi ripristinare i valori precedenti finché non confermi una nuova impostazione manuale." : "Applying saves the new durations; you can restore the previous values if you decide not to use the analysis."}</span></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button type="button" data-apply-minimum class="secondary">${it ? `Applica minimo ${minYears} anni` : `Apply minimum ${minYears} years`}</button>${recommendedDifferent ? `<button type="button" data-apply-recommended class="primary">${it ? `Applica consigliato ${recYears} anni` : `Apply recommended ${recYears} years`}</button>` : ""}${previousPeriods ? `<button type="button" data-restore-duration class="secondary">${it ? "Ripristina durata precedente" : "Restore previous duration"}</button>` : ""}<small data-financing-advisor-status style="color:#64748b"></small></div></div>`;
   }
 
   anchor.parentElement?.appendChild(root);
@@ -213,6 +223,10 @@ function render() {
   });
   root.querySelector("[data-apply-recommended]")?.addEventListener("click", async () => {
     try { await applyDuration(projects, index, recommended.durationYears, root, advisor.mode); }
+    catch (error) { const status = root.querySelector("[data-financing-advisor-status]"); if (status) status.textContent = error?.message || "Errore"; }
+  });
+  root.querySelector("[data-restore-duration]")?.addEventListener("click", async () => {
+    try { await restoreDuration(projects, index, root); }
     catch (error) { const status = root.querySelector("[data-financing-advisor-status]"); if (status) status.textContent = error?.message || "Errore"; }
   });
 }
