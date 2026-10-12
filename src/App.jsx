@@ -399,9 +399,17 @@ export default function App() {
         if (!active || !requests.accepts(revision)) return;
         if (!loaded) { setSyncError("Business Case not found or access unavailable. Select a project."); return; }
         const migrated = migrateProject(loaded);
+        const candidates = projectsRef.current.some((item) => item.id === migrated.id)
+          ? projectsRef.current
+          : [...projectsRef.current, migrated];
+        const preferred = preferredProject(candidates, migrated);
         setProjects((current) => current.some((item) => item.id === migrated.id) ? current : [...current, migrated]);
-        setActiveId(migrated.id);
-        if (params.get("view")) setStoredView(params.get("view"), stableProjectId(migrated));
+        setActiveId(preferred.id);
+        if (params.get("view")) setStoredView(params.get("view"), stableProjectId(preferred));
+        if (preferred.id !== migrated.id) {
+          writeProjectRoute(window, preferred, params.get("view") || "customer", true);
+          rememberProject(localStorage, userId, preferred);
+        }
       }).catch((error) => { if (active && requests.accepts(revision)) { setSyncError(error.message); setSyncState("error"); } });
     } else if (supabaseConfigured) {
       setSyncError("Business Case not found. Reopen the Opportunity in CRM or select a project.");
