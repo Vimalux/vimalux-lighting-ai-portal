@@ -529,7 +529,7 @@ export default function App() {
     setProjects((all) => dedupeProjects([
       importedProject,
       ...all.filter((item) => item.id !== importedProject.id),
-    ]));
+    ], { dedupeImportIdentity: true }));
     activateProject(importedProject, nextView);
   };
   const importProjectFile = async (file) => {
