@@ -1,4 +1,5 @@
 import { findLinkedProject, navigationKey, readNavigation, writeNavigation } from "./navigationState.js";
+import { isArchivedProject } from "./projectVisibility.js";
 
 export const ACTIVE_PROJECT_KEY = "vimalux-intelligence-active-business-case";
 export const PROJECTS_KEY = "vimalux-intelligence-projects";
@@ -6,6 +7,33 @@ export const CACHE_OWNER_KEY = "vimalux-intelligence-projects-owner";
 export const SOLAR_LOCATION_EVENT = "vimalux:project-solar-location";
 export const stableProjectId = (project) => project?.crm?.businessCaseRecordId || project?.id || "";
 export const accountKey = (key, userId) => `${key}:${encodeURIComponent(userId)}`;
+
+export function browserCacheProjects(projects = []) {
+  return (projects || []).filter((project) => !isArchivedProject(project));
+}
+
+export function writeProjectCache(storage, userId, projects = []) {
+  const payload = JSON.stringify(browserCacheProjects(projects));
+  const accountProjectsKey = accountKey(PROJECTS_KEY, userId);
+  const write = () => {
+    storage.setItem(accountProjectsKey, payload);
+    storage.setItem(PROJECTS_KEY, payload);
+    storage.setItem(CACHE_OWNER_KEY, userId);
+  };
+  try {
+    write();
+    return true;
+  } catch {
+    try {
+      storage.removeItem(accountProjectsKey);
+      storage.removeItem(PROJECTS_KEY);
+      write();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
 
 export function readActiveProject(storage, userId) {
   try {
