@@ -113,13 +113,15 @@ function matchesCurrentProject(project, businessCaseId) {
 
 function confirmationText(project, changes) {
   const it = project?.language === "it";
+  const projectName = String(project?.project?.name || project?.name || project?.customer?.name || "").trim();
   const preview = changes.slice(0, 5).map((change) =>
     `${change.category}: ${change.oldProductId} → ${change.newProductId}`
   ).join("\n");
   const extra = changes.length > 5 ? `\n+ ${changes.length - 5} ${it ? "altre assegnazioni" : "more assignments"}` : "";
+  const context = projectName ? `${it ? "Progetto" : "Project"}: ${projectName}\n\n` : "";
   return it
-    ? `${changes.length} assegnazioni prodotto non sono più compatibili con il catalogo attuale. Vuoi aggiornarle automaticamente?\n\n${preview}${extra}\n\nVerranno modificati solo i prodotti non compatibili. Quantità, potenze esistenti, prezzi, CRM e altre impostazioni del Business Case restano invariati.`
-    : `${changes.length} product assignments are no longer compatible with the current catalogue. Update them automatically?\n\n${preview}${extra}\n\nOnly incompatible product assignments will be changed. Quantities, existing wattages, prices, CRM and all other Business Case settings remain unchanged.`;
+    ? `${context}${changes.length} assegnazioni prodotto non sono più compatibili con il catalogo attuale. Vuoi aggiornarle automaticamente?\n\n${preview}${extra}\n\nVerranno modificati solo i prodotti non compatibili. Quantità, potenze esistenti, prezzi, CRM e altre impostazioni del Business Case restano invariati.`
+    : `${context}${changes.length} product assignments are no longer compatible with the current catalogue. Update them automatically?\n\n${preview}${extra}\n\nOnly incompatible product assignments will be changed. Quantities, existing wattages, prices, CRM and all other Business Case settings remain unchanged.`;
 }
 
 function reconcileCurrentStoredProjectWithConfirmation() {
@@ -154,10 +156,15 @@ function reconcileCurrentStoredProjectWithConfirmation() {
 }
 
 if (typeof window !== "undefined") {
-  // Existing Business Cases are never silently rewritten. Once the current project is
-  // loaded, incompatible product assignments are detected and the user is asked before
-  // only those assignments are reconciled against the current catalogue.
-  window.setTimeout(reconcileCurrentStoredProjectWithConfirmation, 1400);
+  // Never prompt merely because Intelligence was opened. A remembered Business Case may
+  // already be present in the URL before the user has consciously selected a project.
+  // Reconciliation is therefore offered only when the user enters a technical project
+  // view, or after an explicit import/re-import action.
+  document.addEventListener("click", (event) => {
+    const target = event.target?.closest?.('[data-intelligence-view="existing"], [data-intelligence-view="solution"]');
+    if (!target) return;
+    window.setTimeout(reconcileCurrentStoredProjectWithConfirmation, 450);
+  });
 
   // After import/re-import, run the same controlled check. The existing import overwrite
   // confirmation still decides whether imported technical data may replace the project.
