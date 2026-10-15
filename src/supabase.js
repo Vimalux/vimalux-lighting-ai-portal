@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { projectFromBusinessCaseRow } from "./businessCaseTransport.js";
 import { isStableCloudId, persistIntelligenceProject } from "./businessCasePersistence.js";
 import { activeIntelligenceProjects, isArchivedProject } from "./projectVisibility.js";
-import { dedupeProjects, isSameImportedProject } from "./projectDeduplication.js";
+import { dedupeProjects } from "./projectDeduplication.js";
 import { buildBusinessCaseSnapshot } from "./businessCaseSync.js";
 import { catalogueForMasterSave, catalogueWithHistoricalSelections } from "./catalogueIntegrity.js";
 import {
@@ -136,7 +136,6 @@ export async function loadCloudState(localProjects, includeLocalProjects = true)
         && String(cloud.project?.businessCaseId || "").trim().toUpperCase()
           === String(item?.project?.businessCaseId || "").trim().toUpperCase()
       )
-      || isSameImportedProject(cloud, item)
     )
   );
   return dedupeProjects([
