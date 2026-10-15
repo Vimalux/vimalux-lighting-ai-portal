@@ -33,8 +33,66 @@ export function normalizePreviewRpcName(name, preview = stagingPreview) {
   return preview && name === "list_business_cases" ? "list_business_cases_v2" : name;
 }
 
+function navigationFixtureBusinessCaseRows() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("navigation_fixture") !== "1") return null;
+
+  return [
+    {
+      id: "7f010000-1111-4111-8111-111111111111",
+      business_case_code: "BC-SAN-FELE-TEST",
+      project_lineage_id: "VXP-SAN-FELE-TEST",
+      crm_opportunity_id: "7f010001-1111-4111-8111-111111111111",
+      intelligence_data: {
+        customer: { name: "Comune di San Fele", province: "Potenza", region: "Basilicata", country: "Italia" },
+        project: { name: "San Fele - NAV TEST", businessCaseId: "BC-SAN-FELE-TEST" },
+        groups: [{
+          name: "SAN FELE TEST - 46 PUNTI",
+          quantity: 46,
+          technology: "SAP",
+          existingWattage: 100,
+          existingSystemFactor: 1.2,
+          selectedForUpgrade: true,
+          projectLedWattage: 50,
+          smartEnabled: true,
+          powerAidEnabled: false
+        }],
+        crm: { status: "lead", businessCaseRecordId: "7f010000-1111-4111-8111-111111111111" }
+      },
+      result_summary: {},
+      crm_fields: { customer: "Comune di San Fele", project: "San Fele - NAV TEST", stage: "lead" }
+    },
+    {
+      id: "7f020000-2222-4222-8222-222222222222",
+      business_case_code: "BC-FELETTO-TEST",
+      project_lineage_id: "VXP-FELETTO-TEST",
+      crm_opportunity_id: "7f020001-2222-4222-8222-222222222222",
+      intelligence_data: {
+        customer: { name: "Comune di Feletto", province: "Torino", region: "Piemonte", country: "Italia" },
+        project: { name: "Feletto - NAV TEST", businessCaseId: "BC-FELETTO-TEST" },
+        groups: [{
+          name: "FELETTO TEST - 355 PUNTI",
+          quantity: 355,
+          technology: "SAP",
+          existingWattage: 70,
+          existingSystemFactor: 1.2,
+          selectedForUpgrade: true,
+          projectLedWattage: 35,
+          smartEnabled: true,
+          powerAidEnabled: false
+        }],
+        crm: { status: "proposal", businessCaseRecordId: "7f020000-2222-4222-8222-222222222222" }
+      },
+      result_summary: {},
+      crm_fields: { customer: "Comune di Feletto", project: "Feletto - NAV TEST", stage: "proposal" }
+    }
+  ];
+}
+
 function previewBusinessCaseRows() {
   try {
+    const fixture = navigationFixtureBusinessCaseRows();
+    if (fixture) return fixture;
     const stored = JSON.parse(localStorage.getItem("vimalux-intelligence-projects") || "[]");
     const projects = Array.isArray(stored) ? stored : [];
     return projects.map((project) => {
