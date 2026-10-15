@@ -145,9 +145,74 @@ const numeric = new Set([
   "totalContractValue",
 ]);
 
+
+function navigationFixtureProjects() {
+  const params = new URLSearchParams(window.location.search);
+  if (!stagingPreview || params.get("navigation_fixture") !== "1") return null;
+
+  const makeFixture = ({ id, code, lineage, customer, projectName, quantity, wattage, stage }) => {
+    const project = defaultProject();
+    project.id = id;
+    project.customer = {
+      ...(project.customer || {}),
+      name: customer,
+      country: "Italia",
+    };
+    project.project = {
+      ...(project.project || {}),
+      name: projectName,
+      businessCaseId: code,
+      projectLineageId: lineage,
+    };
+    project.name = projectName;
+    project.groups = [{
+      ...(project.groups?.[0] || {}),
+      name: projectName.includes("San Fele") ? "SAN FELE TEST - 46 PUNTI" : "FELETTO TEST - 355 PUNTI",
+      quantity,
+      technology: "SAP",
+      existingWattage: wattage,
+      existingSystemFactor: 1.2,
+      selectedForUpgrade: true,
+      projectLedWattage: Math.max(1, Math.round(wattage / 2)),
+      smartEnabled: true,
+      powerAidEnabled: false,
+    }];
+    project.crm = {
+      ...(project.crm || {}),
+      status: stage,
+      businessCaseRecordId: id,
+      projectLineageId: lineage,
+    };
+    return project;
+  };
+
+  return [
+    makeFixture({
+      id: "7f010000-1111-4111-8111-111111111111",
+      code: "BC-SAN-FELE-TEST",
+      lineage: "VXP-SAN-FELE-TEST",
+      customer: "Comune di San Fele",
+      projectName: "San Fele - NAV TEST",
+      quantity: 46,
+      wattage: 100,
+      stage: "lead",
+    }),
+    makeFixture({
+      id: "7f020000-2222-4222-8222-222222222222",
+      code: "BC-FELETTO-TEST",
+      lineage: "VXP-FELETTO-TEST",
+      customer: "Comune di Feletto",
+      projectName: "Feletto - NAV TEST",
+      quantity: 355,
+      wattage: 70,
+      stage: "proposal",
+    }),
+  ];
+}
+
 export default function App() {
   const hadStoredProjects = useMemo(() => Boolean(localStorage.getItem("vimalux-intelligence-projects")), []);
-  const initial = useMemo(loadProjects, []);
+  const initial = useMemo(() => navigationFixtureProjects() || loadProjects(), []);
   const emptyProject = useMemo(defaultProject, []);
   const [projects, setProjects] = useState(initial);
   const [activeId, setActiveId] = useState(() => initialProjectId(initial, window.location.search, stagingPreview ? readActiveProject(localStorage, "local") : ""));
