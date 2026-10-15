@@ -24,7 +24,15 @@ export function isSameImportedProject(a, b) {
   return Boolean(aIdentity && bIdentity && aIdentity === bIdentity);
 }
 
-export function dedupeProjects(projects = []) {
+/**
+ * Deduplicate only on durable identifiers by default.
+ *
+ * Customer/project/file-name identity is intentionally opt-in. It is useful
+ * during an explicit user-driven re-import, but it must never be used during
+ * cloud hydration, autosave, or normal project selection because two distinct
+ * Business Cases can legitimately have the same customer/project name.
+ */
+export function dedupeProjects(projects = [], { dedupeImportIdentity = false } = {}) {
   const byCloudId = new Map();
   const byBusinessCaseRecordId = new Map();
   const byBusinessCaseCode = new Map();
@@ -39,7 +47,7 @@ export function dedupeProjects(projects = []) {
       : "";
     const businessCaseCode = String(project?.project?.businessCaseId || "").trim().toUpperCase();
     const legacyId = String(project?.crm?.legacyIntelligenceId || "").trim();
-    const identity = projectImportIdentity(project);
+    const identity = dedupeImportIdentity ? projectImportIdentity(project) : "";
 
     if (cloudId && byCloudId.has(cloudId)) continue;
     if (businessCaseRecordId && byBusinessCaseRecordId.has(businessCaseRecordId)) continue;
@@ -51,14 +59,18 @@ export function dedupeProjects(projects = []) {
       const existing = result[existingIndex];
       const existingStable = isStableCloudId(existing?.id);
       const currentStable = isStableCloudId(project?.id);
+
+      // During explicit import reconciliation a stable cloud project replaces a
+      // matching local draft. Distinct stable cloud records are never collapsed.
       if (!existingStable && currentStable) {
         result[existingIndex] = project;
         if (cloudId) byCloudId.set(cloudId, existingIndex);
         if (businessCaseRecordId) byBusinessCaseRecordId.set(businessCaseRecordId, existingIndex);
         if (businessCaseCode) byBusinessCaseCode.set(businessCaseCode, existingIndex);
         if (legacyId) byLegacyId.set(legacyId, existingIndex);
+        continue;
       }
-      continue;
+      if (!existingStable || !currentStable) continue;
     }
 
     const index = result.length;
