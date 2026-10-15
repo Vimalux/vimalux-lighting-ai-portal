@@ -23,7 +23,7 @@ import { customerAnalysisResult } from "./vat.js";
 import { publishActiveBusinessCaseResult } from "./liveBusinessCaseResult.js";
 import CatalogueExtended from "./CatalogueExtended.jsx";
 import ProcurementPanel from "./ProcurementPanel.jsx";
-import { accountKey, ACTIVE_PROJECT_KEY, CACHE_OWNER_KEY, PROJECTS_KEY, SOLAR_LOCATION_EVENT, createRequestRevision, initialProjectId, migrateProjectNavigation, readAccountProjects, readActiveProject, reconcileHydration, rememberProject, stableProjectId, writeProjectRoute } from "./projectContext.js";
+import { ACTIVE_PROJECT_KEY, PROJECTS_KEY, SOLAR_LOCATION_EVENT, createRequestRevision, initialProjectId, migrateProjectNavigation, readAccountProjects, readActiveProject, reconcileHydration, rememberProject, stableProjectId, writeProjectCache, writeProjectRoute } from "./projectContext.js";
 import { navigationKey, readNavigation } from "./navigationState.js";
 import usePersistentNavigation from "./usePersistentNavigation.js";
 import { ADMIN_VIEWS, findLinkedProject } from "./navigationState.js";
@@ -183,7 +183,7 @@ export default function App() {
   });
   const setView = (next) => {
     const value = typeof next === "function" ? next(view) : next;
-    setStoredView(value);
+    setStoredView(value, selectedProject ? stableProjectId(selectedProject) : undefined);
   };
   const activateProject = (target, nextView = "customer", replaceHistory = false) => {
     if (!target) return;
@@ -233,11 +233,12 @@ export default function App() {
   const syncedProject = syncedProjects.find((item) => item.id === project.id) || syncBusinessCaseResult(project, project.updatedAt || project.createdAt);
   useEffect(() => {
     if (!cloudReady || !roleVerified) return;
-    try {
-      localStorage.setItem(accountKey(PROJECTS_KEY, userId), JSON.stringify(projects));
-      localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
-      localStorage.setItem(CACHE_OWNER_KEY, userId);
-    } catch { setSyncError("Browser storage is unavailable. Keep this page open until cloud saving completes."); }
+    const stored = writeProjectCache(localStorage, userId, projects);
+    if (!stored) {
+      setSyncError("Browser storage is unavailable. Keep this page open until cloud saving completes.");
+      return;
+    }
+    setSyncError((current) => current === "Browser storage is unavailable. Keep this page open until cloud saving completes." ? "" : current);
   }, [projects, userId, cloudReady, roleVerified]);
   useEffect(() => { if (isAgent && !isAgentViewAllowed(view, agentAllowedViews)) setView("customer"); }, [isAgent, view]);
   useEffect(() => {
