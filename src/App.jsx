@@ -246,8 +246,8 @@ export default function App() {
     let active = true;
     setSyncState("loading");
     loadStagingCatalogue().then((catalogue) => {
-      if (!active || !catalogue) return;
-      setProjects((current) => current.map((item) => migrateProject({ ...item, catalogue })));
+      if (!active) return;
+      if (catalogue) setProjects((current) => current.map((item) => migrateProject({ ...item, catalogue })));
       setCurrentProfile({ id: "staging-preview", role: "admin", email: "staging@vimalux.local", full_name: "Staging Preview" });
       setCloudReady(true);
       setSyncState("local");

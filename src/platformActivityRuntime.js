@@ -56,6 +56,10 @@ async function recordLoginOnce(session) {
 
 let activeSession = null;
 let lastModule = null;
+let activityQueue = Promise.resolve();
+function enqueueActivity(work) {
+  activityQueue = activityQueue.then(work).catch(error => console.warn("[VIMALUX activity] unavailable:", error.message));
+}
 
 async function recordModuleOpen(session, force = false) {
   if (!session?.user?.id || typeof sessionStorage === "undefined") return;
@@ -67,9 +71,11 @@ async function recordModuleOpen(session, force = false) {
     lastModule = module;
     return;
   }
-  lastModule = module;
   const ok = await insertActivity(session, "module_opened", activityDetails(module));
-  if (ok) sessionStorage.setItem(markerKey, module);
+  if (ok) {
+    lastModule = module;
+    sessionStorage.setItem(markerKey, module);
+  }
 }
 
 function clearTrackingMarkers(session) {
@@ -85,7 +91,7 @@ function installTitleObserver() {
   const title = document.querySelector("title");
   if (!title) return;
   const observer = new MutationObserver(() => {
-    if (activeSession) void recordModuleOpen(activeSession);
+    if (activeSession) { const session = activeSession; enqueueActivity(() => recordModuleOpen(session)); }
   });
   observer.observe(title, { childList: true, subtree: true, characterData: true });
 }
@@ -111,19 +117,25 @@ export function installPlatformActivityTracking() {
 
   supabase.auth.getSession().then(({ data }) => {
     activeSession = data.session || null;
-    if (activeSession) void recordModuleOpen(activeSession);
+    if (activeSession) { const session = activeSession; enqueueActivity(() => recordModuleOpen(session)); }
   });
 
+  // Supabase calls must run outside the auth lock. Serialize callbacks so
+  // getSession/title/SIGNED_IN cannot create overlapping module audit writes.
   supabase.auth.onAuthStateChange((event, session) => {
-    activeSession = session || null;
-    if (event === "SIGNED_IN" && session) {
-      void recordLoginOnce(session);
-      void recordModuleOpen(session, true);
-    }
-    if (event === "SIGNED_OUT") {
-      clearTrackingMarkers(session);
-      activeSession = null;
-    }
+    setTimeout(() => enqueueActivity(async () => {
+      if (activeSession?.user?.id !== session?.user?.id) lastModule = null;
+      const previousSession = activeSession;
+      activeSession = session || null;
+      if (event === "SIGNED_IN" && session) {
+        await recordLoginOnce(session);
+        await recordModuleOpen(session);
+      }
+      if (event === "SIGNED_OUT") {
+        clearTrackingMarkers(previousSession);
+        activeSession = null;
+      }
+    }), 0);
   });
 }
 
