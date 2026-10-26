@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { stagingAuthMode } from "./stagingAuthMode.js";
 import { projectFromBusinessCaseRow } from "./businessCaseTransport.js";
 import { isStableCloudId, persistIntelligenceProject } from "./businessCasePersistence.js";
 import { activeIntelligenceProjects, isArchivedProject } from "./projectVisibility.js";
@@ -11,15 +12,18 @@ import {
 } from "./crmBusinessCase.js";
 
 const productionHost = typeof window !== "undefined" && window.location.hostname === "app.vimalux.com";
-export const stagingPreview = !productionHost;
+// Default previews remain local. Explicit staging_auth=1 uses real staging
+// authentication/RLS; endpoint selection depends only on the production host.
+export const authenticatedStaging = typeof window !== "undefined" && stagingAuthMode(window.location.hostname, window.location.search, sessionStorage);
+export const stagingPreview = !productionHost && !authenticatedStaging;
 
 const productionUrl = import.meta.env.VITE_SHARED_SUPABASE_URL || "https://ymzdjjpvuvhxxzsffqik.supabase.co";
 const productionKey = import.meta.env.VITE_SHARED_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_ma_iqpL_aHaoxQSsGs8TeA_p_MGg695";
 const stagingUrl = "https://jjmfvxbfljixdqyibeza.supabase.co";
 const stagingKey = "sb_publishable_o8WIR8kuQ86vY1NjqdA3gQ_pslhpaHM";
 
-const url = stagingPreview ? stagingUrl : productionUrl;
-const key = stagingPreview ? stagingKey : productionKey;
+const url = productionHost ? productionUrl : stagingUrl;
+const key = productionHost ? productionKey : stagingKey;
 
 export const supabaseConfigured = Boolean(url && key);
 export const supabase = supabaseConfigured
