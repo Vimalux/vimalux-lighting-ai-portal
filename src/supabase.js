@@ -87,6 +87,10 @@ if (stagingPreview && supabase?.rpc && !supabase.__vimaluxPreviewRpcIsolationIns
 
 export async function loadStagingCatalogue() {
   if (!stagingPreview || !supabase) return null;
+  // Unauthenticated local previews retain their bundled/cached catalogue.
+  // The prepared staging database is accessed only through an actual login.
+  const { data: authData } = await supabase.auth.getSession();
+  if (!authData?.session) return null;
   const { data, error } = await supabase.rpc("get_intelligence_catalogue");
   if (error) throw error;
   return data ? { led: data.led || [], smart: data.smart || [] } : null;

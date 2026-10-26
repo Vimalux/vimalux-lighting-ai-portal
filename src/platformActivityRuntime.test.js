@@ -54,3 +54,14 @@ test('failed module write remains retryable and is never marked as recorded', as
   h.titleChanged(); await settle();
   assert.equal(h.rows.filter(r => r.action === 'module_opened').length, 1);
 });
+
+test('local preview keeps its existing catalogue without anonymous database access', async () => {
+  const source = fs.readFileSync(new URL('./supabase.js', import.meta.url), 'utf8');
+  const start = source.indexOf('export async function loadStagingCatalogue()');
+  const end = source.indexOf('\nasync function getCurrentProfile',start);
+  let rpcCalls = 0;
+  const context = { stagingPreview: true, supabase: { auth: { getSession: async () => ({ data: { session: null } }) }, rpc: async () => { rpcCalls++; return {}; } } };
+  vm.runInNewContext(source.slice(start,end).replace('export async','async')+'; this.load = loadStagingCatalogue;',context);
+  assert.equal(await context.load(),null);
+  assert.equal(rpcCalls,0);
+});
