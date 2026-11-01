@@ -58,7 +58,7 @@ export function customerVatDisclosure(project = {}, language = "it") {
   const percent = vatRecoverablePercent(project);
   const typeLabel = customerVatTypeLabel(project, language);
   if (it) {
-    return `Valori economici esposti al netto IVA. Tipo cliente: ${typeLabel}. IVA recuperabile dal ${subject}: ${percent}%, secondo le impostazioni del Business Case; aliquote e detraibilità definitive devono essere validate per il singolo contratto.`;
+    return `Valori al netto IVA, salvo dove espressamente indicato IVA inclusa. Tipo cliente: ${typeLabel}. IVA recuperabile dal ${subject}: ${percent}%, secondo le impostazioni del Business Case; aliquote e detraibilità definitive devono essere validate per il singolo contratto.`;
   }
-  return `Commercial values are shown net of VAT. Customer type: ${typeLabel}. VAT recoverable by the ${subject}: ${percent}%, according to the Business Case settings; final VAT rates and recoverability must be validated for the individual contract.`;
+  return `Values are shown net of VAT unless expressly stated as VAT inclusive. Customer type: ${typeLabel}. VAT recoverable by the ${subject}: ${percent}%, according to the Business Case settings; final VAT rates and recoverability must be validated for the individual contract.`;
 }
