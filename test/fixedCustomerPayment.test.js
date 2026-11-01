@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { defaultProject } from '../src/model.js';
 import { calculateBusinessCase } from '../src/calculations.js';
+import fs from 'node:fs';
+import { customerAnalysisResult } from '../src/vat.js';
+import { buildYearOneCustomerValuePhases } from '../src/customerValuePhases.js';
 import { internalProfitabilityMetrics } from '../src/profitabilityMetrics.js';
 
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-6, `${actual} != ${expected}`);
@@ -58,4 +61,17 @@ test('payments stop at their respective service and finance terms', () => {
   assert.equal(r.cashFlowRows[7].powerAidCustomerFee, 0);
   assert.ok(r.cashFlowRows[9].serviceOpex > 0);
   assert.equal(r.cashFlowRows[10].serviceOpex, 0);
+});
+
+
+test('Preview chart and cash table use the same VAT-inclusive fixed payments', () => {
+  const p = fixture('finance', true, 2);
+  const result = calculateBusinessCase(p);
+  const view = customerAnalysisResult(result);
+  const phase = buildYearOneCustomerValuePhases(view).phases[0].display;
+  near(phase.customerSaving, view.cashFlowRows[0].netCashFlow);
+  near(phase.servicePayment + phase.investmentPayment, result.customerGrossAnnualPayment);
+  near(view.customerValueRows[0].servicePayment / 12 + view.customerValueRows[0].investmentPayment / 12, result.customerGrossMonthlyPayment);
+  const runtime = fs.readFileSync(new URL('../src/reportHybridRuntime.js', import.meta.url), 'utf8');
+  assert.match(runtime, /repairCustomerValueChart\(report, live.project, customerAnalysisResult\(live.result\)\)/);
 });
