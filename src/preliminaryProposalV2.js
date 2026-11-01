@@ -1,3 +1,4 @@
+import { proposalSolutionScope } from "./proposalSolutionScope.js";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { supabase } from "./supabase.js";
@@ -115,6 +116,7 @@ function generatePdf(row, version) {
   const analysisYears = Math.round(Number(calculated.analysisPeriod) || contractYears);
   const powerAidYears = project.solution?.powerAidEnabled ? Math.max(1, Math.min(contractYears, Math.round(Number(project.assumptions?.powerAidServicePeriod) || 10))) : 0;
   const energyEscalation = Number(project.assumptions?.energyEscalation) || 0;
+  const scope = proposalSolutionScope(calculated, result, lang);
   const annualFee = Number(calculated.customerAnnualPayment ?? result.annualCustomerPayment ?? result.annualOpex) || 0;
   const maintSaving = Number(calculated.maintenanceSaving) || maintenanceSaving(project);
   const energySaving = Number(calculated.energySaving ?? result.annualEnergySavingEUR) || 0;
@@ -260,11 +262,12 @@ function generatePdf(row, version) {
   autoTable(doc, {
     startY: 39, theme: "grid", head: [[it ? "Ambito" : "Scope", it ? "Configurazione preliminare" : "Preliminary configuration"]],
     body: [
-      [it ? "Upgrade LED" : "LED upgrade", `${Math.round(Number(result.upgradeLuminaires) || 0)} ${it ? "punti luce" : "lighting points"}`],
+      [it ? "Upgrade LED" : "LED upgrade", scope.led],
       ...(hybridUnits > 0 ? [["Hybrid Solar", `${number(hybridUnits, 0, lang)} ${it ? "apparecchi" : "luminaires"} · ${number(hybridInstalledPvKwp, 2, lang)} kWp · ${number(hybridGridOffsetKwh, 0, lang)} kWh/${it ? "anno" : "yr"} ${it ? "offset rete" : "grid offset"}`]] : []),
-      [it ? "Controllo connesso" : "Connected control", `${Math.round(Number(result.smartConnectedLuminaires) || 0)} ${it ? "punti luce Smart" : "Smart lighting points"}`],
+      [it ? "Controllo connesso" : "Connected control", scope.connected],
       ["CMS", project.solution?.cmsEnabled ? (it ? "Monitoraggio, allarmi e gestione remota" : "Monitoring, alarms and remote management") : (it ? "Non incluso" : "Not included")],
-      ["Adaptive Lighting", project.solution?.powerAidEnabled ? "Adaptive Dimming" : (it ? "Predisposizione / da validare" : "Prepared / to be validated")],
+      ["Adaptive Dimming", scope.adaptive],
+      ...scope.existingDimmingRows,
     ],
     headStyles: tableHead, alternateRowStyles: { fillColor: light }, styles: { font: "helvetica", fontSize: 7.6, cellPadding: 1.25 },
     columnStyles: { 0: { fontStyle: "bold", cellWidth: 48, halign: "left" }, 1: { halign: "left" } },
