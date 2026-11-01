@@ -46,6 +46,7 @@ export const BASE_ASSUMPTIONS = {
   agent2CommissionPercent: 0,
   warrantyReservePercent: 0,
   fundingCostPercent: 0,
+  financeTransferFee: 0,
   otherDirectCosts: 0,
   minimumMarginPercent: 30,
 };

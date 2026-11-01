@@ -1,3 +1,4 @@
+import { valueFinanceReceivables } from "./financeReceivables.js";
 import { calculateAdditionalCosts } from "./additionalCosts.js";
 
 export const numberValue = (value) => {
@@ -155,10 +156,22 @@ export function calculateBusinessCase(project) {
   const warrantyReserve = totalCapex * positive(a.warrantyReservePercent) / 100;
   const fundingRate = positive(a.fundingCostPercent) / 1200;
   const fundingPayment = hardwareFinanced ? (fundingRate ? principal * fundingRate / (1 - Math.pow(1 + fundingRate, -months)) : principal / months) : 0;
-  const financingCost = hardwareFinanced ? Math.max(0, fundingPayment * months - principal) : 0;
+  const financeReceivablesSale = dealType === "finance" ? valueFinanceReceivables({
+    monthlyPayment: financingMonthlyPayment, months,
+    annualRatePercent: a.fundingCostPercent, fee: a.financeTransferFee,
+  }) : null;
+  // Keep nominal customer TCV and its cost bridge for CRM compatibility.
+  // Internal VIMALUX economics show upfront proceeds and retained service revenue.
+  const financeReceivablesDiscount = financeReceivablesSale?.discount || 0;
+  const financingCost = financeReceivablesSale
+    ? financeReceivablesDiscount + financeReceivablesSale.transferFee
+    : hardwareFinanced ? Math.max(0, fundingPayment * months - principal) : 0;
   const totalDirectCosts = capexDirectCost + dutyCost + contractOpexCost + commissionCost + warrantyReserve + financingCost + positive(a.otherDirectCosts);
-  const netProjectProfit = totalContractRevenue - totalDirectCosts;
-  const netProjectMarginPercent = totalContractRevenue ? netProjectProfit / totalContractRevenue * 100 : 0;
+  const vimaluxRevenue = totalContractRevenue - financeReceivablesDiscount;
+  const vimaluxDirectCosts = totalDirectCosts - financeReceivablesDiscount;
+  const vimaluxUpfrontCash = financeReceivablesSale ? positive(a.upfrontPayment) + financeReceivablesSale.netProceeds : null;
+  const netProjectProfit = vimaluxRevenue - vimaluxDirectCosts;
+  const netProjectMarginPercent = vimaluxRevenue ? netProjectProfit / vimaluxRevenue * 100 : 0;
   const analysisPeriod = Math.max(1, Math.round(positive(a.analysisPeriod)));
   let cumulative = hardwareFinanced ? -positive(a.upfrontPayment) : -totalCapex, npv = cumulative;
   const cashFlowRows = [];
@@ -226,5 +239,6 @@ export function calculateBusinessCase(project) {
     dealType, financingYears, financingPeriod, serviceAgreementPeriod, powerAidServicePeriod, interestRateSnapshot: a.interestRateSnapshot || null, financingMonthlyPayment, financingAnnualPayment, allInclusiveAnnualPayment, allInclusiveContractRevenue, customerAnnualPayment, customerMonthlyPayment: monthlyPayment, customerPaymentYear1: dealType === "cash" ? totalCapex + totalAnnualOpex : positive(a.upfrontPayment) + customerAnnualPayment,
     customerAnnualNetBenefit, payback, roiPercent, cashBreakEvenYear, npv, lifecycleResult, analysisPeriod, energyReductionPercent, upgradedEnergyReductionPercent, co2ReductionKg, decisionStatus, customerDecisionStatus,
     smartHardwareCost, implementationCost, gatewayCost, antennaCost, meterCost, freightCost, dutyCost, baseCapexDirectCost, capexDirectCost, annualOpexDirectCost, contractOpexRevenue, contractOpexCost, capexContractRevenue, totalContractRevenue, commissionableLampSales, agent1CommissionCost, agent2CommissionCost, commissionCost, warrantyReserve, financingCost, totalDirectCosts, netProjectProfit, netProjectMarginPercent, minimumMarginPercent,
+    financeReceivablesSale, financeReceivablesDiscount, vimaluxRevenue, vimaluxDirectCosts, vimaluxUpfrontCash,
     cashFlowRows, customerValueRows, contractedSavingsTotal, fullSmartSavingsTotal, contractedGrossBenefitTotal, fullSmartGrossBenefitTotal, fullSmartAdditionalGrossSavings: fullSmartGrossBenefitTotal - contractedGrossBenefitTotal, fullSmartExtensionServiceCost, fullSmartIncrementalSavings: fullSmartSavingsTotal - contractedSavingsTotal, groupRows, hardware: { lcu, gateway, antenna, meter, gatewayQty, antennaQty, meterQty }, powerAidEnabled, cmsEnabled, smartEnabled };
 }

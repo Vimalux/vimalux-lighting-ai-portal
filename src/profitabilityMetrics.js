@@ -47,8 +47,8 @@ export function internalProfitabilityMetrics(project, result) {
   const adaptiveSupplierContractCost = numberValue(r.powerAidSupplierContractCost || escalatingTotal(adaptiveCostAnnual, energyRate, powerAidYears));
   const adaptiveContractMargin = adaptiveCustomerContractValue - adaptiveSupplierContractCost;
 
-  const projectRevenue = numberValue(r.totalContractRevenue);
-  const projectDirectCosts = numberValue(r.totalDirectCosts);
+  const projectRevenue = numberValue(r.vimaluxRevenue ?? r.totalContractRevenue);
+  const projectDirectCosts = numberValue(r.vimaluxDirectCosts ?? r.totalDirectCosts);
   const projectContribution = numberValue(r.netProjectProfit || (projectRevenue - projectDirectCosts));
   const projectMarginPercent = numberValue(r.netProjectMarginPercent || pct(projectContribution, projectRevenue));
   const minimumProjectMarginPercent = numberValue(r.minimumMarginPercent || a.minimumMarginPercent);

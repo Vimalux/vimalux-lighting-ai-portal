@@ -197,7 +197,7 @@ function renderInternal() {
   const currency = project.project?.currency || "EUR";
   const t = labels(language);
   const m = internalProfitabilityMetrics(project, result);
-  const signature = JSON.stringify([project.id, result.totalContractRevenue, result.totalDirectCosts, result.cmsRevenue, result.cmsDirectCost, result.powerAidCustomerFee, result.powerAidSupplierCost, result.totalCapex, result.capexDirectCost, result.minimumMarginPercent, language]);
+  const signature = JSON.stringify([project.id, result.totalContractRevenue, result.totalDirectCosts, result.vimaluxRevenue, result.vimaluxDirectCosts, result.cmsRevenue, result.cmsDirectCost, result.powerAidCustomerFee, result.powerAidSupplierCost, result.totalCapex, result.capexDirectCost, result.minimumMarginPercent, language]);
   let host = document.getElementById(INTERNAL_ID);
   if (!host) {
     host = document.createElement("section");
@@ -256,7 +256,7 @@ function renderInternal() {
         [t.margin + " · " + t.contract, money(m.adaptive.contractMargin, language, currency), positiveClass(m.adaptive.contractMargin)],
       ])}
       ${box(t.project, [
-        [t.revenue, money(m.project.revenue, language, currency)],
+        [result.financeReceivablesSale ? (language === "it" ? "Ricavi VIMALUX: prezzo cessione + servizi" : "VIMALUX revenue: sale proceeds + services") : t.revenue, money(m.project.revenue, language, currency)],
         [t.directCosts, money(m.project.directCosts, language, currency)],
         [t.contribution, money(m.project.contribution, language, currency), positiveClass(m.project.contribution)],
         [t.marginPct, percent(m.project.marginPercent, language), positiveClass(m.project.marginBufferPercent)],
