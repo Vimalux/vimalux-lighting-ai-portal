@@ -1,3 +1,4 @@
+import { customerAnalysisResult } from "./vat.js";
 import { getLiveBusinessCaseResult, LIVE_BUSINESS_CASE_EVENT } from "./liveBusinessCaseResult.js";
 import { buildYearOneCustomerValuePhases, customerValueSegments } from "./customerValuePhases.js";
 
@@ -176,7 +177,7 @@ export function renderHybridReportDashboard() {
   const report = document.querySelector(".report-preview");
   if (!report) return;
   renderHybridSummary(report, live.project, live.result);
-  repairCustomerValueChart(report, live.project, live.result);
+  repairCustomerValueChart(report, live.project, customerAnalysisResult(live.result));
 }
 
 let scheduled = false;

@@ -19,7 +19,8 @@ test("preliminary proposal surfaces Hybrid in executive and solution sections", 
 test("preliminary proposal separates energy-price and OPEX escalation", () => {
   assert.match(source, /energyEscalation/);
   assert.match(source, /Indicizzazione prezzo energia/);
-  assert.match(source, /Indicizzazione canone\/OPEX/);
+  assert.match(source, /Indicizzazione pagamento cliente/);
+  assert.doesNotMatch(source, /Indicizzazione.*OPEX/);
 });
 
 test("proposal refinement does not touch access-control or CRM permissions", () => {

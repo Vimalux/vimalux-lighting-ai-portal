@@ -114,7 +114,6 @@ function generatePdf(row, version) {
   const contractYears = Math.round(Number(calculated.serviceAgreementPeriod) || Number(result.contractYears) || Number(project.assumptions?.serviceAgreementPeriod) || 0);
   const analysisYears = Math.round(Number(calculated.analysisPeriod) || contractYears);
   const powerAidYears = project.solution?.powerAidEnabled ? Math.max(1, Math.min(contractYears, Math.round(Number(project.assumptions?.powerAidServicePeriod) || 10))) : 0;
-  const escalation = Number(project.assumptions?.opexEscalation) || 0;
   const energyEscalation = Number(project.assumptions?.energyEscalation) || 0;
   const annualFee = Number(calculated.customerAnnualPayment ?? result.annualCustomerPayment ?? result.annualOpex) || 0;
   const maintSaving = Number(calculated.maintenanceSaving) || maintenanceSaving(project);
@@ -340,7 +339,7 @@ function generatePdf(row, version) {
       [it ? "Periodo di analisi" : "Analysis period", `${analysisYears} ${it ? "anni" : "years"}`],
       [it ? "Durata CMS" : "CMS service term", `${contractYears} ${it ? "anni" : "years"}`],
       ...(project.solution?.powerAidEnabled ? [[it ? "Durata Adaptive Dimming" : "Adaptive Dimming service term", `${powerAidYears} ${it ? "anni" : "years"}`]] : []),
-      [isLaaS ? (it ? "Indicizzazione interna OPEX servizi" : "Internal service OPEX escalation") : (it ? "Indicizzazione canone/OPEX" : "Service/OPEX escalation"), isLaaS ? `${number(escalation, 1, lang)}% ${it ? "annuo · canone cliente fisso" : "p.a. · customer payment fixed"}` : `${number(escalation, 1, lang)}% ${it ? "annuo" : "p.a."}`],
+      [it ? "Indicizzazione pagamento cliente" : "Customer payment indexation", it ? "Nessuna: rate e canoni fissi per i rispettivi periodi contrattuali" : "None: instalments and service fees fixed for their respective contractual terms"],
       [it ? "Modello commerciale" : "Commercial model", String(project.assumptions?.dealType || project.assumptions?.financingModel || "cash")],
       [it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)],
     ],

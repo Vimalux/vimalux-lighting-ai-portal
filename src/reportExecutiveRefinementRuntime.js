@@ -64,7 +64,6 @@ function renderExecutiveRefinement(report, project, result) {
   const currency = project?.project?.currency || "EUR";
   const it = language === "it";
   const energyEscalation = safe(project?.assumptions?.energyEscalation);
-  const opexEscalation = safe(project?.assumptions?.opexEscalation);
   const hybrid = hybridStats(result);
 
   const kpis = summary.querySelector(".customer-summary-kpis");
@@ -89,7 +88,7 @@ function renderExecutiveRefinement(report, project, result) {
   const energyText = document.createElement("span");
   energyText.innerHTML = `<strong>${it ? "Indicizzazione energia" : "Energy escalation"}</strong>: ${formatNumber(energyEscalation, language, 1)}% ${it ? "annuo" : "p.a."}`;
   const opexText = document.createElement("span");
-  opexText.innerHTML = `<strong>${it ? "Indicizzazione canone/OPEX" : "Service/OPEX escalation"}</strong>: ${formatNumber(opexEscalation, language, 1)}% ${it ? "annuo" : "p.a."}`;
+  opexText.innerHTML = `<strong>${it ? "Pagamenti al fornitore" : "Supplier payments"}</strong>: ${it ? "rate e canoni fissi nei rispettivi periodi contrattuali" : "instalments and service fees fixed within their respective contractual terms"}`;
   note.append(energyText, opexText);
   summary.appendChild(note);
 }

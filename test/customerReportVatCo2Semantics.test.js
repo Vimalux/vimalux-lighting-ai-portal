@@ -7,8 +7,8 @@ test("Italy base CO2 factor and customer-report VAT semantics stay aligned", () 
   const proposal = fs.readFileSync("src/preliminaryProposalV2.js", "utf8");
   const cashflow = fs.readFileSync("src/proposalFinalVisualPages.js", "utf8");
   assert.match(model, /co2KgPerKwh:\s*\.1926/);
-  assert.match(proposal, /Indicizzazione interna OPEX servizi/);
-  assert.match(proposal, /canone cliente fisso/);
+  assert.doesNotMatch(proposal, /Indicizzazione.*OPEX/);
+  assert.match(proposal, /rate e canoni fissi/i);
   assert.match(cashflow, /Cash flow economico cliente/);
   assert.match(cashflow, /Cash flow annuale cliente/);
   assert.match(cashflow, /Canone lordo IVA/);
