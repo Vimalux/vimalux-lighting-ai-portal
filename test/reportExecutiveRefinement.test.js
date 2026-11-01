@@ -13,14 +13,15 @@ test("report dashboard loads executive Hybrid refinement without touching access
   assert.match(main, /reportExecutiveRefinementRuntime\.js/);
   assert.match(runtime, /Hybrid Solar/);
   assert.match(runtime, /Indicizzazione energia/);
-  assert.match(runtime, /Indicizzazione canone\/OPEX/);
+  assert.match(runtime, /Pagamenti al fornitore/);
   assert.match(runtime, /hybridSolarSavingKwh/);
   assert.match(runtime, /hybridSolarSavingEUR/);
   assert.doesNotMatch(runtime, /supabase\.auth|agentAllowedViews|currentProfile|pricing|catalogue/);
 });
 
-test("executive refinement reads energy and OPEX escalation separately", () => {
+test("executive refinement keeps energy escalation and fixed customer payments separate", () => {
   const runtime = read("src/reportExecutiveRefinementRuntime.js");
   assert.match(runtime, /assumptions\?\.energyEscalation/);
-  assert.match(runtime, /assumptions\?\.opexEscalation/);
+  assert.doesNotMatch(runtime, /assumptions\?\.opexEscalation/);
+  assert.match(runtime, /rate e canoni fissi/);
 });

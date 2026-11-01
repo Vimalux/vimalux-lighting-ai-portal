@@ -155,7 +155,7 @@ export function buildBusinessCaseSnapshot(project, calculatedAt = new Date().toI
     partnerCommercial,
     datekArr: result.cmsRevenue,
     datekContractValue: result.cmsRevenue && result.serviceAgreementPeriod
-      ? Array.from({ length: result.serviceAgreementPeriod }, (_, index) => result.cmsRevenue * Math.pow(1 + positive(project.assumptions?.opexEscalation) / 100, index)).reduce((sum, value) => sum + value, 0)
+      ? result.cmsRevenue * result.serviceAgreementPeriod
       : 0,
     powerAidCustomerFee: result.powerAidCustomerFee,
     powerAidSupplierCost: result.powerAidSupplierCost,

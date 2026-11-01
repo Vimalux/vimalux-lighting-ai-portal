@@ -36,7 +36,7 @@ const groups = [
       ["interestRate", "Tasso interesse (%)"],
       ["upfrontPayment", "Anticipo"],
       ["energyEscalation", "Aumento energia (%)"],
-      ["opexEscalation", "Aumento OPEX (%)"],
+      ["opexEscalation", "Indicizzazione costi interni OPEX (%)"],
       ["discountRate", "Tasso di attualizzazione (%)"],
     ],
   },

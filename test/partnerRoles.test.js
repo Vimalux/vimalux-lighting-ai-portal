@@ -136,7 +136,8 @@ test("VIMALUX regression retains all 620 annual revenue and full CAPEX plus cont
   assert.ok(cmsPartnerOptions(p).includes("VIMALUX"));
   const row = partnerTotals([p], "VIMALUX");
   assert.equal(row.arr, 620);
-  assert.equal(row.totalContractValue, 30788.82701983747);
+  const result = calculateBusinessCase(p);
+  assert.equal(row.totalContractValue, result.totalCapex + 620 * result.serviceAgreementPeriod);
 });
 test("workflows validate source without write permissions, branch checkout, or source patching", () => {
   const directory = new URL("../.github/workflows/", import.meta.url);

@@ -139,8 +139,9 @@ export function calculateBusinessCase(project) {
   const escalatingTotal = (annual, rate, years = serviceAgreementPeriod) => Array.from({ length: years }, (_, index) => annual * Math.pow(1 + n(rate) / 100, index)).reduce((sum, value) => sum + value, 0);
   const financedHardwareTotal = positive(a.upfrontPayment) + financingAnnualPayment * financingYears;
   const fixedAnnualServiceRevenue = fixedAnnualOpex;
-  const powerAidContractRevenue = Array.from({ length: powerAidServicePeriod }, (_, index) => powerAidCustomerFee * Math.pow(1 + n(a.energyEscalation) / 100, index)).reduce((sum, value) => sum + value, 0);
-  const contractOpexRevenue = dealType === "noleggio_operativo" ? 0 : escalatingTotal(fixedAnnualServiceRevenue, a.opexEscalation, serviceAgreementPeriod) + powerAidContractRevenue;
+  // Customer fees are fixed at inception; escalation applies only to supplier costs.
+  const powerAidContractRevenue = powerAidCustomerFee * powerAidServicePeriod;
+  const contractOpexRevenue = dealType === "noleggio_operativo" ? 0 : fixedAnnualServiceRevenue * serviceAgreementPeriod + powerAidContractRevenue;
   const powerAidSupplierContractCost = Array.from({ length: powerAidServicePeriod }, (_, index) => powerAidSupplierCost * Math.pow(1 + n(a.energyEscalation) / 100, index)).reduce((sum, value) => sum + value, 0);
   const contractOpexCost = escalatingTotal(annualOpexDirectCost, a.opexEscalation, serviceAgreementPeriod) + powerAidSupplierContractCost;
   const capexContractRevenue = dealType === "cash" ? totalCapex : dealType === "finance" ? financedHardwareTotal : 0;
@@ -166,7 +167,6 @@ export function calculateBusinessCase(project) {
   let contractedGrossBenefitTotal = 0, fullSmartGrossBenefitTotal = 0, fullSmartExtensionServiceCost = 0;
   for (let year = 1; year <= analysisPeriod; year += 1) {
     const energyGrowth = Math.pow(1 + n(a.energyEscalation) / 100, year - 1);
-    const opexGrowth = Math.pow(1 + n(a.opexEscalation || a.energyEscalation) / 100, year - 1);
     const cmsActive = cmsEnabled && year <= serviceAgreementPeriod;
     const powerAidActive = powerAidEnabled && cmsActive && year <= powerAidServicePeriod;
     const fixedServiceActive = cmsEnabled ? cmsActive : year <= serviceAgreementPeriod;
@@ -175,10 +175,10 @@ export function calculateBusinessCase(project) {
     const annualPowerAidGrossSaving = powerAidActive ? powerAidGrossSaving * energyGrowth : 0;
     const annualMaintenanceSaving = cmsActive ? maintenanceSaving : 0;
     const benefit = annualLedEnergySaving + annualCloEnergySaving + annualPowerAidGrossSaving + annualMaintenanceSaving;
-    const annualPowerAidCustomerFee = powerAidActive ? annualPowerAidGrossSaving * positive(a.powerAidCustomerFeePercent) / 100 : 0;
-    const annualPowerAidSupplierCost = annualPowerAidCustomerFee * positive(a.powerAidSupplierSharePercent) / 100;
+    const annualPowerAidCustomerFee = powerAidActive ? powerAidCustomerFee : 0;
+    const annualPowerAidSupplierCost = powerAidActive ? powerAidSupplierCost * energyGrowth : 0;
     const fixedServiceOpex = Math.max(0, totalAnnualOpex - powerAidCustomerFee);
-    const opex = fixedServiceActive ? fixedServiceOpex * opexGrowth + annualPowerAidCustomerFee : 0;
+    const opex = fixedServiceActive ? fixedServiceOpex + annualPowerAidCustomerFee : 0;
     const payment = dealType === "noleggio_operativo"
       ? (year <= contractYears ? allInclusiveAnnualPayment : 0)
       : dealType === "finance"
@@ -193,8 +193,8 @@ export function calculateBusinessCase(project) {
     const fullSmartPowerAidGrossSaving = powerAidEnabled ? powerAidGrossSaving * energyGrowth : 0;
     const fullSmartMaintenanceSaving = cmsEnabled ? maintenanceSaving : 0;
     const fullSmartBenefit = annualLedEnergySaving + fullSmartCloSaving + fullSmartPowerAidGrossSaving + fullSmartMaintenanceSaving;
-    const fullSmartPowerAidFee = powerAidEnabled ? fullSmartPowerAidGrossSaving * positive(a.powerAidCustomerFeePercent) / 100 : 0;
-    const fullSmartOpex = fixedServiceOpex * opexGrowth + fullSmartPowerAidFee;
+    const fullSmartPowerAidFee = powerAidEnabled ? powerAidCustomerFee : 0;
+    const fullSmartOpex = fixedServiceOpex + fullSmartPowerAidFee;
     const allConfiguredSmartServicesActive = cmsActive && (!powerAidEnabled || powerAidActive);
     const fullSmartServicePayment = allConfiguredSmartServicesActive ? serviceOpex : fullSmartOpex;
     const fullSmartNetBenefit = fullSmartBenefit - fullSmartServicePayment - payment;

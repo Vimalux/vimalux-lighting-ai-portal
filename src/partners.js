@@ -117,11 +117,11 @@ export function partnerProjectRows(projects = [], partner, role) {
       const annualSupplierCost = cmsAnnualSupplierCost + adaptiveAnnualSupplierCost + equipmentAnnualSupplierCost;
       const annualVimaluxMargin = annualCustomerRevenue - annualSupplierCost;
 
-      const cmsCustomerContractValue = isCmsPartner ? escalatingTotal(cmsAnnualCustomerRevenue, opexRate, serviceYears) : 0;
+      const cmsCustomerContractValue = isCmsPartner ? cmsAnnualCustomerRevenue * serviceYears : 0;
       const cmsSupplierContractCost = isCmsPartner ? escalatingTotal(cmsAnnualSupplierCost, opexRate, serviceYears) : 0;
       const adaptiveCustomerContractValue = isAdaptivePartner ? Number(result.powerAidContractRevenue) || 0 : 0;
       const adaptiveSupplierContractCost = isAdaptivePartner ? Number(result.powerAidSupplierContractCost) || 0 : 0;
-      const equipmentCustomerContractValue = equipmentCapexCustomerValue + escalatingTotal(equipmentAnnualCustomerRevenue, opexRate, serviceYears);
+      const equipmentCustomerContractValue = equipmentCapexCustomerValue + equipmentAnnualCustomerRevenue * serviceYears;
       const equipmentSupplierContractCost = equipmentCapexSupplierCost + escalatingTotal(equipmentAnnualSupplierCost, opexRate, serviceYears);
       const customerContractValue = cmsCustomerContractValue + adaptiveCustomerContractValue + equipmentCustomerContractValue;
       const supplierContractCost = cmsSupplierContractCost + adaptiveSupplierContractCost + equipmentSupplierContractCost;

@@ -190,7 +190,7 @@ export function generateCustomerPdf(project, result) {
       financed ? [it ? "Tasso di interesse" : "Interest rate", percent(project.assumptions.interestRate)] : null,
       financed ? [it ? "Anticipo cliente" : "Customer upfront payment", money(project.assumptions.upfrontPayment)] : null,
       [it ? "Aumento prezzo energia" : "Energy escalation", percent(project.assumptions.energyEscalation)],
-      [it ? "Aumento OPEX" : "OPEX escalation", percent(project.assumptions.opexEscalation)],
+      [it ? "Pagamenti al fornitore" : "Supplier payments", it ? "Rate e canoni fissi nei rispettivi periodi contrattuali" : "Instalments and service fees fixed within their respective contractual terms"],
       [it ? "Tasso di attualizzazione" : "Discount rate", percent(project.assumptions.discountRate)],
       [it ? "Periodo di analisi" : "Analysis period", `${project.assumptions.analysisPeriod} ${t("years")}`],
       ["Smart Lighting", result.smartEnabled ? t("yes") : t("no")],

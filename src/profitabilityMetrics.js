@@ -23,7 +23,7 @@ export function internalProfitabilityMetrics(project, result) {
   const cmsRevenueAnnual = numberValue(r.cmsRevenue);
   const cmsCostAnnual = numberValue(r.cmsDirectCost);
   const cmsMarginAnnual = cmsRevenueAnnual - cmsCostAnnual;
-  const cmsCustomerContractValue = escalatingTotal(cmsRevenueAnnual, opexRate, serviceYears);
+  const cmsCustomerContractValue = cmsRevenueAnnual * serviceYears;
   const cmsSupplierContractCost = escalatingTotal(cmsCostAnnual, opexRate, serviceYears);
 
   const gatewayRevenueAnnual = numberValue(r.gatewayRecurringRevenue);
@@ -37,13 +37,13 @@ export function internalProfitabilityMetrics(project, result) {
   const recurringRevenueAnnual = numberValue(r.fixedAnnualOpex);
   const recurringCostAnnual = numberValue(r.annualOpexDirectCost);
   const recurringMarginAnnual = recurringRevenueAnnual - recurringCostAnnual;
-  const recurringCustomerContractValue = escalatingTotal(recurringRevenueAnnual, opexRate, serviceYears);
+  const recurringCustomerContractValue = recurringRevenueAnnual * serviceYears;
   const recurringSupplierContractCost = escalatingTotal(recurringCostAnnual, opexRate, serviceYears);
 
   const adaptiveRevenueAnnual = numberValue(r.powerAidCustomerFee);
   const adaptiveCostAnnual = numberValue(r.powerAidSupplierCost);
   const adaptiveMarginAnnual = numberValue(r.powerAidVimaluxMargin || (adaptiveRevenueAnnual - adaptiveCostAnnual));
-  const adaptiveCustomerContractValue = numberValue(r.powerAidContractRevenue || escalatingTotal(adaptiveRevenueAnnual, energyRate, powerAidYears));
+  const adaptiveCustomerContractValue = numberValue(r.powerAidContractRevenue ?? adaptiveRevenueAnnual * powerAidYears);
   const adaptiveSupplierContractCost = numberValue(r.powerAidSupplierContractCost || escalatingTotal(adaptiveCostAnnual, energyRate, powerAidYears));
   const adaptiveContractMargin = adaptiveCustomerContractValue - adaptiveSupplierContractCost;
 
