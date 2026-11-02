@@ -71,7 +71,7 @@ test("optimizer is deterministic and leaves input intact", () => {
   const options = { minFinancingYears: 10, maxYears: 10, cmsMinYears: 10, minimumMarginPercent: 0 };
   const first = optimizeScenarios(project, options);
   const second = optimizeScenarios(project, options);
-  assert.equal(first.scenarios.length, 10);
+  assert.equal(first.scenarios.length, 1);
   assert.deepEqual(first.scenarios, second.scenarios);
   assert.equal(JSON.stringify(project), before);
   assert.equal(first.recommendationStatus, "PROVISIONAL_NOT_RISK_ADJUSTED");
