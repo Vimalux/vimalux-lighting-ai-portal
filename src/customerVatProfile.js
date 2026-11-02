@@ -17,6 +17,21 @@ export function vatDefaultForCustomerType(value) {
   return null;
 }
 
+// Change type and its existing VAT defaults together; never accept financial inputs.
+export function projectWithCustomerVatType(project, value) {
+  const customerType = normalizeCustomerVatType(value);
+  const defaults = vatDefaultForCustomerType(customerType);
+  return {
+    ...project,
+    customer: { ...project.customer, customerType },
+    assumptions: defaults ? {
+      ...project.assumptions,
+      vatRecoverability: defaults.mode,
+      vatRecoverablePercent: defaults.recoverablePercent,
+    } : project.assumptions,
+  };
+}
+
 export function customerVatSubject(project = {}, language = "it") {
   const type = normalizeCustomerVatType(project?.customer?.customerType);
   const it = language === "it";
