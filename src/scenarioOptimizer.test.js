@@ -76,3 +76,23 @@ test("optimizer is deterministic and leaves input intact", () => {
   assert.equal(JSON.stringify(project), before);
   assert.equal(first.recommendationStatus, "PROVISIONAL_NOT_RISK_ADJUSTED");
 });
+
+test("active Adaptive and CMS terms cannot be silently shortened", () => {
+  const project = fixture();
+  project.solution.smartEnabled = true;
+  project.solution.cmsEnabled = true;
+  project.solution.powerAidEnabled = true;
+  project.assumptions.serviceAgreementPeriod = 10;
+  project.assumptions.powerAidServicePeriod = 10;
+  assert.throws(() => simulateScenario(project, { financingYears: 5, cmsYears: 12, adaptiveYears: 1 }), /Adaptive term shorter/);
+  assert.throws(() => simulateScenario(project, { financingYears: 5, cmsYears: 9, adaptiveYears: 9 }), /CMS term shorter/);
+  const out = optimizeScenarios(project, { maxYears: 12, minFinancingYears: 5, minimumMarginPercent: 0 });
+  assert.ok(out.scenarios.length > 0);
+  assert.ok(out.scenarios.every(s => s.terms.cmsYears >= 10 && s.terms.adaptiveYears >= 10));
+});
+
+test("optimizer fails closed when maximum term is shorter than baseline service", () => {
+  const project = fixture();
+  project.assumptions.serviceAgreementPeriod = 15;
+  assert.throws(() => optimizeScenarios(project, { maxYears: 12 }), /maximum shorter/);
+});
