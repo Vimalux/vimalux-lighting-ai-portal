@@ -58,12 +58,19 @@ export function simulateScenario(snapshot, terms, { minimumMarginPercent = 10, p
     cmsActive: Boolean(row.cmsActive),
     adaptiveActive: Boolean(row.powerAidActive),
   }));
+  let cumulative = -numeric(snapshot?.assumptions?.upfrontPayment);
+  const discountRate = numeric(snapshot?.assumptions?.discountRate) / 100;
+  const detailedRows = rows.map(row => ({
+    ...row,
+    cumulative: (cumulative += row.netCashFlow),
+    discountedCashFlow: row.netCashFlow / Math.pow(1 + discountRate, row.year),
+    phase: row.year <= terms.financingYears ? "FINANCE_AND_SERVICE" : row.year <= terms.cmsYears ? "SERVICE_ONLY" : "AFTER_SERVICE",
+  }));
   const validRows = rows.length === horizon && rows.every((row) =>
     Number.isFinite(row.netCashFlow) && row.year >= 1 && row.year <= horizon);
   const minimumCashflow = rows.length ? Math.min(...rows.map((r) => r.netCashFlow)) : Number.NEGATIVE_INFINITY;
   const marginPass = rows.every((r) => r.grossBenefit > 0 &&
     r.netCashFlow / r.grossBenefit * 100 >= minimumMarginPercent);
-  const discountRate = numeric(snapshot?.assumptions?.discountRate) / 100;
   const upFront = numeric(snapshot?.assumptions?.upfrontPayment);
   const comparableNpv = -upFront + rows.reduce((sum, row) =>
     sum + row.netCashFlow / Math.pow(1 + discountRate, row.year), 0);
@@ -82,7 +89,10 @@ export function simulateScenario(snapshot, terms, { minimumMarginPercent = 10, p
     totalFinancePayment: rows.reduce((sum, r) => sum + r.financePayment, 0),
     totalServicePayment: rows.reduce((sum, r) => sum + r.serviceOpex, 0),
     totalCapex: result.totalCapex,
-    cashflowRows: rows,
+    financingRatePercent: numeric(snapshot?.assumptions?.interestRate),
+    discountRatePercent: numeric(snapshot?.assumptions?.discountRate),
+    cumulativeNetCashflow: cumulative,
+    cashflowRows: detailedRows,
     riskAssessment: "PENDING_STRESS_TESTS",
   };
 }
