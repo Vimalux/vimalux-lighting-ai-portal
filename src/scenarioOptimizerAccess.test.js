@@ -31,6 +31,7 @@ test('unclear basis displays warning for agents without exposing rates', () => {
 
 test('application role reaches optimizer and its financial notice', async () => {
   const app = await readFile(new URL('./App.jsx', import.meta.url), 'utf8');
-  assert.match(app, /<ScenarioOptimizerPanel key=\{p.id\} project=\{p\} isAgent=\{isAgent\}/);
+  assert.match(app, /<ScenarioOptimizerPanel key=\{p.id\} project=\{p\} isAgent=\{false\}/);
+  assert.match(app, /<ScenarioOptimizerPanel key=\{project.id\} project=\{project\} isAgent=\{true\}/);
   assert.match(source, /<ScenarioRateNotice project=\{project\} isAgent=\{isAgent\}/);
 });
