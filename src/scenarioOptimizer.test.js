@@ -96,3 +96,54 @@ test("optimizer fails closed when maximum term is shorter than baseline service"
   project.assumptions.serviceAgreementPeriod = 15;
   assert.throws(() => optimizeScenarios(project, { maxYears: 12 }), /maximum shorter/);
 });
+
+for (const years of [5, 10, 15]) {
+  test(`8% monthly amortization and 6% year-end NPV over 15 years: ${years}/15/15`, () => {
+    const p = fixture();
+    Object.assign(p.assumptions, { interestRate: 8, discountRate: 6, upfrontPayment: 100,
+      interestRateSnapshot: { profileId: 'custom', annualRate: 8 } });
+    const before = JSON.stringify(p);
+    const s = simulateScenario(p, { financingYears: years, cmsYears: 15, adaptiveYears: 15 });
+    const monthlyRate = .08 / 12;
+    const annual = (s.totalCapex - 100) * monthlyRate / (1 - (1 + monthlyRate) ** (-years * 12)) * 12;
+    for (const row of s.cashflowRows) {
+      assert.ok(Math.abs(row.financePayment - (row.year <= years ? annual : 0)) < 1e-7);
+      assert.ok(Math.abs(row.discountedCashFlow - row.netCashFlow / 1.06 ** row.year) < 1e-7);
+    }
+    const expected = -100 + s.cashflowRows.reduce((sum, row) => sum + row.netCashFlow / 1.06 ** row.year, 0);
+    assert.ok(Math.abs(s.comparableNpv - expected) < 1e-7);
+    assert.equal(s.financingRatePercent, 8);
+    assert.equal(s.discountRatePercent, 6);
+    assert.equal(JSON.stringify(p), before);
+  });
+}
+
+test('unclear rates suppress discounted values and NPV ranking, without mutating data', () => {
+  for (const changes of [
+    { interestRate: undefined }, { discountRate: null }, { discountRate: '' },
+    { discountRate: ' ' }, { discountRate: false }, { interestRate: -1 },
+    { discountRate: Infinity }, { interestRate: 'invalid' },
+    { interestRate: 8 }, // stale default snapshot still says 5
+    { interestRateSnapshot: { annualRate: null } },
+    { interestRateSnapshot: { annualRate: 5, profileId: 'different' } },
+  ]) {
+    const p = fixture(); Object.assign(p.assumptions, changes);
+    const before = structuredClone(p);
+    const out = optimizeScenarios(p, { minFinancingYears: 10, maxYears: 10, cmsMinYears: 10, minimumMarginPercent: 0 });
+    assert.equal(out.preliminaryBest, null);
+    assert.deepEqual(out.eligible, []);
+    const s = out.scenarios[0];
+    assert.equal(s.comparableNpv, null);
+    assert.ok(s.reasonCodes.includes('UNCLEAR_RATE_BASIS'));
+    assert.ok(s.cashflowRows.every(row => row.discountedCashFlow === null));
+    assert.deepEqual(p, before);
+  }
+});
+
+test('explicit zero rates are valid and never replaced with defaults', () => {
+  const p = fixture(); Object.assign(p.assumptions, { interestRate: 0, discountRate: 0, interestRateSnapshot: { annualRate: 0 } });
+  const s = simulateScenario(p, { financingYears: 5, cmsYears: 15, adaptiveYears: 15 });
+  assert.equal(s.rateBasisValid, true);
+  assert.equal(s.comparableNpv, s.cumulativeNetCashflow);
+  assert.ok(Math.abs(s.cashflowRows[0].financePayment - s.totalCapex / 5) < 1e-7);
+});

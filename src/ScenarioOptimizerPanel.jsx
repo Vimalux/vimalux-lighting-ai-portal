@@ -1,11 +1,19 @@
 import React, { useEffect, useState } from "react";
-import { simulateScenario } from "./scenarioOptimizer.js";
+import { simulateScenario, scenarioRateBasis } from "./scenarioOptimizer.js";
 
 const money = (v) => Number.isFinite(v) ? new Intl.NumberFormat("it-IT",{maximumFractionDigits:0}).format(v)+" €" : "—";
 const num = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
 const currentTerm = (x, fallback) => Math.max(1,Math.round(num(x) || fallback));
 
-export default function ScenarioOptimizerPanel({ project }) {
+export function ScenarioRateNotice({ project, isAgent = true }) {
+  const basis = scenarioRateBasis(project);
+  return <>
+    {!isAgent && <p className="muted" data-readonly-rates>Parametri finanziari in sola lettura: tasso finanziamento <strong>{basis.financing === null ? "—" : basis.financing + "%"}</strong> · tasso di sconto <strong>{basis.discount === null ? "—" : basis.discount + "%"}</strong>. I tassi sono gestiti esclusivamente da VIMALUX Admin.</p>}
+    {!basis.valid && <p role="status">NPV non disponibile: presupposti finanziari da verificare da VIMALUX Admin. Cashflow indicativi, non approvati per offerte.</p>}
+  </>;
+}
+
+export default function ScenarioOptimizerPanel({ project, isAgent = true }) {
   const [opened,setOpened] = useState(false);
   const [results,setResults] = useState([]);
   const [selected,setSelected] = useState("");
@@ -17,8 +25,6 @@ export default function ScenarioOptimizerPanel({ project }) {
   const adaptiveBase = currentTerm(project?.assumptions?.powerAidServicePeriod,cmsBase);
   const financeBase = currentTerm(project?.assumptions?.financingPeriod,10);
   const adaptiveEnabled = Boolean(project?.solution?.smartEnabled && project?.solution?.cmsEnabled && project?.solution?.powerAidEnabled);
-  const interest = num(project?.assumptions?.interestRate);
-  const discount = num(project?.assumptions?.discountRate);
   const code = s => [s.terms.financingYears,s.terms.cmsYears,s.terms.adaptiveYears].join("/");
   useEffect(()=>{setResults([]);setSelected("");setError("");},[project,maxYears]);
   const run=()=>{
@@ -53,7 +59,7 @@ export default function ScenarioOptimizerPanel({ project }) {
     {!enabled?<p className="muted">Disponibile per il finanziamento ESCO.</p>:<>
       <button type="button" onClick={()=>setOpened(v=>!v)}>{opened?"Chiudi simulatore":"Apri Scenario Optimizer"}</button>
       {opened&&<div style={{marginTop:12}}>
-        <p className="muted" data-readonly-rates>Parametri finanziari in sola lettura: tasso finanziamento <strong>{interest}%</strong> · tasso di sconto <strong>{discount}%</strong>. I tassi sono gestiti esclusivamente da VIMALUX Admin.</p>
+        <ScenarioRateNotice project={project} isAgent={isAgent} />
         <p className="muted">Business Case corrente: {financeBase} anni finanziamento / {cmsBase} anni CMS / {adaptiveEnabled?adaptiveBase+" anni Adaptive":"Adaptive non attivo"}.</p>
         <label>Durata massima (anni) <select value={maxYears} onChange={e=>setMaxYears(Number(e.target.value))}><option value="10">10</option><option value="12">12</option><option value="15">15</option></select></label>
         <p className="muted">I servizi non vengono accorciati automaticamente. NPV su 15 anni; confronto preliminare e non corretto per il rischio. Costi di garanzia, rinnovo e dati dopo la scadenza dei servizi richiedono verifica.</p>

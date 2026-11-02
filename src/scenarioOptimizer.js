@@ -5,6 +5,20 @@ import { calculateBusinessCase } from "./calculations.js";
 const integer = (value) => Number.isInteger(value) ? value : Number.NaN;
 const numeric = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 
+// Use the same percentage fields as calculationsBase, never a fallback to zero.
+export function scenarioRateBasis(snapshot) {
+  const a = snapshot?.assumptions || {};
+  const rate = value => (typeof value === "number" || typeof value === "string") &&
+    String(value).trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0
+    ? Number(value) : null;
+  const financing = rate(a.interestRate);
+  const discount = rate(a.discountRate);
+  const captured = a.interestRateSnapshot;
+  const consistent = !captured || (rate(captured.annualRate) === financing &&
+    (!captured.profileId || !a.rateProfileId || captured.profileId === a.rateProfileId));
+  return { financing, discount, valid: financing !== null && discount !== null && consistent };
+}
+
 function clone(value) {
   if (!value || typeof value !== "object") throw new TypeError("Business Case snapshot required");
   return structuredClone(value);
@@ -47,6 +61,7 @@ export function simulateScenario(snapshot, terms, { minimumMarginPercent = 10, p
     }
   }
   const scenarioProject = createScenarioProject(snapshot, terms);
+  const rateBasis = scenarioRateBasis(snapshot);
   const result = calculateBusinessCase(scenarioProject, { publish: false });
   const horizon = terms.horizonYears ?? 15;
   const rows = (result.cashFlowRows || []).map((row) => ({
@@ -63,7 +78,7 @@ export function simulateScenario(snapshot, terms, { minimumMarginPercent = 10, p
   const detailedRows = rows.map(row => ({
     ...row,
     cumulative: (cumulative += row.netCashFlow),
-    discountedCashFlow: row.netCashFlow / Math.pow(1 + discountRate, row.year),
+    discountedCashFlow: rateBasis.valid ? row.netCashFlow / Math.pow(1 + discountRate, row.year) : null,
     phase: row.year <= terms.financingYears ? "FINANCE_AND_SERVICE" : row.year <= terms.cmsYears ? "SERVICE_ONLY" : "AFTER_SERVICE",
   }));
   const validRows = rows.length === horizon && rows.every((row) =>
@@ -75,6 +90,7 @@ export function simulateScenario(snapshot, terms, { minimumMarginPercent = 10, p
   const comparableNpv = -upFront + rows.reduce((sum, row) =>
     sum + row.netCashFlow / Math.pow(1 + discountRate, row.year), 0);
   const reasonCodes = [];
+  if (!rateBasis.valid) reasonCodes.push("UNCLEAR_RATE_BASIS");
   if (!validRows) reasonCodes.push("INCOMPLETE_CASHFLOW");
   if (!marginPass) reasonCodes.push("INSUFFICIENT_CASHFLOW_MARGIN");
   const warrantyYears = numeric(snapshot?.assumptions?.warrantyYears);
@@ -85,12 +101,13 @@ export function simulateScenario(snapshot, terms, { minimumMarginPercent = 10, p
     reasonCodes,
     firstYearBenefit: rows[0]?.netCashFlow ?? null,
     minAnnualCashflow: minimumCashflow,
-    comparableNpv: validRows ? comparableNpv : null,
+    comparableNpv: validRows && rateBasis.valid ? comparableNpv : null,
+    rateBasisValid: rateBasis.valid,
     totalFinancePayment: rows.reduce((sum, r) => sum + r.financePayment, 0),
     totalServicePayment: rows.reduce((sum, r) => sum + r.serviceOpex, 0),
     totalCapex: result.totalCapex,
-    financingRatePercent: numeric(snapshot?.assumptions?.interestRate),
-    discountRatePercent: numeric(snapshot?.assumptions?.discountRate),
+    financingRatePercent: rateBasis.financing,
+    discountRatePercent: rateBasis.discount,
     cumulativeNetCashflow: cumulative,
     cashflowRows: detailedRows,
     riskAssessment: "PENDING_STRESS_TESTS",
@@ -116,6 +133,6 @@ export function optimizeScenarios(snapshot, { minFinancingYears = 5, maxYears = 
     }
   }
   // NPV ranking is provisional until service-expiry and warranty stress assumptions are validated.
-  const eligible = scenarios.filter((s) => s.valid).sort((a, b) => b.comparableNpv - a.comparableNpv);
+  const eligible = scenarios.filter((s) => s.valid && Number.isFinite(s.comparableNpv)).sort((a, b) => b.comparableNpv - a.comparableNpv);
   return { scenarios, eligible, preliminaryBest: eligible[0] ?? null, recommendationStatus: "PROVISIONAL_NOT_RISK_ADJUSTED" };
 }
