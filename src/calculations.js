@@ -134,7 +134,9 @@ function addHybridToCashFlow(project, base, annualHybridBenefit) {
   };
 }
 
-export function calculateBusinessCase(project) {
+export function calculateBusinessCase(project, options = {}) {
+  // Read-only scenario calculations must never mutate active live result stores or emit events.
+  const finish = (result) => options.publish === false ? result : publishLiveBusinessCaseResult(project, result);
   // Partner equipment is stored as catalogue selections in Solution. For calculation only,
   // convert those selections to virtual Additional Costs so the existing, tested CAPEX/OPEX
   // engine remains authoritative. Stored project data is never rewritten here.
@@ -150,14 +152,14 @@ export function calculateBusinessCase(project) {
   const base = presentLcuQuantity(baseRaw, lcuPrepared.effectiveQuantity, lcuPrepared.originalLcu);
   const hybrid = calculateHybridSolar(calculationProject);
   if (!hybrid.enabled || hybrid.totalUsableSolarKwh <= 0) {
-    return publishLiveBusinessCaseResult(project, applyCustomerVatCashFlow(project, { ...base, hybridSolar: hybrid, hybridSolarSavingKwh: 0, hybridSolarSavingEUR: 0 }));
+    return finish(applyCustomerVatCashFlow(project, { ...base, hybridSolar: hybrid, hybridSolarSavingKwh: 0, hybridSolarSavingEUR: 0 }));
   }
 
   const hybridEligibleGridKwh = hybridGridBeforeSolar(calculationProject, base);
   const hybridSolarSavingKwh = Math.min(positive(hybrid.totalUsableSolarKwh), hybridEligibleGridKwh, positive(base.finalKwh));
   const hybridSolarSavingEUR = hybridSolarSavingKwh * positive(calculationProject?.assumptions?.energyPrice);
   if (hybridSolarSavingKwh <= 0) {
-    return publishLiveBusinessCaseResult(project, applyCustomerVatCashFlow(project, { ...base, hybridSolar: hybrid, hybridSolarSavingKwh: 0, hybridSolarSavingEUR: 0 }));
+    return finish(applyCustomerVatCashFlow(project, { ...base, hybridSolar: hybrid, hybridSolarSavingKwh: 0, hybridSolarSavingEUR: 0 }));
   }
 
   const adjusted = addHybridToCashFlow(calculationProject, base, hybridSolarSavingEUR);
@@ -177,7 +179,7 @@ export function calculateBusinessCase(project) {
     ? "GO"
     : positive(base.netProjectMarginPercent) >= 20 && customerDecisionStatus !== "NO_GO" ? "REVIEW" : "NO_GO";
 
-  return publishLiveBusinessCaseResult(project, applyCustomerVatCashFlow(project, {
+  return finish(applyCustomerVatCashFlow(project, {
     ...adjusted,
     lcuQuantity: lcuPrepared.effectiveQuantity,
     hardware: lcuPrepared.originalLcu ? { ...(adjusted.hardware || {}), lcu: lcuPrepared.originalLcu } : adjusted.hardware,
