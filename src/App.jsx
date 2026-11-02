@@ -18,6 +18,8 @@ import CrmOpportunity from "./CrmOpportunity.jsx";
 import AdditionalCostsCard from "./AdditionalCostsCard.jsx";
 import WarrantySelector from "./WarrantySelector.jsx";
 import ScenarioOptimizerPanel from "./ScenarioOptimizerPanel.jsx";
+import AgentCustomerType from "./AgentCustomerType.jsx";
+import { projectWithCustomerVatType } from "./customerVatProfile.js";
 import VatSettings, { VatSummaryCard } from "./VatSettings.jsx";
 import { applyWarrantyPricing } from "./warranty.js";
 import { customerAnalysisResult } from "./vat.js";
@@ -485,6 +487,9 @@ export default function App() {
       let next = periodKey
         ? updateProjectPeriod(p, periodKey, normalized, changedAt)
         : setPath({ ...p, updatedAt: changedAt }, path, normalized);
+      if (isAgent && path.length === 2 && path[0] === "customer" && path[1] === "customerType") {
+        next = projectWithCustomerVatType(next, normalized);
+      }
       if (path[0] === "solution" && path[1] === "cmsPartner") next = { ...next, solution: changeCmsPartner(next, normalized) };
       if (path[0] === "solution" && path[1] === "adaptiveDimmingPartner") next = { ...next, solution: changeAdaptiveDimmingPartner(next, normalized) };
       if (path[0] === "crm" && path[1] === "status" && normalized === "won") next = setPath(next, ["crm", "closingProbability"], 100);
@@ -586,6 +591,7 @@ function AgentAssumptions({ p, update }) {
   const adaptive = Boolean(p.solution?.powerAidEnabled);
   return <Card title={it ? "Assunzioni progetto" : "Project assumptions"}>
     <div className="form-grid">
+      <AgentCustomerType project={p} update={update} disabled={p.crm?.agentAccessMode === "read_only"} />
       <Field label={it ? "Prezzo energia (EUR/kWh)" : "Energy price (EUR/kWh)"} value={p.assumptions.energyPrice} onChange={(v) => update(["assumptions","energyPrice"],v)} />
       <Field label={it ? "Ore operative annue" : "Annual operating hours"} value={p.assumptions.operatingHours} onChange={(v) => update(["assumptions","operatingHours"],v)} />
       <Field label={it ? "Soluzione commerciale" : "Commercial solution"} value={type} onChange={(v) => update(["assumptions","dealType"],v)}>
