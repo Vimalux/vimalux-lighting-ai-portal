@@ -1,62 +1,76 @@
 import React, { useEffect, useState } from "react";
 import { simulateScenario } from "./scenarioOptimizer.js";
 
-const fmt = (v) => Number.isFinite(v) ? new Intl.NumberFormat("it-IT",{maximumFractionDigits:0}).format(v)+" €" : "—";
+const money = (v) => Number.isFinite(v) ? new Intl.NumberFormat("it-IT",{maximumFractionDigits:0}).format(v)+" €" : "—";
+const num = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+const currentTerm = (x, fallback) => Math.max(1,Math.round(num(x) || fallback));
 
 export default function ScenarioOptimizerPanel({ project }) {
   const [opened,setOpened] = useState(false);
   const [results,setResults] = useState([]);
+  const [selected,setSelected] = useState("");
   const [error,setError] = useState("");
   const [running,setRunning] = useState(false);
   const [maxYears,setMaxYears] = useState(15);
   const enabled = project?.assumptions?.dealType === "finance";
-  const currentCms = Math.max(1, Math.round(Number(project?.assumptions?.serviceAgreementPeriod) || 10));
-  const currentAdaptive = Math.max(1, Math.round(Number(project?.assumptions?.powerAidServicePeriod) || currentCms));
-  const currentFinance = Math.max(1, Math.round(Number(project?.assumptions?.financingPeriod) || 10));
+  const cmsBase = currentTerm(project?.assumptions?.serviceAgreementPeriod,10);
+  const adaptiveBase = currentTerm(project?.assumptions?.powerAidServicePeriod,cmsBase);
+  const financeBase = currentTerm(project?.assumptions?.financingPeriod,10);
   const adaptiveEnabled = Boolean(project?.solution?.smartEnabled && project?.solution?.cmsEnabled && project?.solution?.powerAidEnabled);
-  // A previously calculated table is no longer valid after source assumptions or the cap change.
-  useEffect(() => { setResults([]); setError(""); }, [project, maxYears]);
-  const run = () => {
-    setRunning(true); setError("");
+  const interest = num(project?.assumptions?.interestRate);
+  const discount = num(project?.assumptions?.discountRate);
+  const code = s => [s.terms.financingYears,s.terms.cmsYears,s.terms.adaptiveYears].join("/");
+  useEffect(()=>{setResults([]);setSelected("");setError("");},[project,maxYears]);
+  const run=()=>{
+    setRunning(true);setError("");
     try {
-      const snapshot = structuredClone(project);
-      if (maxYears < currentCms || (snapshot.solution?.powerAidEnabled && maxYears < currentAdaptive)) throw new Error("Durata massima inferiore ai servizi attivi: aumentare il limite.");
-      const next = [];
-      for (let finance=5; finance<=maxYears; finance++) {
-        for (let cms=currentCms; cms<=maxYears; cms++) {
-          // Adaptive Dimming remains available for the CMS term or a shorter period.
-          const active = Boolean(snapshot.solution?.smartEnabled && snapshot.solution?.cmsEnabled && snapshot.solution?.powerAidEnabled);
-          const adaptiveTerms = active ? Array.from({length:Math.max(0,cms-currentAdaptive+1)},(_,i)=>currentAdaptive+i) : [cms];
-          for (const adaptive of adaptiveTerms) {
-            const item = simulateScenario(snapshot,
-              {financingYears:finance,cmsYears:cms,adaptiveYears:adaptive,horizonYears:15});
-            if (item.terms.cmsYears < currentCms || (active && item.terms.adaptiveYears < currentAdaptive)) throw new Error("Scenario non conforme ai servizi di partenza.");
-            if (item.valid) next.push(item);
+      if(maxYears<cmsBase || (adaptiveEnabled&&maxYears<adaptiveBase)) throw new Error("Il limite massimo è inferiore ai servizi attuali.");
+      const snapshot=structuredClone(project);
+      const found=[];
+      for(let finance=5;finance<=maxYears;finance++){
+        for(let cms=cmsBase;cms<=maxYears;cms++){
+          const start=adaptiveEnabled?adaptiveBase:cms;
+          for(let adaptive=start;adaptive<=(adaptiveEnabled?cms:start);adaptive++){
+            found.push(simulateScenario(snapshot,{financingYears:finance,cmsYears:cms,adaptiveYears:adaptive,horizonYears:15}));
           }
         }
       }
-      next.sort((a,b)=>(b.comparableNpv??-Infinity)-(a.comparableNpv??-Infinity));
-      setResults(next.slice(0,12));
-      if (!next.length) setError("Nessuno scenario ammissibile con questi vincoli. Verificare durata massima e margine minimo.");
-    } catch (err) {
-      setResults([]); setError(err?.message || "Simulation failed");
-    } finally {setRunning(false);}
+      found.sort((a,b)=>Number(b.valid)-Number(a.valid)||(b.comparableNpv??-Infinity)-(a.comparableNpv??-Infinity));
+      setResults(found);
+      const preferred=found.find(x=>x.terms.financingYears===financeBase&&x.terms.cmsYears===cmsBase&&(!adaptiveEnabled||x.terms.adaptiveYears===adaptiveBase))||found[0];
+      setSelected(preferred?code(preferred):"");
+      if(!found.some(x=>x.valid))setError("Nessuna combinazione supera il vincolo di cashflow. Mostriamo gli scenari per revisione, non come raccomandazione.");
+    }catch(e){setResults([]);setSelected("");setError(e.message||"Errore simulazione");}
+    finally{setRunning(false);}
   };
+  const selectedResult=results.find(s=>code(s)===selected);
+  const benchmarks=[5,10,15].filter(x=>x<=maxYears).map(years=>
+    results.find(s=>s.terms.financingYears===years&&s.terms.cmsYears===maxYears&&s.terms.adaptiveYears===(adaptiveEnabled?maxYears:maxYears))
+  ).filter(Boolean);
   return <section className="card" data-scenario-optimizer="read-only">
     <h2>Ottimizza Business Case</h2>
-    <p className="muted">Simulazione read-only: non salva e non modifica prodotti, prezzi, progetti o CRM.</p>
-    {!enabled ? <p className="muted">Disponibile inizialmente solo per la soluzione finanziaria.</p> : <>
+    <p className="muted">Simulazioni indipendenti, senza salvataggio o modifica del Business Case, del CRM e dei prezzi.</p>
+    {!enabled?<p className="muted">Disponibile per il finanziamento ESCO.</p>:<>
       <button type="button" onClick={()=>setOpened(v=>!v)}>{opened?"Chiudi simulatore":"Apri Scenario Optimizer"}</button>
-      {opened && <div style={{marginTop:12}}>
-        <label>Durata massima (anni) <select value={maxYears} onChange={e=>{setMaxYears(Number(e.target.value));setResults([]);}}><option value="10">10</option><option value="12">12</option><option value="15">15</option></select></label>
-        <p className="muted">Scenario di partenza: finanziamento {currentFinance} anni, CMS {currentCms} anni, Adaptive {adaptiveEnabled ? `${currentAdaptive} anni (attivo)` : `non attivo (durata impostata: ${currentAdaptive} anni)`}. Le simulazioni non riducono la durata dei servizi già selezionata.</p>
-        {!adaptiveEnabled && <p role="status" className="muted">Adaptive Dimming non è attivo nella sezione Soluzione: il valore di durata non abilita il servizio e non genera benefici Adaptive.</p>}
-        <p className="muted">NPV indicativo a 15 anni. Graduatoria provvisoria: rischio, garanzia e costi post-servizio devono essere validati prima di un'offerta.</p>
+      {opened&&<div style={{marginTop:12}}>
+        <p className="muted" data-readonly-rates>Parametri finanziari in sola lettura: tasso finanziamento <strong>{interest}%</strong> · tasso di sconto <strong>{discount}%</strong>. I tassi sono gestiti esclusivamente da VIMALUX Admin.</p>
+        <p className="muted">Business Case corrente: {financeBase} anni finanziamento / {cmsBase} anni CMS / {adaptiveEnabled?adaptiveBase+" anni Adaptive":"Adaptive non attivo"}.</p>
+        <label>Durata massima (anni) <select value={maxYears} onChange={e=>setMaxYears(Number(e.target.value))}><option value="10">10</option><option value="12">12</option><option value="15">15</option></select></label>
+        <p className="muted">I servizi non vengono accorciati automaticamente. NPV su 15 anni; confronto preliminare e non corretto per il rischio. Costi di garanzia, rinnovo e dati dopo la scadenza dei servizi richiedono verifica.</p>
         <button type="button" className="primary" disabled={running} onClick={run}>{running?"Calcolo…":"Simula scenari (senza salvare)"}</button>
-        {error && <p role="alert" className="sync-error">{error}</p>}
-        {results.length>0 && <div className="table-scroll" style={{marginTop:12}}><table><thead><tr><th>Fin.</th><th>CMS</th><th>Adaptive</th><th>Beneficio anno 1</th><th>NPV comparabile 15 anni</th><th>Rischio</th></tr></thead><tbody>
-          {results.map((item,i)=><tr key={i}><td>{item.terms.financingYears}</td><td>{item.terms.cmsYears}</td><td>{adaptiveEnabled ? item.terms.adaptiveYears : "Non attivo"}</td><td>{fmt(item.firstYearBenefit)}</td><td>{fmt(item.comparableNpv)}</td><td>Da validare</td></tr>)}
-        </tbody></table></div>}
+        {error&&<p role="status" className="sync-error">{error}</p>}
+        {!!results.length&&<>
+          <h3>Confronto diretto — servizi {maxYears} anni</h3>
+          <div className="table-scroll"><table><thead><tr><th>Fin./CMS/Adaptive</th><th>Beneficio anno 1</th><th>NPV 15 anni</th><th>Cashflow totale</th><th>Esito</th></tr></thead><tbody>{benchmarks.map(s=><tr key={code(s)}><td><button type="button" onClick={()=>setSelected(code(s))}>{adaptiveEnabled?code(s):s.terms.financingYears+"/"+s.terms.cmsYears+"/Non attivo"}</button></td><td>{money(s.firstYearBenefit)}</td><td>{money(s.comparableNpv)}</td><td>{money(s.cumulativeNetCashflow)}</td><td>{s.valid?"Cashflow OK":"Da rivedere"}</td></tr>)}</tbody></table></div>
+          <h3>Tutte le combinazioni ammissibili (e da rivedere)</h3>
+          <div className="table-scroll" style={{maxHeight:340,overflowY:"auto"}}><table><thead><tr><th>Fin.</th><th>CMS</th><th>Adaptive</th><th>Beneficio anno 1</th><th>NPV 15 anni</th><th>Stato</th></tr></thead><tbody>{results.map(s=><tr key={code(s)}><td><button type="button" onClick={()=>setSelected(code(s))}>{s.terms.financingYears}</button></td><td>{s.terms.cmsYears}</td><td>{adaptiveEnabled?s.terms.adaptiveYears:"Non attivo"}</td><td>{money(s.firstYearBenefit)}</td><td>{money(s.comparableNpv)}</td><td>{s.valid?"Cashflow OK":"Da rivedere"}</td></tr>)}</tbody></table></div>
+          {selectedResult&&<div data-scenario-cashflow>
+            <h3>Cashflow annuale — {adaptiveEnabled?selected:"Fin. "+selectedResult.terms.financingYears+" / CMS "+selectedResult.terms.cmsYears}</h3>
+            <p className="muted">Rata finanziamento = 0 € dopo anno {selectedResult.terms.financingYears}. La durata CMS e Adaptive determina i servizi ancora attivi.</p>
+            <div className="table-scroll" style={{maxHeight:420,overflowY:"auto"}}><table><thead><tr><th>Anno</th><th>Beneficio lordo</th><th>Finanziamento</th><th>Servizi</th><th>Netto annuale</th><th>Cumulato</th></tr></thead><tbody>{selectedResult.cashflowRows.map(row=><tr key={row.year}><td>{row.year}</td><td>{money(row.grossBenefit)}</td><td>{money(row.financePayment)}</td><td>{money(row.serviceOpex)}</td><td>{money(row.netCashFlow)}</td><td>{money(row.cumulative)}</td></tr>)}</tbody></table></div>
+          </div>}
+          <p className="muted">Nessuna proposta viene applicata automaticamente. La classifica non è ancora una raccomandazione di rischio approvata.</p>
+        </>}
       </div>}
     </>}
   </section>;
