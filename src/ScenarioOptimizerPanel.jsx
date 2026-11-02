@@ -13,6 +13,7 @@ export default function ScenarioOptimizerPanel({ project }) {
   const currentCms = Math.max(1, Math.round(Number(project?.assumptions?.serviceAgreementPeriod) || 10));
   const currentAdaptive = Math.max(1, Math.round(Number(project?.assumptions?.powerAidServicePeriod) || currentCms));
   const currentFinance = Math.max(1, Math.round(Number(project?.assumptions?.financingPeriod) || 10));
+  const adaptiveEnabled = Boolean(project?.solution?.smartEnabled && project?.solution?.cmsEnabled && project?.solution?.powerAidEnabled);
   // A previously calculated table is no longer valid after source assumptions or the cap change.
   useEffect(() => { setResults([]); setError(""); }, [project, maxYears]);
   const run = () => {
@@ -24,8 +25,8 @@ export default function ScenarioOptimizerPanel({ project }) {
       for (let finance=5; finance<=maxYears; finance++) {
         for (let cms=currentCms; cms<=maxYears; cms++) {
           // Adaptive Dimming remains available for the CMS term or a shorter period.
-          const active = Boolean(snapshot.solution?.powerAidEnabled);
-          const adaptiveTerms = active ? Array.from({length:Math.max(0,cms-currentAdaptive+1)},(_,i)=>currentAdaptive+i) : [1];
+          const active = Boolean(snapshot.solution?.smartEnabled && snapshot.solution?.cmsEnabled && snapshot.solution?.powerAidEnabled);
+          const adaptiveTerms = active ? Array.from({length:Math.max(0,cms-currentAdaptive+1)},(_,i)=>currentAdaptive+i) : [cms];
           for (const adaptive of adaptiveTerms) {
             const item = simulateScenario(snapshot,
               {financingYears:finance,cmsYears:cms,adaptiveYears:adaptive,horizonYears:15});
@@ -48,12 +49,13 @@ export default function ScenarioOptimizerPanel({ project }) {
       <button type="button" onClick={()=>setOpened(v=>!v)}>{opened?"Chiudi simulatore":"Apri Scenario Optimizer"}</button>
       {opened && <div style={{marginTop:12}}>
         <label>Durata massima (anni) <select value={maxYears} onChange={e=>{setMaxYears(Number(e.target.value));setResults([]);}}><option value="10">10</option><option value="12">12</option><option value="15">15</option></select></label>
-        <p className="muted">Scenario di partenza: finanziamento {currentFinance} anni, CMS {currentCms} anni, Adaptive {currentAdaptive} anni. Le simulazioni non riducono la durata dei servizi già selezionata.</p>
+        <p className="muted">Scenario di partenza: finanziamento {currentFinance} anni, CMS {currentCms} anni, Adaptive {adaptiveEnabled ? `${currentAdaptive} anni (attivo)` : `non attivo (durata impostata: ${currentAdaptive} anni)`}. Le simulazioni non riducono la durata dei servizi già selezionata.</p>
+        {!adaptiveEnabled && <p role="status" className="muted">Adaptive Dimming non è attivo nella sezione Soluzione: il valore di durata non abilita il servizio e non genera benefici Adaptive.</p>}
         <p className="muted">NPV indicativo a 15 anni. Graduatoria provvisoria: rischio, garanzia e costi post-servizio devono essere validati prima di un'offerta.</p>
         <button type="button" className="primary" disabled={running} onClick={run}>{running?"Calcolo…":"Simula scenari (senza salvare)"}</button>
         {error && <p role="alert" className="sync-error">{error}</p>}
         {results.length>0 && <div className="table-scroll" style={{marginTop:12}}><table><thead><tr><th>Fin.</th><th>CMS</th><th>Adaptive</th><th>Beneficio anno 1</th><th>NPV comparabile 15 anni</th><th>Rischio</th></tr></thead><tbody>
-          {results.map((item,i)=><tr key={i}><td>{item.terms.financingYears}</td><td>{item.terms.cmsYears}</td><td>{item.terms.adaptiveYears}</td><td>{fmt(item.firstYearBenefit)}</td><td>{fmt(item.comparableNpv)}</td><td>Da validare</td></tr>)}
+          {results.map((item,i)=><tr key={i}><td>{item.terms.financingYears}</td><td>{item.terms.cmsYears}</td><td>{adaptiveEnabled ? item.terms.adaptiveYears : "Non attivo"}</td><td>{fmt(item.firstYearBenefit)}</td><td>{fmt(item.comparableNpv)}</td><td>Da validare</td></tr>)}
         </tbody></table></div>}
       </div>}
     </>}
