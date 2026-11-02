@@ -36,7 +36,16 @@ export function createScenarioProject(snapshot, { financingYears, cmsYears, adap
   return project;
 }
 
-export function simulateScenario(snapshot, terms, { minimumMarginPercent = 10 } = {}) {
+export function simulateScenario(snapshot, terms, { minimumMarginPercent = 10, preserveServiceTerms = true } = {}) {
+  // A like-for-like optimization may extend the existing services, never silently shorten them.
+  if (preserveServiceTerms) {
+    const baseCms = Math.max(1, Math.round(numeric(snapshot?.assumptions?.serviceAgreementPeriod) || 10));
+    const baseAdaptive = Math.max(1, Math.round(numeric(snapshot?.assumptions?.powerAidServicePeriod) || baseCms));
+    if (terms.cmsYears < baseCms) throw new RangeError("CMS term shorter than baseline");
+    if (snapshot?.solution?.powerAidEnabled && terms.adaptiveYears < baseAdaptive) {
+      throw new RangeError("Adaptive term shorter than baseline");
+    }
+  }
   const scenarioProject = createScenarioProject(snapshot, terms);
   const result = calculateBusinessCase(scenarioProject, { publish: false });
   const horizon = terms.horizonYears ?? 15;
@@ -82,10 +91,16 @@ export function optimizeScenarios(snapshot, { minFinancingYears = 5, maxYears = 
   if (!Number.isInteger(maxYears) || maxYears < 5 || maxYears > 15) throw new RangeError("maxYears 5..15");
   if (!Number.isInteger(minFinancingYears) || minFinancingYears < 5 || minFinancingYears > maxYears) throw new RangeError("minFinancingYears");
   if (!Number.isInteger(cmsMinYears) || cmsMinYears < 1 || cmsMinYears > maxYears) throw new RangeError("cmsMinYears");
+  const baselineCms = Math.max(cmsMinYears, Math.round(numeric(snapshot?.assumptions?.serviceAgreementPeriod) || cmsMinYears));
+  const adaptiveEnabled = Boolean(snapshot?.solution?.powerAidEnabled);
+  const baselineAdaptive = adaptiveEnabled ? Math.max(1, Math.round(numeric(snapshot?.assumptions?.powerAidServicePeriod) || baselineCms)) : 1;
+  if (baselineCms > maxYears || (adaptiveEnabled && baselineAdaptive > maxYears)) {
+    throw new RangeError("Selected maximum shorter than existing services");
+  }
   const scenarios = [];
   for (let financingYears = minFinancingYears; financingYears <= maxYears; financingYears++) {
-    for (let cmsYears = cmsMinYears; cmsYears <= maxYears; cmsYears++) {
-      for (let adaptiveYears = 1; adaptiveYears <= cmsYears; adaptiveYears++) {
+    for (let cmsYears = baselineCms; cmsYears <= maxYears; cmsYears++) {
+      for (let adaptiveYears = adaptiveEnabled ? baselineAdaptive : 1; adaptiveYears <= (adaptiveEnabled ? cmsYears : 1); adaptiveYears++) {
         scenarios.push(simulateScenario(snapshot, { financingYears, cmsYears, adaptiveYears, horizonYears: 15 }, { minimumMarginPercent }));
       }
     }
