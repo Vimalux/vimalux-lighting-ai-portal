@@ -10,16 +10,20 @@ export default function ScenarioOptimizerPanel({ project }) {
   const [running,setRunning] = useState(false);
   const [maxYears,setMaxYears] = useState(15);
   const enabled = project?.assumptions?.dealType === "finance";
+  const currentCms = Math.max(1, Math.round(Number(project?.assumptions?.serviceAgreementPeriod) || 10));
+  const currentAdaptive = Math.max(1, Math.round(Number(project?.assumptions?.powerAidServicePeriod) || currentCms));
+  const currentFinance = Math.max(1, Math.round(Number(project?.assumptions?.financingPeriod) || 10));
   const run = () => {
     setRunning(true); setError("");
     try {
       const snapshot = structuredClone(project);
+      if (maxYears < currentCms || (snapshot.solution?.powerAidEnabled && maxYears < currentAdaptive)) throw new Error("Durata massima inferiore ai servizi attivi: aumentare il limite.");
       const next = [];
       for (let finance=5; finance<=maxYears; finance++) {
-        for (let cms=10; cms<=maxYears; cms++) {
+        for (let cms=currentCms; cms<=maxYears; cms++) {
           // Adaptive Dimming remains available for the CMS term or a shorter period.
           const active = Boolean(snapshot.solution?.powerAidEnabled);
-          const adaptiveTerms = active ? Array.from({length:cms},(_,i)=>i+1) : [1];
+          const adaptiveTerms = active ? Array.from({length:Math.max(0,cms-currentAdaptive+1)},(_,i)=>currentAdaptive+i) : [1];
           for (const adaptive of adaptiveTerms) {
             const item = simulateScenario(snapshot,
               {financingYears:finance,cmsYears:cms,adaptiveYears:adaptive,horizonYears:15});
@@ -29,6 +33,7 @@ export default function ScenarioOptimizerPanel({ project }) {
       }
       next.sort((a,b)=>(b.comparableNpv??-Infinity)-(a.comparableNpv??-Infinity));
       setResults(next.slice(0,12));
+      if (!next.length) setError("Nessuno scenario ammissibile con questi vincoli. Verificare durata massima e margine minimo.");
     } catch (err) {
       setResults([]); setError(err?.message || "Simulation failed");
     } finally {setRunning(false);}
@@ -40,6 +45,7 @@ export default function ScenarioOptimizerPanel({ project }) {
       <button type="button" onClick={()=>setOpened(v=>!v)}>{opened?"Chiudi simulatore":"Apri Scenario Optimizer"}</button>
       {opened && <div style={{marginTop:12}}>
         <label>Durata massima (anni) <select value={maxYears} onChange={e=>setMaxYears(Number(e.target.value))}><option value="10">10</option><option value="12">12</option><option value="15">15</option></select></label>
+        <p className="muted">Scenario di partenza: finanziamento {currentFinance} anni, CMS {currentCms} anni, Adaptive {currentAdaptive} anni. Le simulazioni non riducono la durata dei servizi già selezionata.</p>
         <p className="muted">NPV indicativo a 15 anni. Graduatoria provvisoria: rischio, garanzia e costi post-servizio devono essere validati prima di un'offerta.</p>
         <button type="button" className="primary" disabled={running} onClick={run}>{running?"Calcolo…":"Simula scenari (senza salvare)"}</button>
         {error && <p role="alert" className="sync-error">{error}</p>}
