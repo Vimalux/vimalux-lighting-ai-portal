@@ -3,22 +3,20 @@ import { saveCloudState, supabaseConfigured } from "./supabase.js";
 import { financingCashflowAdvisor } from "./financingAdvisor.js";
 import { resolveActiveProjectIndex } from "./activeBusinessCaseResolver.js";
 import { advisorPreviousPeriods, applyAdvisorDuration, restoreAdvisorDuration } from "./financingAdvisorPeriods.js";
+import { isAgentRuntime, readRuntimeProjects, writeRuntimeProjects } from "./runtimeProjectStore.js";
 
 const ROOT_ID = "vimalux-financing-advisor";
 const MONTHLY_OVERRIDE_ID = "vimalux-laas-monthly-override";
 const ACTIVE_CONTEXT_KEY = "vimalux-intelligence-active-business-case";
 
 function localProjects() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem("vimalux-intelligence-projects") || "[]");
-    return Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.projects) ? parsed.projects : []);
-  } catch { return []; }
+  return readRuntimeProjects();
 }
 
 function activeIdentity() {
   const params = new URLSearchParams(window.location.search);
   let storedBusinessCaseId = "";
-  try { storedBusinessCaseId = localStorage.getItem(ACTIVE_CONTEXT_KEY) || ""; } catch (_) {}
+  if (!isAgentRuntime()) try { storedBusinessCaseId = localStorage.getItem(ACTIVE_CONTEXT_KEY) || ""; } catch (_) {}
   return {
     urlBusinessCaseId: params.get("business_case_id") || "",
     headerText: String(document.querySelector("main header small")?.textContent || "").trim(),
@@ -74,7 +72,7 @@ function parseLocalizedNumber(value) {
 }
 
 async function persistProjects(projects, updatedProject) {
-  localStorage.setItem("vimalux-intelligence-projects", JSON.stringify(projects));
+  writeRuntimeProjects(projects);
   // Persist only the Business Case changed by this advisor. Agents can see
   // read-only collaborator projects, and portfolio-wide saves must never try
   // to write those unrelated rows.

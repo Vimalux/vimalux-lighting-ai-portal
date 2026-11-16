@@ -1,12 +1,9 @@
+import { readRuntimeProjects } from "./runtimeProjectStore.js";
+
 const ROOT_SELECTOR = ".customer-value-chart";
 
 function localProjects() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem("vimalux-intelligence-projects") || "[]");
-    return Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.projects) ? parsed.projects : []);
-  } catch {
-    return [];
-  }
+  return readRuntimeProjects();
 }
 
 function activeProject(projects) {

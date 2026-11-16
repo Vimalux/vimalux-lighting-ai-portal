@@ -1,4 +1,5 @@
 import { loadCurrentProfile, saveCloudState } from "./supabase.js";
+import { readRuntimeProjects, writeRuntimeProjects } from "./runtimeProjectStore.js";
 
 const STORAGE_KEY = "vimalux-intelligence-projects";
 const MARKER = "agent-project-inputs";
@@ -8,17 +9,10 @@ const numberValue = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const readProjects = () => {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : Array.isArray(parsed?.projects) ? parsed.projects : [];
-  } catch {
-    return [];
-  }
-};
+const readProjects = readRuntimeProjects;
 
 const writeProjects = (projects) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+  writeRuntimeProjects(projects);
 };
 
 const activeProject = () => {

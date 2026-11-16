@@ -1,18 +1,11 @@
-const STORAGE_KEY = "vimalux-intelligence-projects";
+import { readRuntimeProjects } from "./runtimeProjectStore.js";
 
 const n = (value) => {
   const parsed = Number(String(value ?? 0).replace(",", "."));
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const readProjects = () => {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
+const readProjects = readRuntimeProjects;
 
 const activeProject = () => {
   const caseId = document.querySelector("main > header small")?.textContent?.trim();

@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import { appendCapexProposalPage } from "./capexProposalPage.js";
 import { appendFinalProposalVisualPages } from "./proposalFinalVisualPages.js";
 import { appendHybridProposalPage } from "./hybridProposalPage.js";
+import { readRuntimeProjects } from "./runtimeProjectStore.js";
 
 function businessCaseCodeFromFilename(filename) {
   return String(filename || "").match(/BC-[A-Z0-9]+/i)?.[0]?.toUpperCase() || "";
@@ -15,7 +16,7 @@ function currentProject(filename) {
   try {
     const businessCaseRecordId = new URLSearchParams(window.location.search).get("business_case_id") || "";
     const businessCaseCode = businessCaseCodeFromFilename(filename);
-    const projects = JSON.parse(localStorage.getItem("vimalux-intelligence-projects") || "[]");
+    const projects = readRuntimeProjects();
     if (!Array.isArray(projects) || !projects.length) return null;
 
     return projects.find((project) => {

@@ -1,11 +1,11 @@
 import { useCallback, useRef, useState } from "react";
 import { navigationKey, readNavigation, writeNavigation } from "./navigationState.js";
 
-export default function usePersistentNavigation({ ready, userId, projectId, allowedViews, initialView }) {
+export default function usePersistentNavigation({ ready, userId, projectId, allowedViews, initialView, persist = true }) {
   const [selection, setSelection] = useState(null);
   const key = navigationKey(userId, projectId);
   let storage;
-  try { storage = window.localStorage; } catch { /* Browser storage may be disabled. */ }
+  if (persist) try { storage = window.localStorage; } catch { /* Browser storage may be disabled. */ }
   // Read after the account, permissions and active project are known. Never save
   // the temporary customer screen rendered during authentication/hydration.
   const candidate = selection?.key === key ? selection.view : (!selection && allowedViews.has(initialView) ? initialView : readNavigation(storage, key, allowedViews));

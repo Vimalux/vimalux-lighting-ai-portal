@@ -1,4 +1,5 @@
 import { compatibleLedProducts, isCatalogueProductCompatible, normalizeProductCategory } from "./productCatalogue.js";
+import { isAgentRuntime, readRuntimeProjects, writeRuntimeProjects } from "./runtimeProjectStore.js";
 
 const STORAGE_KEY = "vimalux-intelligence-projects";
 const DISMISS_KEY = "vimalux-catalogue-reconcile-dismissed";
@@ -83,6 +84,10 @@ export function reconcileImportedProjectProductCategories(project) {
 }
 
 function readStoredContainer() {
+  if (isAgentRuntime()) {
+    const projects = readRuntimeProjects();
+    return { parsed: projects, projects, wrapped: false };
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
@@ -122,7 +127,7 @@ function confirmationText(project, changes) {
     : `${changes.length} product assignments are no longer compatible with the current catalogue. Update them automatically?\n\n${preview}${extra}\n\nOnly incompatible product assignments will be changed. Quantities, existing wattages, prices, CRM and all other Business Case settings remain unchanged.`;
 }
 
-function reconcileCurrentStoredProjectWithConfirmation() {
+async function reconcileCurrentStoredProjectWithConfirmation() {
   const businessCaseId = currentBusinessCaseId();
   if (!businessCaseId) return;
   const container = readStoredContainer();
@@ -148,7 +153,18 @@ function reconcileCurrentStoredProjectWithConfirmation() {
   const projects = [...container.projects];
   projects[index] = reconcileImportedProjectProductCategories(project);
   const nextValue = container.wrapped ? { ...container.parsed, projects } : projects;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextValue));
+  if (isAgentRuntime()) {
+    writeRuntimeProjects(projects);
+    try {
+      const { saveCloudState } = await import("./supabase.js");
+      await saveCloudState([projects[index]]);
+    } catch (error) {
+      window.alert(`Impossibile salvare le modifiche: ${error.message}`);
+      return;
+    }
+  } else {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextValue));
+  }
   sessionStorage.removeItem(dismissKey);
   window.location.reload();
 }

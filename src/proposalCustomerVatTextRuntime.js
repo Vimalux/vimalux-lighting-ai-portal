@@ -1,11 +1,12 @@
 import { jsPDF } from "jspdf";
 import { transformProposalCustomerText } from "./proposalCustomerVatText.js";
+import { readRuntimeProjects } from "./runtimeProjectStore.js";
 
 function currentProject() {
   try {
     const businessCaseRecordId = new URLSearchParams(window.location.search).get("business_case_id") || "";
     if (!businessCaseRecordId) return null;
-    const projects = JSON.parse(localStorage.getItem("vimalux-intelligence-projects") || "[]");
+    const projects = readRuntimeProjects();
     if (!Array.isArray(projects) || !projects.length) return null;
     return projects.find((project) => [
       project?.id,

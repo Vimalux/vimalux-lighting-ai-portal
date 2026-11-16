@@ -1,6 +1,7 @@
 import { detectWorkbookType, readLightingWorkbook } from "./lightingImport.js";
+import { readRuntimeProjects } from "./runtimeProjectStore.js";
+import { clearRuntimeImportTarget, setRuntimeImportTarget } from "./runtimeImportTarget.js";
 
-const TARGET_KEY = "vimalux-reimport-target-id";
 const PROJECTS_KEY = "vimalux-intelligence-projects";
 const nativeConfirm = window.confirm.bind(window);
 const nativeAlert = window.alert.bind(window);
@@ -10,13 +11,7 @@ const normalize = (value) => String(value || "").trim().toLowerCase().replace(/\
 const baseName = (fileName) => String(fileName || "").replace(/\.(xlsx?|csv)$/i, "");
 
 function loadStoredProjects() {
-  try {
-    const raw = localStorage.getItem(PROJECTS_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    return Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.projects) ? parsed.projects : []);
-  } catch {
-    return [];
-  }
+  return readRuntimeProjects();
 }
 
 function fieldValue(sheet, fieldName) {
@@ -101,7 +96,7 @@ window.confirm = function vimaluxConfirm(message) {
 
   const matches = matchingProjects(identity);
   if (!matches.length) {
-    localStorage.removeItem(TARGET_KEY);
+    clearRuntimeImportTarget();
     return nativeConfirm(`${preview}\n\nNessun progetto esistente con questo nome. Creare un nuovo progetto "${identity.projectName}"?`);
   }
 
@@ -112,19 +107,19 @@ window.confirm = function vimaluxConfirm(message) {
       selected.businessCaseId && String(candidate?.project?.businessCaseId || "").trim() === selected.businessCaseId,
     );
     if (!target || normalize(selected.name) !== normalize(identity.projectName)) {
-      localStorage.removeItem(TARGET_KEY);
+      clearRuntimeImportTarget();
       nativeAlert(`Sono presenti ${matches.length} progetti con il nome "${identity.projectName}".\n\nSeleziona nell'elenco il Business Case che desideri aggiornare e importa nuovamente il file.`);
       return false;
     }
   }
 
-  localStorage.setItem(TARGET_KEY, String(target.id));
+  setRuntimeImportTarget(String(target.id));
   const businessCaseId = target?.project?.businessCaseId || target?.crm?.businessCaseRecordId || target.id;
   const approved = nativeConfirm(
     `${preview}\n\nIl progetto "${identity.projectName}" esiste già.\nBusiness Case: ${businessCaseId}\n\nAggiornare il Business Case esistente con i dati importati?`,
   );
-  if (!approved) localStorage.removeItem(TARGET_KEY);
-  else setTimeout(() => localStorage.removeItem(TARGET_KEY), 0);
+  if (!approved) clearRuntimeImportTarget();
+  else setTimeout(clearRuntimeImportTarget, 0);
   return approved;
 };
 

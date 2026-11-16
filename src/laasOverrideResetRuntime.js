@@ -1,15 +1,11 @@
 import { migrateProject } from "./model.js";
 import { saveCloudState, supabaseConfigured } from "./supabase.js";
+import { readRuntimeProjects, writeRuntimeProjects } from "./runtimeProjectStore.js";
 
 const RESET_ID = "vimalux-laas-override-reset";
 
 function localProjects() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem("vimalux-intelligence-projects") || "[]");
-    return Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.projects) ? parsed.projects : []);
-  } catch {
-    return [];
-  }
+  return readRuntimeProjects();
 }
 
 function activeIndex(projects) {
@@ -47,7 +43,7 @@ async function resetOverride(button) {
     updatedAt: new Date().toISOString(),
   });
 
-  localStorage.setItem("vimalux-intelligence-projects", JSON.stringify(projects));
+  writeRuntimeProjects(projects);
   if (supabaseConfigured) await saveCloudState(projects);
   window.location.reload();
 }

@@ -1,4 +1,5 @@
 import { businessCaseCodeFromText, resolveProjectByReference } from "./activeBusinessCaseResolver.js";
+import { isAgentRuntime, readRuntimeProjects } from "./runtimeProjectStore.js";
 
 const STORAGE_KEY = "vimalux-intelligence-active-business-case";
 const PROJECTS_KEY = "vimalux-intelligence-projects";
@@ -8,12 +9,7 @@ function currentParams() {
 }
 
 function storedProjects() {
-  try {
-    const rows = JSON.parse(localStorage.getItem(PROJECTS_KEY) || "[]");
-    return Array.isArray(rows) ? rows : (Array.isArray(rows?.projects) ? rows.projects : []);
-  } catch (_) {
-    return [];
-  }
+  return readRuntimeProjects();
 }
 
 function projectForBusinessCase(ref) {
@@ -32,7 +28,7 @@ function displayBusinessCaseCode(ref) {
 
 function rememberBusinessCaseId(id) {
   const value = stableRecordId(id);
-  if (!value) return;
+  if (!value || isAgentRuntime()) return;
   try { localStorage.setItem(STORAGE_KEY, value); } catch (_) {}
 }
 
@@ -60,7 +56,7 @@ function restoreBusinessCaseIdIntoUrl() {
   }
   if (params.get("opportunity_id")) return;
   let saved = "";
-  try { saved = localStorage.getItem(STORAGE_KEY) || ""; } catch (_) {}
+  if (!isAgentRuntime()) try { saved = localStorage.getItem(STORAGE_KEY) || ""; } catch (_) {}
   if (!saved) return;
   replaceBusinessCaseInUrl(saved);
 }
