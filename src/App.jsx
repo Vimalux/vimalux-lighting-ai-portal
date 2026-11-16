@@ -28,6 +28,7 @@ import CatalogueExtended from "./CatalogueExtended.jsx";
 import ProcurementPanel from "./ProcurementPanel.jsx";
 import { ACTIVE_PROJECT_KEY, PROJECTS_KEY, SOLAR_LOCATION_EVENT, clearAgentProjectCache, createRequestRevision, initialProjectId, migrateProjectNavigation, readAccountProjects, readActiveProject, reconcileHydration, rememberProject, stableProjectId, writeProjectCache, writeProjectRoute } from "./projectContext.js";
 import { loadGlobalDefaults } from "./globalDefaultsApi.js";
+import { canRefreshAgentPortfolio, hasNewAgentCloudData } from "./agentCloudRefresh.js";
 import { setRuntimeProjectSnapshot } from "./runtimeProjectStore.js";
 import { navigationKey, readNavigation } from "./navigationState.js";
 import usePersistentNavigation from "./usePersistentNavigation.js";
@@ -173,6 +174,8 @@ export default function App() {
   const [authReady, setAuthReady] = useState(stagingPreview || !supabaseConfigured);
   const [cloudReady, setCloudReady] = useState(stagingPreview || !supabaseConfigured);
   const [syncState, setSyncState] = useState(supabaseConfigured ? "connecting" : "local");
+  const syncStateRef = useRef(syncState);
+  syncStateRef.current = syncState;
   const [syncError, setSyncError] = useState("");
   const [syncRetry, setSyncRetry] = useState(0);
   const selectedProject = projects.find((p) => p.id === activeId);
@@ -415,6 +418,67 @@ export default function App() {
     window.addEventListener("online", retry);
     return () => window.removeEventListener("online", retry);
   }, [isAgent]);
+  useEffect(() => {
+    if (!isAgent || !cloudReady || !roleVerified || !session || stagingPreview) return;
+    let active = true;
+    let inFlight = false;
+    const savingUser = userId;
+    const refresh = async () => {
+      if (!active || inFlight || document.hidden) return;
+      const editing = document.activeElement?.matches?.("main input, main textarea, main select, main [contenteditable]") || false;
+      const before = projectsRef.current;
+      if (!canRefreshAgentPortfolio({
+        syncState: syncStateRef.current,
+        pendingSaveCount: pendingSaveRef.current.size,
+        observed: observedProjectsRef.current,
+        current: before,
+        editing,
+      })) return;
+      inFlight = true;
+      try {
+        // A pending save from this account must settle before reading back
+        // database state. A failed save keeps syncState=error and prevents the
+        // refresh from destroying the agent's unsaved work.
+        await saveQueueRef.current.catch(() => {});
+        if (!active || accountRef.current !== savingUser || syncStateRef.current !== "saved") return;
+        await loadGlobalDefaults();
+        const cloud = (await loadCloudState([], false)).map(migrateProject);
+        if (!active || accountRef.current !== savingUser || projectsRef.current !== before) return;
+        const stillEditing = document.activeElement?.matches?.("main input, main textarea, main select, main [contenteditable]") || false;
+        if (!canRefreshAgentPortfolio({
+          syncState: syncStateRef.current,
+          pendingSaveCount: pendingSaveRef.current.size,
+          observed: observedProjectsRef.current,
+          current: projectsRef.current,
+          editing: stillEditing,
+        }) || !hasNewAgentCloudData(before, cloud)) return;
+        // Tell autosave that this is server state, not an Agent edit.
+        observedProjectsRef.current = cloud;
+        projectsRef.current = cloud;
+        setRuntimeProjectSnapshot(cloud, { agent: true });
+        setProjects(cloud);
+        setActiveId((previous) => cloud.some((item) => item.id === previous) ? previous : cloud[0]?.id || "");
+      } catch (error) {
+        // Passive refresh failure must never turn a successfully saved edit
+        // into a false "unsaved" warning. Retry on focus/online/next interval.
+        console.warn("Agent cloud refresh unavailable", error);
+      } finally {
+        inFlight = false;
+      }
+    };
+    const onVisible = () => { if (!document.hidden) refresh(); };
+    const interval = window.setInterval(refresh, 45000);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [isAgent, cloudReady, roleVerified, userId]);
   useEffect(() => {
     if (!cloudReady || !roleVerified) return;
     const params = new URLSearchParams(window.location.search);

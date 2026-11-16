@@ -1,20 +1,16 @@
 import { readRuntimeProjects } from "./runtimeProjectStore.js";
-
-const n = (value) => {
-  const parsed = Number(String(value ?? 0).replace(",", "."));
-  return Number.isFinite(parsed) ? parsed : 0;
-};
+import { resolveActiveProjectIndex } from "./activeBusinessCaseResolver.js";
+import { solutionAdditionalCostRows } from "./solutionAdditionalCostsData.js";
 
 const readProjects = readRuntimeProjects;
 
 const activeProject = () => {
-  const caseId = document.querySelector("main > header small")?.textContent?.trim();
   const projects = readProjects();
-  return projects.find((project) =>
-    project?.project?.businessCaseId === caseId ||
-    project?.id === caseId ||
-    project?.crm?.businessCaseRecordId === caseId,
-  ) || null;
+  const index = resolveActiveProjectIndex(projects, {
+    urlBusinessCaseId: new URLSearchParams(window.location.search).get("business_case_id"),
+    headerText: document.querySelector("main > header small")?.textContent || "",
+  });
+  return projects[index] || null;
 };
 
 const currencyFormatter = (project) => new Intl.NumberFormat(
@@ -30,7 +26,7 @@ const currencyFormatter = (project) => new Intl.NumberFormat(
 const makeSection = (project, type, formatter) => {
   const it = project.language === "it";
   const da = project.language === "da";
-  const rows = (project.additionalCosts || []).filter((item) => item?.costType === type && n(item.quantity) * n(item.unitSalesPrice) > 0);
+  const rows = solutionAdditionalCostRows(project, type);
   if (!rows.length) return null;
 
   const wrapper = document.createElement("div");
@@ -39,22 +35,25 @@ const makeSection = (project, type, formatter) => {
 
   const title = document.createElement("p");
   title.className = "hint additional-costs-solution-title";
-  title.innerHTML = `<strong>${
+  const heading = document.createElement("strong");
+  heading.textContent =
     type === "capex"
       ? (it ? "Costi aggiuntivi CAPEX" : da ? "Ekstra CAPEX-omkostninger" : "Additional CAPEX costs")
-      : (it ? "Costi aggiuntivi OPEX annuali" : da ? "Ekstra årlige OPEX-omkostninger" : "Additional annual OPEX costs")
-  }</strong>`;
+      : (it ? "Costi aggiuntivi OPEX annuali" : da ? "Ekstra årlige OPEX-omkostninger" : "Additional annual OPEX costs");
+  title.appendChild(heading);
   wrapper.appendChild(title);
 
   const breakdown = document.createElement("div");
   breakdown.className = "breakdown";
   rows.forEach((item) => {
-    const quantity = n(item.quantity);
-    const unitPrice = n(item.unitSalesPrice);
-    const total = quantity * unitPrice;
     const row = document.createElement("div");
-    const label = item.description?.trim() || (it ? "Costo aggiuntivo" : da ? "Ekstra omkostning" : "Additional cost");
-    row.innerHTML = `<span>${label}</span><span>${quantity} ${item.unit || ""} × ${formatter.format(unitPrice)}</span><strong>${formatter.format(total)}</strong>`;
+    const label = document.createElement("span");
+    label.textContent = item.description;
+    const detail = document.createElement("span");
+    detail.textContent = `${item.quantity} ${item.unit || ""} × ${formatter.format(item.unitSalesPrice)}`;
+    const total = document.createElement("strong");
+    total.textContent = formatter.format(item.salesTotal);
+    row.append(label, detail, total);
     breakdown.appendChild(row);
   });
   wrapper.appendChild(breakdown);
@@ -72,6 +71,13 @@ const enhance = () => {
   });
   if (!card) return;
 
+  const capexRows = solutionAdditionalCostRows(project, "capex");
+  const opexRows = solutionAdditionalCostRows(project, "opex_annual");
+  const signature = JSON.stringify({ projectId: project.id, capexRows, opexRows });
+  if (card.dataset.additionalCostsSignature === signature
+      && Boolean(card.querySelector('[data-additional-costs-summary="capex"]')) === Boolean(capexRows.length)
+      && Boolean(card.querySelector('[data-additional-costs-summary="opex_annual"]')) === Boolean(opexRows.length)) return;
+  card.dataset.additionalCostsSignature = signature;
   card.querySelectorAll("[data-additional-costs-summary]").forEach((node) => node.remove());
   const formatter = currencyFormatter(project);
   const summaryLines = [...card.querySelectorAll(":scope > .summary-line")];

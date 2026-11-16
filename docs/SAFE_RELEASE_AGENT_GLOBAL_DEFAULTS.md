@@ -32,6 +32,14 @@ Status: **staging validation only**. Do not merge to `main` or promote to
       reloads and sees the change from the central database.
 - [ ] Agent disconnects during an edit: saving error and retry are visible;
       closing the tab prompts a warning until the data is synchronized.
+- [ ] While an Agent has a clean, open tab, Admin changes its assigned Business
+      Case. The Agent receives the newer values on window focus or within 45 s,
+      without saving the retrieved snapshot as an Agent edit.
+- [ ] Leave a numeric Agent input focused, or block autosave offline, while
+      Admin updates the case. Automatic refresh must not replace the Agent's
+      in-progress input or locally unsaved edits.
+- [ ] Extra CAPEX/OPEX line items appear in the Solution summary for both roles,
+      use customer prices only, and reconcile to the final CAPEX/OPEX amounts.
 - [ ] Agent sign-out/sign-in, direct Business Case links, import/reimport,
       CRM links, calculation, proposal PDF and project navigation still work.
 - [ ] Admin workspaces, catalogue, existing saved projects and the CRM retain
