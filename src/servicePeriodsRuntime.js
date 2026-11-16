@@ -1,15 +1,11 @@
 import { migrateProject } from "./model.js";
 import { saveCloudState, supabaseConfigured } from "./supabase.js";
+import { readRuntimeProjects, writeRuntimeProjects } from "./runtimeProjectStore.js";
 
 const ROOT_ID = "vimalux-smart-service-periods";
 
 function localProjects() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem("vimalux-intelligence-projects") || "[]");
-    return Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.projects) ? parsed.projects : []);
-  } catch {
-    return [];
-  }
+  return readRuntimeProjects();
 }
 
 function activeIdentity() {
@@ -57,7 +53,7 @@ async function savePeriods(root) {
     updatedAt: new Date().toISOString(),
   });
   projects[index] = updated;
-  localStorage.setItem("vimalux-intelligence-projects", JSON.stringify(projects));
+  writeRuntimeProjects(projects);
 
   const status = root.querySelector("[data-service-period-status]");
   if (status) status.textContent = "Salvataggio...";
@@ -98,7 +94,7 @@ function persistAnalysisHorizon(projects, index, cmsYears) {
     updatedAt: new Date().toISOString(),
   });
   projects[index] = updated;
-  localStorage.setItem("vimalux-intelligence-projects", JSON.stringify(projects));
+  writeRuntimeProjects(projects);
   return updated;
 }
 

@@ -35,6 +35,37 @@ export function writeProjectCache(storage, userId, projects = []) {
   }
 }
 
+// An agent's cloud Business Cases must not remain in persistent browser storage.
+// Keep caches belonging to another account intact (especially unsynced Admin work).
+export function clearAgentProjectCache(storage, userId, cloudProjects = []) {
+  if (!storage || !userId || userId === "local") return;
+  try {
+    const owned = storage.getItem(CACHE_OWNER_KEY) === userId;
+    const keys = [accountKey(PROJECTS_KEY, userId), ...(owned ? [PROJECTS_KEY] : [])];
+    const cloud = new Map(cloudProjects.map((item) => [stableProjectId(item), item]));
+    const verified = keys.every((key) => {
+      const raw = storage.getItem(key);
+      if (!raw) return true;
+      const parsed = JSON.parse(raw);
+      const projects = Array.isArray(parsed) ? parsed : parsed?.projects;
+      if (!Array.isArray(projects)) return false;
+      return projects.every((item) => {
+        const server = cloud.get(stableProjectId(item));
+        return Boolean(server) && Date.parse(item.updatedAt || "1970-01-01") <= Date.parse(server.updatedAt || "1970-01-01");
+      });
+    });
+    if (!verified) return false; // Never erase a possibly unsynced legacy draft.
+    storage.removeItem(accountKey(PROJECTS_KEY, userId));
+    storage.removeItem(accountKey(ACTIVE_PROJECT_KEY, userId));
+    if (owned) {
+      storage.removeItem(PROJECTS_KEY);
+      storage.removeItem(ACTIVE_PROJECT_KEY);
+      storage.removeItem(CACHE_OWNER_KEY);
+    }
+    return true;
+  } catch { return false; /* Malformed old data is retained for recovery. */ }
+}
+
 export function readActiveProject(storage, userId) {
   try {
     const saved = storage.getItem(accountKey(ACTIVE_PROJECT_KEY, userId));

@@ -14,5 +14,7 @@ test("default assumptions modal uses explicit display state instead of hidden at
 
 test("save and close actions both close the modal", () => {
   assert.match(source, /data-default-close[\s\S]*hideModal\(overlay\)/);
-  assert.match(source, /localStorage\.setItem\(DEFAULT_ASSUMPTIONS_STORAGE_KEY[\s\S]*hideModal\(overlay\)/);
+  assert.match(source, /await saveGlobalDefaults\(values\);[\s\S]*hideModal\(overlay\)/);
+  assert.match(source, /await loadGlobalDefaults\(\)/);
+  assert.doesNotMatch(source, /localStorage\.(?:setItem|getItem)/);
 });

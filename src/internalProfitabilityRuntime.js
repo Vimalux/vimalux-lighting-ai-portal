@@ -1,6 +1,7 @@
 import { getActiveBusinessCaseResult, LIVE_BUSINESS_CASE_EVENT } from "./liveBusinessCaseResult.js";
 import { internalProfitabilityMetrics } from "./profitabilityMetrics.js";
 import { partnerReportOptions, partnerTotals } from "./partners.js";
+import { readRuntimeProjects } from "./runtimeProjectStore.js";
 
 const INTERNAL_ID = "vimalux-internal-profitability-runtime";
 const PARTNER_ID = "vimalux-partner-profitability-runtime";
@@ -269,12 +270,7 @@ function renderInternal() {
 }
 
 function storedProjects() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem("vimalux-intelligence-projects") || "[]");
-    return Array.isArray(parsed) ? parsed : Array.isArray(parsed?.projects) ? parsed.projects : [];
-  } catch {
-    return [];
-  }
+  return readRuntimeProjects();
 }
 
 function renderPartnerPortfolio() {

@@ -26,7 +26,10 @@ import { customerAnalysisResult } from "./vat.js";
 import { publishActiveBusinessCaseResult } from "./liveBusinessCaseResult.js";
 import CatalogueExtended from "./CatalogueExtended.jsx";
 import ProcurementPanel from "./ProcurementPanel.jsx";
-import { ACTIVE_PROJECT_KEY, PROJECTS_KEY, SOLAR_LOCATION_EVENT, createRequestRevision, initialProjectId, migrateProjectNavigation, readAccountProjects, readActiveProject, reconcileHydration, rememberProject, stableProjectId, writeProjectCache, writeProjectRoute } from "./projectContext.js";
+import { ACTIVE_PROJECT_KEY, PROJECTS_KEY, SOLAR_LOCATION_EVENT, clearAgentProjectCache, createRequestRevision, initialProjectId, migrateProjectNavigation, readAccountProjects, readActiveProject, reconcileHydration, rememberProject, stableProjectId, writeProjectCache, writeProjectRoute } from "./projectContext.js";
+import { loadGlobalDefaults } from "./globalDefaultsApi.js";
+import { canRefreshAgentPortfolio, hasNewAgentCloudData } from "./agentCloudRefresh.js";
+import { setRuntimeProjectSnapshot } from "./runtimeProjectStore.js";
 import { navigationKey, readNavigation } from "./navigationState.js";
 import usePersistentNavigation from "./usePersistentNavigation.js";
 import { ADMIN_VIEWS, findLinkedProject } from "./navigationState.js";
@@ -151,7 +154,9 @@ const numeric = new Set([
 
 export default function App() {
   const hadStoredProjects = useMemo(() => Boolean(localStorage.getItem("vimalux-intelligence-projects")), []);
-  const initial = useMemo(loadProjects, []);
+  // A signed-in app starts from cloud state. In particular, agent Business Cases
+  // must never hydrate from another browser session's persisted local projects.
+  const initial = useMemo(() => stagingPreview ? loadProjects() : [], []);
   const emptyProject = useMemo(defaultProject, []);
   const [projects, setProjects] = useState(initial);
   const [activeId, setActiveId] = useState(() => initialProjectId(initial, window.location.search, stagingPreview ? readActiveProject(localStorage, "local") : ""));
@@ -169,7 +174,10 @@ export default function App() {
   const [authReady, setAuthReady] = useState(stagingPreview || !supabaseConfigured);
   const [cloudReady, setCloudReady] = useState(stagingPreview || !supabaseConfigured);
   const [syncState, setSyncState] = useState(supabaseConfigured ? "connecting" : "local");
+  const syncStateRef = useRef(syncState);
+  syncStateRef.current = syncState;
   const [syncError, setSyncError] = useState("");
+  const [syncRetry, setSyncRetry] = useState(0);
   const selectedProject = projects.find((p) => p.id === activeId);
   const project = selectedProject || emptyProject;
   const userId = session?.user?.id || "local";
@@ -184,6 +192,7 @@ export default function App() {
     initialView,
     projectId: project.crm?.businessCaseRecordId || project.id,
     allowedViews: isAgent ? agentAllowedViews : ADMIN_VIEWS,
+    persist: !isAgent,
   });
   const setView = (next) => {
     const value = typeof next === "function" ? next(view) : next;
@@ -196,7 +205,7 @@ export default function App() {
     setActiveId(target.id);
     setStoredView(nextView, stableProjectId(target));
     const search = writeProjectRoute(window, target, nextView, replaceHistory);
-    rememberProject(localStorage, userId, target);
+    if (!isAgent) rememberProject(localStorage, userId, target);
     setRoute(search);
   };
   useEffect(() => {
@@ -215,7 +224,7 @@ export default function App() {
     if (!selectedProject || !cloudReady || !roleVerified) return;
     // React owns both header and route. Other runtimes only consume this context.
     writeProjectRoute(window, selectedProject, view);
-    rememberProject(localStorage, userId, selectedProject);
+    if (!isAgent) rememberProject(localStorage, userId, selectedProject);
   }, [selectedProject, view, cloudReady, roleVerified, userId]);
   const t = useT(project.language);
   useEffect(() => {
@@ -236,14 +245,20 @@ export default function App() {
   const activeSyncedProjects = useMemo(() => syncedProjects.filter((item) => !isArchivedProject(item)), [syncedProjects]);
   const syncedProject = syncedProjects.find((item) => item.id === project.id) || syncBusinessCaseResult(project, project.updatedAt || project.createdAt);
   useEffect(() => {
+    if (!roleVerified || !cloudReady) return;
+    setRuntimeProjectSnapshot(projects, { agent: isAgent });
+  }, [projects, isAgent, roleVerified, cloudReady]);
+  useEffect(() => {
     if (!cloudReady || !roleVerified) return;
+    // Agent data has exactly one durable source: the authenticated database.
+    if (isAgent) return;
     const stored = writeProjectCache(localStorage, userId, projects);
     if (!stored) {
       setSyncError("Browser storage is unavailable. Keep this page open until cloud saving completes.");
       return;
     }
     setSyncError((current) => current === "Browser storage is unavailable. Keep this page open until cloud saving completes." ? "" : current);
-  }, [projects, userId, cloudReady, roleVerified]);
+  }, [projects, userId, cloudReady, roleVerified, isAgent]);
   useEffect(() => { if (isAgent && !isAgentViewAllowed(view, agentAllowedViews)) setView("customer"); }, [isAgent, view]);
   useEffect(() => {
     if (!stagingPreview) return;
@@ -287,27 +302,38 @@ export default function App() {
     let active = true;
     const revision = requests.current();
     const baseline = projectsRef.current;
-    const locals = readAccountProjects(localStorage, userId, hadStoredProjects ? baseline : []);
     setSyncState("loading");
     setCloudReady(false);
-    Promise.all([loadCloudState(locals, true), loadCurrentProfile()]).then(([rows, profile]) => {
+    Promise.all([loadCurrentProfile(), loadGlobalDefaults()])
+      .then(async ([profile]) => {
+        const agent = profile?.role === "agent";
+        const locals = agent ? [] : readAccountProjects(localStorage, userId, hadStoredProjects ? loadProjects() : []);
+        const rows = await loadCloudState(locals, !agent);
+        return [rows, profile];
+      }).then(([rows, profile]) => {
       if (!active) return;
       const migrated = rows.map(migrateProject);
-      const merged = reconcileHydration(projectsRef.current, migrated, baseline);
+      const merged = profile?.role === "agent"
+        ? migrated
+        : reconcileHydration(projectsRef.current, migrated, baseline);
+      if (profile?.role === "agent") clearAgentProjectCache(localStorage, userId, migrated);
+      // Switch legacy runtimes to the safe memory adapter before the agent UI
+      // becomes visible, rather than waiting for the next React effect.
+      setRuntimeProjectSnapshot(merged, { agent: profile?.role === "agent" });
       projectsRef.current = merged;
       observedProjectsRef.current = merged;
       pendingSaveRef.current.clear();
       setCurrentProfile(profile);
       setProjects(merged);
       if (requests.accepts(revision)) {
-        const requestedId = initialProjectId(merged, window.location.search, readActiveProject(localStorage, userId));
+        const requestedId = initialProjectId(merged, window.location.search, profile?.role === "agent" ? "" : readActiveProject(localStorage, userId));
         const requestedProject = merged.find((item) => item.id === requestedId) || null;
         const preferred = preferredProject(merged, requestedProject);
         setActiveId(preferred?.id || requestedId);
         if (preferred && requestedProject && preferred.id !== requestedProject.id) {
-          const requestedView = new URLSearchParams(window.location.search).get("view") || readNavigation(localStorage, navigationKey(userId, preferred.id), isAgent ? agentAllowedViews : ADMIN_VIEWS);
+          const requestedView = new URLSearchParams(window.location.search).get("view") || (profile?.role === "agent" ? "customer" : readNavigation(localStorage, navigationKey(userId, preferred.id), ADMIN_VIEWS));
           writeProjectRoute(window, preferred, requestedView || "customer", true);
-          rememberProject(localStorage, userId, preferred);
+          if (profile?.role !== "agent") rememberProject(localStorage, userId, preferred);
         }
       }
       setCloudReady(true);
@@ -338,7 +364,7 @@ export default function App() {
         .then((promotions = []) => {
           if (accountRef.current !== savingUser) return;
           if (promotions.length) {
-            promotions.forEach(({ legacyId, caseId }) => migrateProjectNavigation(localStorage, userId, legacyId, caseId, isAgent ? agentAllowedViews : ADMIN_VIEWS));
+            if (!isAgent) promotions.forEach(({ legacyId, caseId }) => migrateProjectNavigation(localStorage, userId, legacyId, caseId, ADMIN_VIEWS));
             setProjects((current) => dedupeProjects(current.map((item) => {
               const promotion = promotions.find((entry) => entry.legacyId === item.id);
               if (!promotion) return item;
@@ -376,7 +402,83 @@ export default function App() {
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [projects, userId, cloudReady, session, isAgent]);
+  }, [projects, userId, cloudReady, session, isAgent, syncRetry]);
+  useEffect(() => {
+    if (!isAgent || !["saving", "error"].includes(syncState)) return;
+    const warnUnsaved = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnUnsaved);
+    return () => window.removeEventListener("beforeunload", warnUnsaved);
+  }, [isAgent, syncState]);
+  useEffect(() => {
+    if (!isAgent) return;
+    const retry = () => setSyncRetry((version) => version + 1);
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, [isAgent]);
+  useEffect(() => {
+    if (!isAgent || !cloudReady || !roleVerified || !session || stagingPreview) return;
+    let active = true;
+    let inFlight = false;
+    const savingUser = userId;
+    const refresh = async () => {
+      if (!active || inFlight || document.hidden) return;
+      const editing = document.activeElement?.matches?.("main input, main textarea, main select, main [contenteditable]") || false;
+      const before = projectsRef.current;
+      if (!canRefreshAgentPortfolio({
+        syncState: syncStateRef.current,
+        pendingSaveCount: pendingSaveRef.current.size,
+        observed: observedProjectsRef.current,
+        current: before,
+        editing,
+      })) return;
+      inFlight = true;
+      try {
+        // A pending save from this account must settle before reading back
+        // database state. A failed save keeps syncState=error and prevents the
+        // refresh from destroying the agent's unsaved work.
+        await saveQueueRef.current.catch(() => {});
+        if (!active || accountRef.current !== savingUser || syncStateRef.current !== "saved") return;
+        await loadGlobalDefaults();
+        const cloud = (await loadCloudState([], false)).map(migrateProject);
+        if (!active || accountRef.current !== savingUser || projectsRef.current !== before) return;
+        const stillEditing = document.activeElement?.matches?.("main input, main textarea, main select, main [contenteditable]") || false;
+        if (!canRefreshAgentPortfolio({
+          syncState: syncStateRef.current,
+          pendingSaveCount: pendingSaveRef.current.size,
+          observed: observedProjectsRef.current,
+          current: projectsRef.current,
+          editing: stillEditing,
+        }) || !hasNewAgentCloudData(before, cloud)) return;
+        // Tell autosave that this is server state, not an Agent edit.
+        observedProjectsRef.current = cloud;
+        projectsRef.current = cloud;
+        setRuntimeProjectSnapshot(cloud, { agent: true });
+        setProjects(cloud);
+        setActiveId((previous) => cloud.some((item) => item.id === previous) ? previous : cloud[0]?.id || "");
+      } catch (error) {
+        // Passive refresh failure must never turn a successfully saved edit
+        // into a false "unsaved" warning. Retry on focus/online/next interval.
+        console.warn("Agent cloud refresh unavailable", error);
+      } finally {
+        inFlight = false;
+      }
+    };
+    const onVisible = () => { if (!document.hidden) refresh(); };
+    const interval = window.setInterval(refresh, 45000);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [isAgent, cloudReady, roleVerified, userId]);
   useEffect(() => {
     if (!cloudReady || !roleVerified) return;
     const params = new URLSearchParams(window.location.search);
@@ -392,7 +494,7 @@ export default function App() {
         setActiveId(preferred.id);
         if (params.get("view")) setStoredView(params.get("view"), stableProjectId(preferred));
         writeProjectRoute(window, preferred, params.get("view") || "customer", true);
-        rememberProject(localStorage, userId, preferred);
+        if (!isAgent) rememberProject(localStorage, userId, preferred);
       }
       return;
     }
@@ -413,7 +515,7 @@ export default function App() {
         if (params.get("view")) setStoredView(params.get("view"), stableProjectId(preferred));
         if (preferred.id !== migrated.id) {
           writeProjectRoute(window, preferred, params.get("view") || "customer", true);
-          rememberProject(localStorage, userId, preferred);
+          if (!isAgent) rememberProject(localStorage, userId, preferred);
         }
       }).catch((error) => { if (active && requests.accepts(revision)) { setSyncError(error.message); setSyncState("error"); } });
     } else if (supabaseConfigured) {
@@ -571,7 +673,7 @@ export default function App() {
   if (!authReady) return <div className="auth-screen"><div className="auth-card"><strong>VIMALUX Intelligence</strong><p>Connessione a Supabase…</p></div></div>;
   if (supabaseConfigured && !stagingPreview && !session) return <AuthScreen />;
   if (supabaseConfigured && !stagingPreview && (!cloudReady || !roleVerified)) return <div className="auth-screen"><div className="auth-card"><strong>VIMALUX Intelligence</strong><p>{syncError || "Caricamento progetti…"}</p></div></div>;
-  return <div className="app" data-active-project-id={selectedProject?.id || ""}><aside data-navigation-managed="react"><div className="brand"><span>V</span><div><strong>VIMALUX</strong><small>Intelligence v1.0</small></div></div><nav>{visibleWorkflow.map(([id, key], i) => <button data-intelligence-view={id} className={view === id ? "active" : ""} onClick={() => setView(id)} key={id}><b>{i + 1}</b>{t(key)}</button>)}</nav>{!isAgent && <hr />}{!isAgent && <button className={view === "crm" ? "active" : ""} onClick={() => setView("crm")}>CRM</button>}{!isAgent && <button className={view === "datek" ? "active" : ""} onClick={() => setView("datek")}>Partners</button>}{!isAgent && <button className={view === "partnerReports" ? "active" : ""} onClick={() => setView("partnerReports")}>Partner reports</button>}<button className={view === "projects" ? "active" : ""} onClick={() => setView("projects")}>{t("projects")}</button>{!isAgent && <button className={view === "catalogue" ? "active" : ""} onClick={() => setView("catalogue")}>{t("catalogue")}</button>}{!isAgent && <button data-intelligence-view="orderList" className={view === "orderList" ? "active" : ""} onClick={() => setView("orderList")}>{t("orderList")}</button>}{!isAgent && <button className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}>{t("priceAdmin")}</button>}{!isAgent && <button className={view === "internalReport" ? "active" : ""} onClick={() => setView("internalReport")}>{t("internalReport")}</button>}{supabaseConfigured && !stagingPreview && <button className="signout" onClick={() => supabase.auth.signOut()}>Esci / Sign out</button>}</aside><main><header><div><small>{selectedProject ? `${project.project.name || project.customer.name} · ${project.project.businessCaseId}` : "Business Case"}</small><h1>{view === "datek" ? "Partners" : t(view === "admin" ? "priceAdmin" : visibleWorkflow.find((x) => x[0] === view)?.[1] || view)}</h1></div><div className="header-actions"><span className={`saved ${syncState}`}>● {syncState === "saving" ? "Salvataggio…" : syncState === "error" ? "Errore sincronizzazione" : syncState === "local" ? t("save") : "Supabase sincronizzato"}</span><select value={project.language} onChange={(e) => update(["language"], e.target.value)} aria-label="Language"><option value="it">Italiano</option><option value="en">English</option><option value="da">Dansk</option></select></div></header>{syncError && <div className="sync-error">{syncError}</div>}{selectedProject && isArchivedProject(selectedProject) && <div className="sync-error">{project.language === "it" ? "Business Case archiviato/perso · storico in sola lettura · escluso da pipeline e forecast." : project.language === "da" ? "Business Case tabt/arkiveret · historik i skrivebeskyttet visning · udeladt fra pipeline og forecast." : "Business Case lost/archived · read-only history · excluded from pipeline and forecasts."}</div>}{cloudReady && projects.length === 0 && view !== "projects" && <div className="card"><h2>Nessun Business Case assegnato</h2><p className="muted">Apri una Opportunity assegnata a te in VIMALUX CRM e seleziona “Preliminary Business Case”.</p></div>}{!selectedProject && view !== "projects" && <div className="card"><p>{syncError || "Select a Business Case to continue."}</p><button onClick={() => setView("projects")}>{t("projects")}</button></div>}{(Boolean(selectedProject) || view === "projects") && <>{view === "customer" && <Customer p={project} update={update} />}{view === "existing" && <Existing p={project} update={update} t={t} readOnly={isReadOnlyAgentProject} />}{view === "solution" && <Solution p={project} r={result} update={update} t={t} money={money} num={num} />}{view === "additionalCosts" && <AdditionalCostsCard p={project} update={update} mode={isAgent ? "agent" : "admin"} />}{!isAgent && view === "pricing" && <Pricing p={project} r={result} update={update} t={t} money={money} />}{view === "assumptions" && (isAgent ? <><AgentAssumptions p={project} update={update} /><ScenarioOptimizerPanel key={project.id} project={project} isAgent={true} /></> : <Assumptions p={project} r={result} update={update} />)}{view === "business" && <Business p={project} r={result} t={t} money={money} num={num} isAgent={isAgent} />}{view === "report" && <Report p={project} r={result} t={t} money={money} num={num} />}{!isAgent && view === "internalReport" && <InternalReport p={project} r={result} update={update} money={money} />}{!isAgent && view === "crm" && <CrmOpportunity projects={activeSyncedProjects} active={syncedProject} update={update} money={money} onImport={importOpportunities} onManual={createManualOpportunity} setView={setView} currentUser={session?.user?.email || "Local user"} getLinkedBusinessCaseId={getLinkedBusinessCaseId} createOrOpenBusinessCase={createOrOpenBusinessCase} onBusinessCaseLinked={rememberBusinessCaseLink} />}{!isAgent && view === "datek" && <CmsPartnerDashboard projects={activeSyncedProjects} money={money} />}{!isAgent && view === "partnerReports" && <PartnerReports projects={activeSyncedProjects} p={syncedProject} money={money} />}{view === "projects" && <Projects list={projects} activeId={activeId} select={(id) => activateProject(projects.find((item) => item.id === id))} remove={isAgent ? undefined : removeProject} create={isAgent ? undefined : create} importProjectFile={importProjectFile} t={t} />}{!isAgent && view === "catalogue" && <CatalogueExtended p={project} update={update} projects={projects} />}{!isAgent && view === "orderList" && <ProcurementPanel key={project.id} p={project} />}{!isAgent && view === "admin" && <Admin p={project} r={result} setView={setView} reset={reset} t={t} />}</>}</main></div>;
+  return <div className="app" data-active-project-id={selectedProject?.id || ""}><aside data-navigation-managed="react"><div className="brand"><span>V</span><div><strong>VIMALUX</strong><small>Intelligence v1.0</small></div></div><nav>{visibleWorkflow.map(([id, key], i) => <button data-intelligence-view={id} className={view === id ? "active" : ""} onClick={() => setView(id)} key={id}><b>{i + 1}</b>{t(key)}</button>)}</nav>{!isAgent && <hr />}{!isAgent && <button className={view === "crm" ? "active" : ""} onClick={() => setView("crm")}>CRM</button>}{!isAgent && <button className={view === "datek" ? "active" : ""} onClick={() => setView("datek")}>Partners</button>}{!isAgent && <button className={view === "partnerReports" ? "active" : ""} onClick={() => setView("partnerReports")}>Partner reports</button>}<button className={view === "projects" ? "active" : ""} onClick={() => setView("projects")}>{t("projects")}</button>{!isAgent && <button className={view === "catalogue" ? "active" : ""} onClick={() => setView("catalogue")}>{t("catalogue")}</button>}{!isAgent && <button data-intelligence-view="orderList" className={view === "orderList" ? "active" : ""} onClick={() => setView("orderList")}>{t("orderList")}</button>}{!isAgent && <button className={view === "admin" ? "active" : ""} onClick={() => setView("admin")}>{t("priceAdmin")}</button>}{!isAgent && <button className={view === "internalReport" ? "active" : ""} onClick={() => setView("internalReport")}>{t("internalReport")}</button>}{supabaseConfigured && !stagingPreview && <button className="signout" onClick={() => supabase.auth.signOut()}>Esci / Sign out</button>}</aside><main><header><div><small>{selectedProject ? `${project.project.name || project.customer.name} · ${project.project.businessCaseId}` : "Business Case"}</small><h1>{view === "datek" ? "Partners" : t(view === "admin" ? "priceAdmin" : visibleWorkflow.find((x) => x[0] === view)?.[1] || view)}</h1></div><div className="header-actions"><span className={`saved ${syncState}`}>● {syncState === "saving" ? "Salvataggio…" : syncState === "error" ? "Errore sincronizzazione" : syncState === "local" ? t("save") : "Supabase sincronizzato"}</span><select value={project.language} onChange={(e) => update(["language"], e.target.value)} aria-label="Language"><option value="it">Italiano</option><option value="en">English</option><option value="da">Dansk</option></select></div></header>{syncError && <div className="sync-error">{syncError}{isAgent && <button type="button" onClick={() => setSyncRetry((version) => version + 1)}>Riprova salvataggio</button>}{isAgent && <small>Non chiudere questa pagina finché il salvataggio non è riuscito.</small>}</div>}{selectedProject && isArchivedProject(selectedProject) && <div className="sync-error">{project.language === "it" ? "Business Case archiviato/perso · storico in sola lettura · escluso da pipeline e forecast." : project.language === "da" ? "Business Case tabt/arkiveret · historik i skrivebeskyttet visning · udeladt fra pipeline og forecast." : "Business Case lost/archived · read-only history · excluded from pipeline and forecasts."}</div>}{cloudReady && projects.length === 0 && view !== "projects" && <div className="card"><h2>Nessun Business Case assegnato</h2><p className="muted">Apri una Opportunity assegnata a te in VIMALUX CRM e seleziona “Preliminary Business Case”.</p></div>}{!selectedProject && view !== "projects" && <div className="card"><p>{syncError || "Select a Business Case to continue."}</p><button onClick={() => setView("projects")}>{t("projects")}</button></div>}{(Boolean(selectedProject) || view === "projects") && <>{view === "customer" && <Customer p={project} update={update} />}{view === "existing" && <Existing p={project} update={update} t={t} readOnly={isReadOnlyAgentProject} />}{view === "solution" && <Solution p={project} r={result} update={update} t={t} money={money} num={num} />}{view === "additionalCosts" && <AdditionalCostsCard p={project} update={update} mode={isAgent ? "agent" : "admin"} />}{!isAgent && view === "pricing" && <Pricing p={project} r={result} update={update} t={t} money={money} />}{view === "assumptions" && (isAgent ? <><AgentAssumptions p={project} update={update} /><ScenarioOptimizerPanel key={project.id} project={project} isAgent={true} /></> : <Assumptions p={project} r={result} update={update} />)}{view === "business" && <Business p={project} r={result} t={t} money={money} num={num} isAgent={isAgent} />}{view === "report" && <Report p={project} r={result} t={t} money={money} num={num} />}{!isAgent && view === "internalReport" && <InternalReport p={project} r={result} update={update} money={money} />}{!isAgent && view === "crm" && <CrmOpportunity projects={activeSyncedProjects} active={syncedProject} update={update} money={money} onImport={importOpportunities} onManual={createManualOpportunity} setView={setView} currentUser={session?.user?.email || "Local user"} getLinkedBusinessCaseId={getLinkedBusinessCaseId} createOrOpenBusinessCase={createOrOpenBusinessCase} onBusinessCaseLinked={rememberBusinessCaseLink} />}{!isAgent && view === "datek" && <CmsPartnerDashboard projects={activeSyncedProjects} money={money} />}{!isAgent && view === "partnerReports" && <PartnerReports projects={activeSyncedProjects} p={syncedProject} money={money} />}{view === "projects" && <Projects list={projects} activeId={activeId} select={(id) => activateProject(projects.find((item) => item.id === id))} remove={isAgent ? undefined : removeProject} create={isAgent ? undefined : create} importProjectFile={importProjectFile} t={t} />}{!isAgent && view === "catalogue" && <CatalogueExtended p={project} update={update} projects={projects} />}{!isAgent && view === "orderList" && <ProcurementPanel key={project.id} p={project} />}{!isAgent && view === "admin" && <Admin p={project} r={result} setView={setView} reset={reset} t={t} />}</>}</main></div>;
 }
 
 function AuthScreen() { const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false); const submit = async (event) => { event.preventDefault(); setBusy(true); setMessage(""); const { error } = await supabase.auth.signInWithPassword({ email, password }); if (error) setMessage(error.message); setBusy(false); }; return <div className="auth-screen"><form className="auth-card" onSubmit={submit}><div className="auth-logo">V</div><h1>VIMALUX Intelligence</h1><p>Accedi con l’account Supabase autorizzato.<br />Sign in with your authorised Supabase account.</p><Field label="Email" type="email" value={email} onChange={setEmail} /><Field label="Password" type="password" value={password} onChange={setPassword} />{message && <div className="sync-error">{message}</div>}<button className="primary" disabled={busy}>{busy ? "Accesso…" : "Accedi / Sign in"}</button></form></div>; }

@@ -34,4 +34,5 @@ export function sanitizeStoredDefaultOverrides(storage = globalThis?.localStorag
   }
 }
 
-if (typeof window !== "undefined") sanitizeStoredDefaultOverrides(window.localStorage);
+// The legacy local override is no longer an active defaults source. Never
+// rewrite it during bootstrap before the signed-in user's role is known.

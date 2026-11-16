@@ -1,4 +1,7 @@
 import { numberValue } from "./calculations.js";
+import { getSharedDefaultState } from "./sharedDefaultState.js";
+import { readRuntimeProjects } from "./runtimeProjectStore.js";
+import { readRuntimeImportTarget } from "./runtimeImportTarget.js";
 
 export const today = () => new Date().toISOString().slice(0, 10);
 export const uid = () => Math.random().toString(36).slice(2, 10);
@@ -36,8 +39,8 @@ export const BASE_ASSUMPTIONS = {
   energyEscalation: 2,
   opexEscalation: 2,
   discountRate: 5,
-  freightCostPerLamp: 4,
-  freightSalesPerLamp: 6,
+  freightCostPerLamp: 11,
+  freightSalesPerLamp: 12,
   dutyCost: 0,
   commissionPercent: 0,
   agent1Name: "",
@@ -54,36 +57,28 @@ export const BASE_ASSUMPTIONS = {
 const DEFAULT_ASSUMPTION_KEYS = new Set(Object.keys(BASE_ASSUMPTIONS));
 
 export function readStoredDefaultAssumptions() {
-  if (typeof localStorage === "undefined") return { ...BASE_ASSUMPTIONS };
-  try {
-    const raw = localStorage.getItem(DEFAULT_ASSUMPTIONS_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    const values = parsed?.values && typeof parsed.values === "object" ? parsed.values : parsed;
-    const safe = {};
-    Object.entries(values || {}).forEach(([key, value]) => {
-      if (!DEFAULT_ASSUMPTION_KEYS.has(key)) return;
-      if (key === "interestRateSnapshot") return;
-      if (["financingModel", "dealType", "rateProfileId", "agent1Name", "agent2Name"].includes(key)) {
-        safe[key] = String(value ?? "");
-      } else {
-        const numeric = Number(value);
-        if (Number.isFinite(numeric)) safe[key] = numeric;
-      }
-    });
-    const merged = { ...BASE_ASSUMPTIONS, ...safe };
-    merged.financingYears = merged.financingPeriod;
-    merged.contractYears = merged.serviceAgreementPeriod;
-    merged.analysisPeriod = merged.serviceAgreementPeriod;
-    merged.powerAidServicePeriod = Math.max(1, Math.min(merged.serviceAgreementPeriod, Math.round(numberValue(merged.powerAidServicePeriod) || 10)));
-    merged.interestRateSnapshot = {
-      profileId: merged.rateProfileId || "custom",
-      annualRate: numberValue(merged.interestRate),
-      capturedAt: null,
-    };
-    return merged;
-  } catch {
-    return { ...BASE_ASSUMPTIONS };
-  }
+  const values = getSharedDefaultState()?.values || {};
+  const safe = {};
+  Object.entries(values).forEach(([key, value]) => {
+    if (!DEFAULT_ASSUMPTION_KEYS.has(key) || key === "interestRateSnapshot" || value == null) return;
+    if (["financingModel", "dealType", "rateProfileId", "agent1Name", "agent2Name"].includes(key)) {
+      safe[key] = String(value);
+    } else {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) safe[key] = numeric;
+    }
+  });
+  const merged = { ...BASE_ASSUMPTIONS, ...safe };
+  merged.financingYears = merged.financingPeriod;
+  merged.contractYears = merged.serviceAgreementPeriod;
+  merged.analysisPeriod = merged.serviceAgreementPeriod;
+  merged.powerAidServicePeriod = Math.max(1, Math.min(merged.serviceAgreementPeriod, Math.round(numberValue(merged.powerAidServicePeriod) || 10)));
+  merged.interestRateSnapshot = {
+    profileId: merged.rateProfileId || "custom",
+    annualRate: numberValue(merged.interestRate),
+    capturedAt: null,
+  };
+  return merged;
 }
 
 const FALLBACK_CATALOGUE = {
@@ -110,11 +105,8 @@ const cloneCatalogue = (catalogue) => ({
 });
 
 export function storedMasterCatalogue() {
-  if (typeof localStorage === "undefined") return null;
   try {
-    const raw = localStorage.getItem("vimalux-intelligence-projects");
-    const parsed = raw ? JSON.parse(raw) : null;
-    const list = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.projects) ? parsed.projects : []);
+    const list = readRuntimeProjects();
     let best = null;
     let bestScore = -1;
     for (const item of list) {
@@ -174,7 +166,7 @@ export function reconcileReimportIdentity(incoming, candidates = []) {
     })
     .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
 
-  const preferredId = typeof localStorage !== "undefined" ? String(localStorage.getItem("vimalux-reimport-target-id") || "") : "";
+  const preferredId = readRuntimeImportTarget();
   const existing = (preferredId && matches.find((candidate) => String(candidate.id) === preferredId)) || matches[0];
   if (!existing) return incoming;
 
@@ -211,11 +203,8 @@ export function reconcileReimportIdentity(incoming, candidates = []) {
 }
 
 const storedProjectsForReimport = () => {
-  if (typeof localStorage === "undefined") return [];
   try {
-    const raw = localStorage.getItem("vimalux-intelligence-projects");
-    const parsed = raw ? JSON.parse(raw) : null;
-    return Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.projects) ? parsed.projects : []);
+    return readRuntimeProjects();
   } catch {
     return [];
   }

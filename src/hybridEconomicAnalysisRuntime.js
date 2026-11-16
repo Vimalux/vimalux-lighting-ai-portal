@@ -1,6 +1,7 @@
 import { calculateBusinessCase } from "./calculations.js";
 import { getLiveBusinessCaseResult, LIVE_BUSINESS_CASE_EVENT } from "./liveBusinessCaseResult.js";
 import { getHybridSolarAutoStatus, HYBRID_SOLAR_AUTO_STATUS_EVENT } from "./hybridSolarAutoStatus.js";
+import { readRuntimeProjects } from "./runtimeProjectStore.js";
 
 const PROJECTS_KEY = "vimalux-intelligence-projects";
 const MARKER = "data-vimalux-hybrid-economic-ui";
@@ -159,12 +160,7 @@ function makeHybridCard(display) {
 }
 
 function fallbackDisplay() {
-  let projects;
-  try {
-    projects = JSON.parse(localStorage.getItem(PROJECTS_KEY) || "[]");
-  } catch {
-    return null;
-  }
+  const projects = readRuntimeProjects();
   const project = resolveActiveProject(projects, window.location.search);
   return hybridEconomicDisplay(project);
 }

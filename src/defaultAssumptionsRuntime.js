@@ -1,8 +1,5 @@
-import {
-  BASE_ASSUMPTIONS,
-  DEFAULT_ASSUMPTIONS_STORAGE_KEY,
-  readStoredDefaultAssumptions,
-} from "./model.js";
+import { readStoredDefaultAssumptions } from "./model.js";
+import { loadGlobalDefaults, saveGlobalDefaults } from "./globalDefaultsApi.js";
 
 const groups = [
   {
@@ -71,13 +68,14 @@ function modal() {
         <div>
           <div style="font-size:13px;color:#5c6f83;margin-bottom:4px">VIMALUX Intelligence · Admin</div>
           <h2 style="margin:0 0 6px;font-size:26px">Impostazioni Default</h2>
-          <div style="color:#5c6f83;max-width:760px">Questi valori vengono applicati solo ai nuovi Business Case. I progetti esistenti non vengono modificati.</div>
+          <div style="color:#5c6f83;max-width:760px">Impostazioni centralizzate per tutti gli utenti. Valide solo per i nuovi Business Case; i progetti esistenti non vengono modificati.</div>
         </div>
         <button type="button" data-default-close style="border:1px solid #d4dde7;background:#fff;border-radius:9px;padding:9px 13px;cursor:pointer">Chiudi</button>
       </div>
       <div data-default-groups style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px"></div>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;border-top:1px solid #e4eaf0;padding-top:18px">
-        <button type="button" data-default-reset style="border:1px solid #cbd6e2;background:#fff;border-radius:9px;padding:10px 15px;cursor:pointer">Ripristina standard</button>
+        <span data-default-status role="status" style="align-self:center;margin-right:auto;color:#40566d;font-size:12px"></span>
+        <button type="button" data-default-reset style="border:1px solid #cbd6e2;background:#fff;border-radius:9px;padding:10px 15px;cursor:pointer">Annulla modifiche</button>
         <button type="button" data-default-save style="border:0;background:#087f72;color:#fff;border-radius:9px;padding:10px 18px;font-weight:700;cursor:pointer">Salva default</button>
       </div>
     </div>`;
@@ -101,8 +99,10 @@ function modal() {
   overlay.addEventListener("click", (event) => {
     if (event.target === overlay || event.target.closest("[data-default-close]")) hideModal(overlay);
   });
-  overlay.querySelector("[data-default-reset]").addEventListener("click", () => fill(overlay, BASE_ASSUMPTIONS));
-  overlay.querySelector("[data-default-save]").addEventListener("click", () => {
+  overlay.querySelector("[data-default-reset]").addEventListener("click", () => fill(overlay, readStoredDefaultAssumptions()));
+  overlay.querySelector("[data-default-save]").addEventListener("click", async () => {
+    const save = overlay.querySelector("[data-default-save]");
+    const status = overlay.querySelector("[data-default-status]");
     const values = { ...readStoredDefaultAssumptions() };
     overlay.querySelectorAll("[data-default-key]").forEach((input) => {
       const key = input.dataset.defaultKey;
@@ -116,8 +116,21 @@ function modal() {
     values.contractYears = values.serviceAgreementPeriod;
     values.rateProfileId = "custom";
     values.interestRateSnapshot = { profileId: "custom", annualRate: values.interestRate, capturedAt: null };
-    localStorage.setItem(DEFAULT_ASSUMPTIONS_STORAGE_KEY, JSON.stringify({ version: 1, updatedAt: new Date().toISOString(), values }));
-    hideModal(overlay);
+    if (!(values.freightCostPerLamp > 0) || values.freightSalesPerLamp < values.freightCostPerLamp) {
+      status.textContent = "Verificare i valori trasporto: costo positivo e prezzo almeno pari al costo.";
+      return;
+    }
+    save.disabled = true;
+    status.textContent = "Salvataggio centralizzato…";
+    try {
+      await saveGlobalDefaults(values);
+      status.textContent = "Valori salvati per tutti gli utenti.";
+      hideModal(overlay);
+    } catch (error) {
+      status.textContent = `Errore: ${error.message}`;
+    } finally {
+      save.disabled = false;
+    }
   });
   return overlay;
 }
@@ -129,10 +142,21 @@ function fill(overlay, values) {
   });
 }
 
-function openDefaults() {
+async function openDefaults() {
   const overlay = modal();
-  fill(overlay, readStoredDefaultAssumptions());
   showModal(overlay);
+  const save = overlay.querySelector("[data-default-save]");
+  const status = overlay.querySelector("[data-default-status]");
+  save.disabled = true;
+  status.textContent = "Caricamento impostazioni condivise…";
+  try {
+    await loadGlobalDefaults();
+    fill(overlay, readStoredDefaultAssumptions());
+    status.textContent = "Fonte: database VIMALUX centrale";
+    save.disabled = false;
+  } catch (error) {
+    status.textContent = `Impostazioni non disponibili: ${error.message}`;
+  }
 }
 
 function installMenu() {

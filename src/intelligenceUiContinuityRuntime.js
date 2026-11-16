@@ -1,3 +1,5 @@
+import { isAgentRuntime } from "./runtimeProjectStore.js";
+
 const VIEW_STORAGE_PREFIX = "vimalux-intelligence-last-view";
 
 // Browser-return continuity is deliberately limited to the Business Case workflow.
@@ -68,10 +70,12 @@ function activeProjectCandidate() {
 
 function writeStoredView(ref, view, label = "") {
   if (!PROJECT_VIEW_IDS.has(view)) return;
+  if (isAgentRuntime()) return;
   try { localStorage.setItem(storageKey(ref), JSON.stringify({ view, label })); } catch (_) {}
 }
 
 function storedView(ref = currentBusinessCaseRef()) {
+  if (isAgentRuntime()) return null;
   try {
     const parsed = JSON.parse(localStorage.getItem(storageKey(ref)) || "null");
     if (!parsed || typeof parsed !== "object" || !PROJECT_VIEW_IDS.has(parsed.view)) return null;
