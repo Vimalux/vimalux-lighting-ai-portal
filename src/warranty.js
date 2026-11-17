@@ -66,7 +66,6 @@ export function applyWarrantyPricing(project = {}) {
 // Commercial uplift remains internal to pricing and must not leak into reports/proposals.
 export function warrantyLabel(project = {}, language = "it") {
   const warranty = projectWarranty(project);
-  return language === "it"
-    ? `${warranty.selectedYears} anni`
-    : `${warranty.selectedYears} years`;
+  const yearNames = { it: "anni", en: "years", es: "años", da: "år" };
+  return `${warranty.selectedYears} ${yearNames[language] || yearNames.en}`;
 }

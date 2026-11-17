@@ -9,6 +9,8 @@ test('customer-facing warranty label shows only the selected term', () => {
   assert.equal(warrantyLabel({ solution: { warrantyYears: 5 } }, 'en'), '5 years');
   assert.equal(warrantyLabel({ solution: { warrantyYears: 10 } }, 'en'), '10 years');
   assert.equal(warrantyLabel({ solution: { warrantyYears: 12 } }, 'en'), '12 years');
+  assert.equal(warrantyLabel({ solution: { warrantyYears: 5 } }, 'es'), '5 años');
+  assert.equal(warrantyLabel({ solution: { warrantyYears: 12 } }, 'da'), '12 år');
 });
 
 test('a project-specific 12-year extended warranty keeps the configured uplift', () => {

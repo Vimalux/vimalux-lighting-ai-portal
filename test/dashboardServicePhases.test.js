@@ -3,12 +3,15 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const source = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+const reportCopy = fs.readFileSync(new URL("../src/customerReportCopy.js", import.meta.url), "utf8");
 
 test("dashboard phases follow CMS and Adaptive Dimming state changes independently", () => {
   assert.match(source, /phaseKey = \(row\) => `\$\{Boolean\(row\?\.cmsActive\)\}\|\$\{Boolean\(row\?\.powerAidActive\)\}/);
   assert.match(source, /CMS \+ Adaptive Dimming/);
-  assert.match(source, /Solo CMS/);
-  assert.match(source, /Post-servizi/);
+  assert.match(source, /s\("cmsOnly"\)/);
+  assert.match(source, /s\("postService"\)/);
+  assert.match(reportCopy, /Solo CMS/);
+  assert.match(reportCopy, /Post-servizi/);
 });
 
 test("dashboard full-period note requires every configured Smart service to remain active", () => {
@@ -22,5 +25,6 @@ test("dashboard phase comparison is normalized to year-one prices", () => {
   assert.match(source, /ledEnergySavingEUR/);
   assert.match(source, /cloSavingEUR/);
   assert.match(source, /powerAidGrossSavingEUR/);
-  assert.match(source, /Energia \+ manutenzione/);
+  assert.match(source, /s\("energyMaintenance"\)/);
+  assert.match(reportCopy, /Energia \+ manutenzione/);
 });

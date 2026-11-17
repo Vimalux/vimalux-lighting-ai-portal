@@ -69,14 +69,14 @@ const checks = [
   },
   {
     name: 'Customer-facing warranty label contains term only',
-    ok: warranty.includes('`${warranty.selectedYears} anni`')
-      && warranty.includes('`${warranty.selectedYears} years`')
+    ok: warranty.includes('it: "anni", en: "years", es: "años", da: "år"')
+      && warranty.includes('`${warranty.selectedYears} ${yearNames[language] || yearNames.en}`')
       && !warranty.includes('return warranty.isExtended ? `${warranty.selectedYears} anni · +')
       && !warranty.includes('`${warranty.selectedYears} anni · standard`'),
   },
   {
     name: 'All customer PDFs use the shared warranty label',
-    ok: report.includes('[it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)]')
+    ok: report.includes('[pdfT(it ? "Garanzia apparecchi" : "Luminaire warranty"), warrantyLabel(project, lang)]')
       && preliminaryProposal.includes('[it ? "Garanzia apparecchi" : "Luminaire warranty", warrantyLabel(project, lang)]'),
   },
 ];
