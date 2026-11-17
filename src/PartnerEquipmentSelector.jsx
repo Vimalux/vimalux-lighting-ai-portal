@@ -2,9 +2,10 @@ import React, { useEffect } from "react";
 import { adaptiveDimmingPartnerOptions, resolveAdaptiveDimmingPartner, resolveCmsPartner } from "./partners.js";
 import { partnerDisplayText, productRoles, productSupportsPartner } from "./partnerRoles.js";
 import { uid } from "./model.js";
+import { solutionT } from "./solutionCopy.js";
 
 export default function PartnerEquipmentSelector({ p, update, adaptive = true }) {
-  const it = p.language === "it";
+  const s = (key, ...args) => solutionT(p.language, key, ...args);
   const smart = p.catalogue?.smart || [];
   const allRows = p.solution?.partnerEquipment || [];
   const role = adaptive ? "ADAPTIVE_DIMMING" : "CMS";
@@ -59,49 +60,43 @@ export default function PartnerEquipmentSelector({ p, update, adaptive = true })
   const availableToAdd = products.some((item) => !allRows.some((row) => row.productId === item.id));
 
   return <div className="optional-equipment partner-equipment-selector">
-    <h3>{adaptive ? "Adaptive Dimming" : "CMS / Lighting Control"}</h3>
+    <h3>{adaptive ? "Adaptive Dimming" : s("cmsControl")}</h3>
 
-    {adaptive && <label><span>{it ? "Partner Adaptive Dimming" : "Adaptive Dimming Partner"}</span><select aria-label={it ? "Partner Adaptive Dimming" : "Adaptive Dimming Partner"} value={selectedPartner || ""} onChange={(e) => update(["solution", "adaptiveDimmingPartner"], e.target.value)}>
-      <option value="">{it ? "-- seleziona partner --" : "-- select partner --"}</option>
+    {adaptive && <label><span>{s("adaptivePartner")}</span><select aria-label={s("adaptivePartner")} value={selectedPartner || ""} onChange={(e) => update(["solution", "adaptiveDimmingPartner"], e.target.value)}>
+      <option value="">{s("selectPartner")}</option>
       {adaptiveDimmingPartnerOptions(p).map((name) => <option key={name} value={name}>{name}</option>)}
     </select></label>}
 
     {!adaptive && <>
       <div className="form-grid">
-        <label><span>{it ? "Prodotto LCU" : "LCU product"}</span><select aria-label={it ? "Prodotto LCU" : "LCU product"} value={lcuProducts.some((item) => item.id === p.solution?.lcuProductId) ? p.solution.lcuProductId : ""} onChange={(e) => update(["solution", "lcuProductId"], e.target.value)}>
-          <option value="">{it ? "-- seleziona LCU --" : "-- select LCU --"}</option>
+        <label><span>{s("lcuProduct")}</span><select aria-label={s("lcuProduct")} value={lcuProducts.some((item) => item.id === p.solution?.lcuProductId) ? p.solution.lcuProductId : ""} onChange={(e) => update(["solution", "lcuProductId"], e.target.value)}>
+          <option value="">{s("selectLcu")}</option>
           {lcuProducts.map((item) => <option key={item.id} value={item.id}>{partnerDisplayText(item.name)} · {item.supplier || ""} {item.supplierSku || ""}</option>)}
         </select></label>
-        <label><span>{it ? "Quantità LCU" : "LCU quantity"}</span><input type="number" min="0" step="1" value={lcuQuantity} onChange={(e) => update(["solution", "lcuQuantityOverride"], e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0))} /></label>
+        <label><span>{s("lcuQuantity")}</span><input type="number" min="0" step="1" value={lcuQuantity} onChange={(e) => update(["solution", "lcuQuantityOverride"], e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0))} /></label>
       </div>
       <div className="lcu-quantity-auto">
-        <span className="hint">{it ? `Automatico: ${automaticLcuQuantity} unità (uguale agli apparecchi selezionati per l'upgrade)` : `Automatic: ${automaticLcuQuantity} units (equal to luminaires selected for upgrade)`}</span>
-        {hasLcuQuantityOverride && <button type="button" className="secondary partner-add-button" onClick={() => update(["solution", "lcuQuantityOverride"], null)}>{it ? "Ripristina automatico" : "Reset to automatic"}</button>}
+        <span className="hint">{s("automaticQuantity", automaticLcuQuantity)}</span>
+        {hasLcuQuantityOverride && <button type="button" className="secondary partner-add-button" onClick={() => update(["solution", "lcuQuantityOverride"], null)}>{s("resetAutomatic")}</button>}
       </div>
     </>}
 
-    <p className="hint">{adaptive
-      ? (it ? "Selezionare il partner e i prodotti per il dimming adattivo. Le quantità entrano nel CAPEX, nella lista ordini del relativo fornitore e nel report partner." : "Select the adaptive-dimming partner and products. Quantities feed CAPEX, the relevant supplier order list and the partner report.")
-      : (it ? `LCU e quantità sono gestite qui. Eventuali altri prodotti CMS / Lighting Control del partner ${selectedPartner || "selezionato"} possono essere aggiunti sotto.` : `LCU and quantity are managed here. Any additional CMS / Lighting Control products from ${selectedPartner || "the selected partner"} can be added below.`)}</p>
+    <p className="hint">{adaptive ? s("adaptiveProductsHint") : s("cmsProductsHint", selectedPartner)}</p>
 
-    {!adaptive && !lcuProducts.length && <p className="hint">{it
-      ? `Nessuna LCU configurata per ${selectedPartner || "il partner selezionato"}.`
-      : `No LCU is configured for ${selectedPartner || "the selected partner"}.`}</p>}
+    {!adaptive && !lcuProducts.length && <p className="hint">{s("noLcu", selectedPartner)}</p>}
 
-    {!adaptive && !products.length && <p className="hint">{it
-      ? `Nessun altro prodotto CMS configurato per ${selectedPartner || "il partner selezionato"}.`
-      : `No additional CMS products are configured for ${selectedPartner || "the selected partner"}.`}</p>}
+    {!adaptive && !products.length && <p className="hint">{s("noCmsProducts", selectedPartner)}</p>}
 
-    {(adaptive || products.length > 0 || rows.length > 0) && <button type="button" className="secondary partner-add-button" disabled={!availableToAdd} onClick={() => replaceRows([...allRows, { id: uid(), partnerRole: role, productId: "", quantity: 1 }])}>+ {adaptive ? (it ? "Aggiungi prodotto" : "Add product") : (it ? "Aggiungi prodotto DATEK / CMS" : "Add DATEK / CMS product")}</button>}
+    {(adaptive || products.length > 0 || rows.length > 0) && <button type="button" className="secondary partner-add-button" disabled={!availableToAdd} onClick={() => replaceRows([...allRows, { id: uid(), partnerRole: role, productId: "", quantity: 1 }])}>+ {adaptive ? s("addProduct") : s("addCmsProduct")}</button>}
 
     {rows.map(({ row, index }) => <div className="form-grid partner-equipment-row" key={row.id || index}>
-      <label><span>{adaptive ? (it ? "Prodotto Adaptive Dimming" : "Adaptive Dimming product") : (it ? "Prodotto CMS" : "CMS product")}</span><select aria-label={adaptive ? (it ? "Prodotto Adaptive Dimming" : "Adaptive Dimming product") : (it ? "Prodotto CMS" : "CMS product")} value={row.productId || ""} onChange={(e) => change(index, "productId", e.target.value)}>
-        <option value="">{it ? "-- seleziona prodotto --" : "-- select product --"}</option>
+      <label><span>{adaptive ? s("adaptiveProduct") : s("cmsProduct")}</span><select aria-label={adaptive ? s("adaptiveProduct") : s("cmsProduct")} value={row.productId || ""} onChange={(e) => change(index, "productId", e.target.value)}>
+        <option value="">{s("selectProduct")}</option>
         {products.filter((item) => item.id === row.productId || !allRows.some((other) => other.productId === item.id)).map((item) => <option key={item.id} value={item.id}>{partnerDisplayText(item.name)} · {item.supplier || ""} {item.supplierSku || ""}</option>)}
-        {row.productId && !products.some((item) => item.id === row.productId) && <option value={row.productId}>{partnerDisplayText(smart.find((item) => item.id === row.productId)?.name || row.productId)} · {it ? "non compatibile / non disponibile" : "incompatible / unavailable"}</option>}
+        {row.productId && !products.some((item) => item.id === row.productId) && <option value={row.productId}>{partnerDisplayText(smart.find((item) => item.id === row.productId)?.name || row.productId)} · {s("incompatible")}</option>}
       </select></label>
-      <label><span>{it ? "Quantità" : "Quantity"}</span><input type="number" min="0" step="1" value={row.quantity ?? 0} onChange={(e) => change(index, "quantity", Math.max(0, Number(e.target.value) || 0))} /></label>
-      <button type="button" className="danger secondary partner-remove-button" onClick={() => replaceRows(allRows.filter((_, i) => i !== index))}>{it ? "Rimuovi" : "Remove"}</button>
+      <label><span>{s("quantity")}</span><input type="number" min="0" step="1" value={row.quantity ?? 0} onChange={(e) => change(index, "quantity", Math.max(0, Number(e.target.value) || 0))} /></label>
+      <button type="button" className="danger secondary partner-remove-button" onClick={() => replaceRows(allRows.filter((_, i) => i !== index))}>{s("remove")}</button>
     </div>)}
   </div>;
 }

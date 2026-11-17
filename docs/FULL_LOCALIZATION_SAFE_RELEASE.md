@@ -38,6 +38,11 @@ coverage checks. The separate `vimalux-crm` application and the remaining
 Intelligence/PDF modules still require full inspection and localization. A green
 build confirms regression coverage only, not complete language coverage.
 
+The Intelligence Solution workflow (warranty, Smart/CMS/Adaptive selection,
+LCU controls, partner equipment and cost summary) also has complete
+IT/EN/DA/ES source-copy coverage and dedicated automated tests. Production
+remains unchanged while the rest of the platform is localized.
+
 Bolivia-specific energy tariff and VAT assumptions are **not** automatically
 changed by the interface language: verify the local tariff, applicable taxes and
 currency before sending a proposal.
