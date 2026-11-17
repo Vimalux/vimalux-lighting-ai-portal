@@ -63,3 +63,20 @@ test("CRM-owned commercial fields are not present in the Intelligence cost paylo
     assert.equal(Object.hasOwn(mapped, key), false, `${key} must remain CRM-owned`);
   }
 });
+
+test("installed additional CAPEX is classified as installation rather than other costs", () => {
+  const project = { assumptions: { serviceAgreementPeriod: 10 } };
+  const result = {
+    totalDirectCosts: 5000,
+    implementationCost: 200,
+    additionalCosts: { rows: [
+      { costType: "capex", category: "servizi", description: "Installazione e smaltimento", costTotal: 3000 },
+      { costType: "capex", category: "altro", description: "Gestione del cantiere", costTotal: 900 },
+      { costType: "opex_annual", category: "servizi", description: "Installazione annuale", costTotal: 100 },
+    ] },
+  };
+  const mapped = buildCrmInternalFinancials(project, result);
+  assert.equal(mapped.installation_costs, 3200);
+  assert.equal(mapped.other_direct_costs, 1800);
+  assert.equal(mapped.total_direct_costs, 5000);
+});
