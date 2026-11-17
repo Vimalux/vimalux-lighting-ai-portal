@@ -6,6 +6,7 @@ const proposal = fs.readFileSync(new URL("../src/preliminaryProposalV2.js", impo
 const capexPage = fs.readFileSync(new URL("../src/capexProposalPage.js", import.meta.url), "utf8");
 const cashPage = fs.readFileSync(new URL("../src/proposalFinalVisualPages.js", import.meta.url), "utf8");
 const vatCard = fs.readFileSync(new URL("../src/VatSettings.jsx", import.meta.url), "utf8");
+const vatLabels = fs.readFileSync(new URL("../src/vatCopy.js", import.meta.url), "utf8");
 
 test("LaaS proposal uses all-inclusive payment semantics and non-indexed TCV wording", () => {
   assert.match(proposal, /Canone annuale LaaS \/ Noleggio tutto incluso/);
@@ -38,6 +39,8 @@ test("LaaS cash-flow labels canone and included OPEX explicitly", () => {
 
 test("VAT card is deal-type aware", () => {
   assert.match(vatCard, /dealType === "noleggio_operativo"/);
-  assert.match(vatCard, /Canone mensile lordo cliente/);
-  assert.match(vatCard, /Rata mensile finanziamento CAPEX/);
+  assert.match(vatCard, /t\("monthlyGross"\)/);
+  assert.match(vatCard, /t\("monthlyFinancing"\)/);
+  assert.match(vatLabels, /Canone mensile lordo cliente/);
+  assert.match(vatLabels, /Rata mensile finanziamento CAPEX/);
 });

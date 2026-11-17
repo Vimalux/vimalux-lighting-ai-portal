@@ -13,9 +13,12 @@ test("customer type only supplies safe VAT defaults", () => {
 
 test("VAT UI keeps recoverability manually editable and stores customer type", () => {
   const source = fs.readFileSync(new URL("../src/VatSettings.jsx", import.meta.url), "utf8");
-  assert.match(source, /IVA recuperabile dal cliente/);
+  const labels = fs.readFileSync(new URL("../src/vatCopy.js", import.meta.url), "utf8");
+  assert.match(source, /t\("recoverableByCustomer"\)/);
+  assert.match(labels, /IVA recuperabile dal cliente/);
   assert.match(source, /customerType/);
   assert.match(source, /vatRecoverability/);
-  assert.match(source, /Parziale \/ manuale/);
-  assert.match(source, /resta sempre modificabile manualmente/);
+  assert.match(source, /t\("partial"\)/);
+  assert.match(labels, /Parziale \/ manuale/);
+  assert.match(labels, /resta sempre modificabile manualmente/);
 });

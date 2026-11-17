@@ -1,0 +1,87 @@
+// Visible settings and administration copy must not silently fall back to English.
+const sections = {
+  en: {
+    adminIntro: "Manage standard catalogue prices and project-specific prices for the active project.",
+    catalogueDetail: "Costs, sales prices, implementation and annual fees.",
+    openCatalogue: "Open catalogue",
+    customPrices: "custom prices",
+    pricingDetail: "Set project prices without changing the master catalogue.",
+    openPricing: "Open project pricing",
+    projectsDetail: "Check the active project before changing prices.",
+    openProjects: "Open projects",
+    dataReset: "Data reset",
+    dataResetWarning: "Destructive action: deletes local data and restores initial values.",
+    dimmingTitle: "Existing baseline & dimming",
+    filterTechnology: "Filter technology",
+    filterWattage: "Filter wattage",
+    all: "All",
+    applyFirstRow: (n) => `Apply first row to ${n} groups`,
+    firstRowNote: "The first filtered row is used as the template.",
+    group: "Group", dimmingProfile: "Dimming profile", method: "Method", averageReduction: "Annual average reduction %",
+    fullHours: "Full-power hours / night", reducedHours: "Reduced hours / night", remainingPower: "Remaining power level %",
+    effectiveReduction: "Effective reduction %", systemFactor: "System factor", driverType: "Driver type", note: "Note",
+    none: "None", fixed: "Fixed", annualAverage: "Annual average", hourlyProfile: "Hourly profile", nonDimmable: "Non-dimmable", other: "Other",
+    totalHours: "Total hours",
+    dimmingHint: "The annual average reduction is weighted across all operating hours. Remaining power level means the power used during reduced hours: 70% means a 30% reduction. The calculation is reduced hours × (100% − remaining level) ÷ annual hours. The default system factor can be overridden for every group.",
+  },
+  it: {
+    adminIntro: "Gestisci i prezzi standard del catalogo e i prezzi specifici del progetto attivo.",
+    catalogueDetail: "Costi, prezzi di vendita, implementazione e canoni annuali.",
+    openCatalogue: "Apri catalogo", customPrices: "prezzi personalizzati",
+    pricingDetail: "Assegna prezzi di progetto senza modificare il catalogo principale.",
+    openPricing: "Apri prezzi progetto", projectsDetail: "Controlla il progetto attivo prima di modificare i prezzi.",
+    openProjects: "Apri progetti", dataReset: "Ripristino dati",
+    dataResetWarning: "Operazione distruttiva: elimina i dati locali e ripristina i valori iniziali.",
+    dimmingTitle: "Baseline e dimmer esistente", filterTechnology: "Filtra tecnologia", filterWattage: "Filtra potenza", all: "Tutte",
+    applyFirstRow: (n) => `Applica la prima riga a ${n} gruppi`, firstRowNote: "La prima riga filtrata viene usata come modello.",
+    group: "Gruppo", dimmingProfile: "Profilo dimmer", method: "Metodo", averageReduction: "Riduzione media annua %",
+    fullHours: "Ore a piena potenza / notte", reducedHours: "Ore a potenza ridotta / notte", remainingPower: "Livello potenza residua %",
+    effectiveReduction: "Riduzione effettiva %", systemFactor: "Fattore sistema", driverType: "Tipo driver", note: "Nota",
+    none: "Nessuno", fixed: "Fisso", annualAverage: "Media annua", hourlyProfile: "Profilo orario", nonDimmable: "Non dimmerabile", other: "Altro",
+    totalHours: "Ore totali",
+    dimmingHint: "La riduzione media annua è ponderata sull'intero periodo di funzionamento. Il livello di potenza residua indica la potenza utilizzata durante le ore ridotte: 70% significa una riduzione del 30%. Il calcolo è ore ridotte × (100% − livello residuo) ÷ ore annue. Il fattore sistema predefinito può essere sovrascritto per ogni gruppo.",
+  },
+  da: {
+    adminIntro: "Administrer standardpriser i kataloget og projektspecifikke priser for det aktive projekt.",
+    catalogueDetail: "Omkostninger, salgspriser, installation og årlige gebyrer.",
+    openCatalogue: "Åbn katalog", customPrices: "tilpassede priser",
+    pricingDetail: "Angiv projektpriser uden at ændre hovedkataloget.",
+    openPricing: "Åbn projektpriser", projectsDetail: "Kontrollér det aktive projekt, før du ændrer priser.",
+    openProjects: "Åbn projekter", dataReset: "Nulstilling af data",
+    dataResetWarning: "Sletning af lokale data og gendannelse af startværdier. Denne handling kan ikke fortrydes.",
+    dimmingTitle: "Eksisterende referenceforbrug og dæmpning", filterTechnology: "Filtrér teknologi", filterWattage: "Filtrér watt", all: "Alle",
+    applyFirstRow: (n) => `Anvend første række på ${n} grupper`, firstRowNote: "Den første filtrerede række bruges som skabelon.",
+    group: "Gruppe", dimmingProfile: "Dæmpningsprofil", method: "Metode", averageReduction: "Gennemsnitlig årlig reduktion %",
+    fullHours: "Timer ved fuld effekt / nat", reducedHours: "Timer ved reduceret effekt / nat", remainingPower: "Resterende effektniveau %",
+    effectiveReduction: "Faktisk reduktion %", systemFactor: "Systemfaktor", driverType: "Drivertype", note: "Bemærkning",
+    none: "Ingen", fixed: "Fast", annualAverage: "Årligt gennemsnit", hourlyProfile: "Timeprofil", nonDimmable: "Kan ikke dæmpes", other: "Andet",
+    totalHours: "Timer i alt",
+    dimmingHint: "Den årlige gennemsnitlige reduktion vægtes over alle driftstimer. Resterende effektniveau er den effekt, der bruges i timer med dæmpning: 70 % svarer til 30 % reduktion. Beregning: timer med dæmpning × (100 % − resterende effektniveau) ÷ årlige driftstimer. Systemfaktoren kan ændres for hver gruppe.",
+  },
+  es: {
+    adminIntro: "Administre los precios estándar del catálogo y los precios específicos del proyecto activo.",
+    catalogueDetail: "Costos, precios de venta, instalación y cuotas anuales.",
+    openCatalogue: "Abrir catálogo", customPrices: "precios personalizados",
+    pricingDetail: "Configure precios del proyecto sin modificar el catálogo principal.",
+    openPricing: "Abrir precios del proyecto", projectsDetail: "Compruebe el proyecto activo antes de modificar precios.",
+    openProjects: "Abrir proyectos", dataReset: "Restablecimiento de datos",
+    dataResetWarning: "Acción irreversible: elimina los datos locales y restaura los valores iniciales.",
+    dimmingTitle: "Situación actual y regulación de intensidad", filterTechnology: "Filtrar tecnología", filterWattage: "Filtrar potencia", all: "Todas",
+    applyFirstRow: (n) => `Aplicar la primera fila a ${n} grupos`, firstRowNote: "La primera fila filtrada se utiliza como plantilla.",
+    group: "Grupo", dimmingProfile: "Perfil de regulación", method: "Método", averageReduction: "Reducción media anual %",
+    fullHours: "Horas a plena potencia / noche", reducedHours: "Horas a potencia reducida / noche", remainingPower: "Potencia residual %",
+    effectiveReduction: "Reducción efectiva %", systemFactor: "Factor del sistema", driverType: "Tipo de controlador", note: "Nota",
+    none: "Ninguno", fixed: "Fijo", annualAverage: "Media anual", hourlyProfile: "Perfil horario", nonDimmable: "No regulable", other: "Otro",
+    totalHours: "Horas totales",
+    dimmingHint: "La reducción media anual se pondera por todas las horas de funcionamiento. La potencia residual indica la potencia utilizada durante las horas reducidas: 70 % significa una reducción del 30 %. El cálculo es horas reducidas × (100 % − potencia residual) ÷ horas anuales. El factor del sistema puede ajustarse por grupo.",
+  },
+};
+
+export function sectionT(language, key, ...args) {
+  const entry = sections[language]?.[key] ?? sections.en[key] ?? key;
+  return typeof entry === "function" ? entry(...args) : entry;
+}
+
+export function sectionTranslationCoverage() {
+  return Object.fromEntries(Object.entries(sections).map(([language, entries]) => [language, Object.keys(sections.en).filter((key) => !entries[key])]));
+}

@@ -30,6 +30,18 @@ user-entered descriptions and uploaded files) is never machine-translated.
 
 ## Release gates
 
+### Current staging status — 17 November 2026
+
+**Not approved for production.** The VAT/cash-flow, existing dimming and price
+administration panels have now received explicit IT/EN/DA/ES copy and translation
+coverage checks. The separate `vimalux-crm` application and the remaining
+Intelligence/PDF modules still require full inspection and localization. A green
+build confirms regression coverage only, not complete language coverage.
+
+Bolivia-specific energy tariff and VAT assumptions are **not** automatically
+changed by the interface language: verify the local tariff, applicable taxes and
+currency before sending a proposal.
+
 - No untranslated English/Italian labels when Spanish is selected, and likewise
   for each other supported language. Explicitly approved loanwords, trademarks,
   technical abbreviations and product names are allowed.
