@@ -1,0 +1,19 @@
+.commercial-approval {
+  margin-bottom: 20px;
+  padding: 17px 20px;
+  border: 1px solid #fed7aa;
+  border-left: 5px solid #ea580c;
+  border-radius: 10px;
+  background: #fff7ed;
+  color: #334155;
+}
+.commercial-approval.authorized { border-color: #a7f3d0; border-left-color: #15803d; background: #ecfdf5; }
+.commercial-approval-head { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: center; }
+.commercial-approval-head strong { color: #0f172a; font-size: 15px; }
+.commercial-approval-head span { font-weight: 750; font-size: 13px; }
+.commercial-approval p { font-size: 13px; line-height: 1.5; margin: 9px 0; }
+.commercial-approval small { color: #475569; font-size: 12px; display: block; margin-top: 8px; }
+.commercial-approval-actions { display: grid; gap: 10px; margin-top: 15px; max-width: 720px; }
+.commercial-approval-actions textarea { display: block; width: 100%; margin-top: 6px; padding: 9px; border: 1px solid #cbd5e1; border-radius: 7px; font: inherit; resize: vertical; }
+.commercial-approval-actions button { justify-self: start; }
+.commercial-approval-actions button:disabled { opacity: .55; cursor: not-allowed; }
