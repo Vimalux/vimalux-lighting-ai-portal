@@ -4,6 +4,7 @@ import fs from "node:fs";
 import { calculateBusinessCase } from "../src/calculations.js";
 import { defaultProject } from "../src/model.js";
 import { customerAnalysisResult } from "../src/vat.js";
+import { businessT } from "../src/businessCopy.js";
 
 test("cashBreakEvenYear equals first full year with non-negative cumulative customer cash flow", () => {
   const project = defaultProject({ applyStoredDefaults: false });
@@ -16,17 +17,18 @@ test("Economic Analysis separates Cash from Finance and LaaS customer semantics"
   const source = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
   assert.match(source, /const cashDeal = r\.dealType === "cash"/);
   assert.match(source, /const financed = !cashDeal/);
-  assert.match(source, /CAPEX iniziale cliente/);
-  assert.match(source, /Rata mensile finanziamento CAPEX/);
-  assert.match(source, /Canone mensile LaaS \/ Noleggio tutto incluso/);
-  assert.match(source, /Break-even cash cumulato/);
-  assert.match(source, /Cash flow cliente positivo dal primo anno/);
-  assert.match(source, /Metriche tecniche del progetto/);
-  assert.match(source, /Adaptive Dimming service fee annua \(inclusa nel canone\)/);
-  assert.match(source, /Adaptive Dimming service fee annua \(inclusa nell'OPEX servizi\)/);
-  assert.match(source, /Annual Adaptive Dimming service fee \(included in payment\)/);
-  assert.match(source, /Annual Adaptive Dimming service fee \(included in service OPEX\)/);
-  assert.match(source, /indipendenti dalla struttura di finanziamento/);
+  assert.equal(businessT("it", "upfront"), "CAPEX iniziale cliente");
+  assert.equal(businessT("it", "monthlyCapexFinance"), "Rata mensile finanziamento CAPEX");
+  assert.equal(businessT("it", "monthlyLaaS"), "Canone mensile LaaS / Noleggio tutto incluso");
+  assert.equal(businessT("it", "cashBreakEven"), "Break-even cash cumulato");
+  assert.equal(businessT("it", "positiveYear"), "Cash flow cliente positivo dal primo anno");
+  assert.equal(businessT("it", "technicalTitle"), "Metriche tecniche del progetto");
+  assert.match(businessT("it", "adaptiveFeeInclusive"), /inclusa nel canone/);
+  assert.match(businessT("it", "adaptiveFeeOpex"), /inclusa nell'OPEX servizi/);
+  assert.match(businessT("en", "adaptiveFeeInclusive"), /included in payment/);
+  assert.match(businessT("en", "adaptiveFeeOpex"), /included in service OPEX/);
+  assert.match(businessT("it", "technicalHint"), /indipendenti dalla struttura di finanziamento/);
+  assert.match(source, /s\("adaptiveFeeInclusive"\)/);
 });
 
 test("Finance and LaaS keep technical payback and ROI secondary, not as customer financing KPIs", () => {

@@ -3,20 +3,23 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { calculateBusinessCase } from "../src/calculations.js";
 import { defaultProject } from "../src/model.js";
+import { businessT } from "../src/businessCopy.js";
 
 const appSource = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 const reportSource = fs.readFileSync(new URL("../src/report.js", import.meta.url), "utf8");
 
 test("customer payment presentation distinguishes LaaS from CAPEX financing", () => {
-  assert.match(appSource, /Canone mensile LaaS \/ Noleggio tutto incluso/);
-  assert.match(appSource, /OPEX servizi \/ mese \(incluso nel canone\)/);
-  assert.match(appSource, /Rata mensile finanziamento CAPEX/);
-  assert.match(appSource, /Pagamento mensile totale cliente/);
+  assert.equal(businessT("it", "monthlyLaaS"), "Canone mensile LaaS / Noleggio tutto incluso");
+  assert.equal(businessT("it", "monthlyOpexIncluded"), "OPEX servizi / mese (incluso nel canone)");
+  assert.equal(businessT("it", "monthlyCapexFinance"), "Rata mensile finanziamento CAPEX");
+  assert.equal(businessT("it", "totalMonthly"), "Pagamento mensile totale cliente");
+  assert.match(appSource, /s\("monthlyLaaS"\)/);
 });
 
 test("operational ROI and payback are explicitly labelled as financing-independent", () => {
-  assert.match(appSource, /Payback operativo \(escl\. finanziamento\)/);
-  assert.match(appSource, /ROI operativo \(escl\. finanziamento\)/);
+  assert.equal(businessT("it", "payback"), "Payback operativo (escl. finanziamento)");
+  assert.equal(businessT("it", "roi"), "ROI operativo (escl. finanziamento)");
+  assert.match(appSource, /s\("payback"\)/);
   assert.match(reportSource, /Operational payback \(excl\. financing\)/);
 });
 

@@ -1,4 +1,5 @@
 import { readRuntimeProjects } from "./runtimeProjectStore.js";
+import { customerReportT } from "./customerReportCopy.js";
 
 const ROOT_SELECTOR = ".customer-value-chart";
 
@@ -29,19 +30,17 @@ function isNoleggioProject(project) {
 
 function phaseRange(node) {
   const label = String(node.querySelector("strong")?.textContent || "");
-  const match = label.match(/(\d+)\s*[–-]\s*(\d+)|(?:Anni|Years)\s*(\d+)/i);
+  const match = label.match(/(\d+)\s*[–-]\s*(\d+)|(?:Anni|Years|Años|År)\s*(\d+)/i);
   if (!match) return null;
   if (match[1] && match[2]) return { start: Number(match[1]), end: Number(match[2]) };
   if (match[3]) return { start: Number(match[3]), end: Number(match[3]) };
   return null;
 }
 
-function patchChart(chart, serviceYears, it, isNoleggio) {
+function patchChart(chart, serviceYears, language, isNoleggio) {
   if (!chart) return;
   const title = chart.querySelector("h3");
-  const desiredTitle = it
-    ? `Evoluzione dei costi e dei risparmi - ${serviceYears} anni`
-    : `Cost and savings development - ${serviceYears} years`;
+  const desiredTitle = customerReportT(language, "chartTitle", serviceYears);
   if (title && title.textContent !== desiredTitle) title.textContent = desiredTitle;
 
   chart.querySelectorAll(".value-period-phase").forEach((phase) => {
@@ -53,18 +52,18 @@ function patchChart(chart, serviceYears, it, isNoleggio) {
     }
     if (range.end > serviceYears) {
       const label = phase.querySelector("strong");
-      if (label) label.textContent = `${it ? "Anni" : "Years"} ${range.start}–${serviceYears}`;
+      if (label) label.textContent = `${customerReportT(language, "years")} ${range.start}–${serviceYears}`;
       phase.style.flexGrow = String(Math.max(1, serviceYears - range.start + 1));
     }
     if (isNoleggio) {
       const stateLabel = [...phase.children].find((child) => child.tagName === "SPAN" && !child.classList.contains("value-summary-bar"));
-      const desired = it ? "Pagamento all-inclusive" : "All-inclusive payment";
+      const desired = customerReportT(language, "allInclusive");
       if (stateLabel && stateLabel.textContent !== desired) stateLabel.textContent = desired;
     }
   });
 }
 
-function patchCashflowTable(serviceYears, it) {
+function patchCashflowTable(serviceYears, language) {
   const section = document.querySelector(".advanced-customer-economics.cashflow-visible");
   if (!section) return;
   const rows = [...section.querySelectorAll("tbody tr")];
@@ -75,9 +74,7 @@ function patchCashflowTable(serviceYears, it) {
 
   const hint = section.querySelector(".hint");
   if (hint) {
-    const desired = it
-      ? `Dettaglio annuale limitato al periodo contrattuale/servizi di ${serviceYears} anni, con beneficio lordo, OPEX, pagamento e flusso netto cliente.`
-      : `Annual detail limited to the ${serviceYears}-year contract/service period, with gross benefit, OPEX, payment and customer net cash flow.`;
+    const desired = customerReportT(language, "limitedCashflowHint", serviceYears);
     if (hint.textContent !== desired) hint.textContent = desired;
   }
 }
@@ -86,10 +83,10 @@ function patchReportHorizon() {
   const project = activeProject(localProjects());
   const serviceYears = serviceYearsFor(project);
   if (!project || !serviceYears) return;
-  const it = project?.language === "it";
+  const language = project?.language || "en";
   const isNoleggio = isNoleggioProject(project);
-  patchChart(document.querySelector(ROOT_SELECTOR), serviceYears, it, isNoleggio);
-  patchCashflowTable(serviceYears, it);
+  patchChart(document.querySelector(ROOT_SELECTOR), serviceYears, language, isNoleggio);
+  patchCashflowTable(serviceYears, language);
 }
 
 if (typeof document !== "undefined") {

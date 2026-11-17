@@ -1,6 +1,7 @@
 import { customerAnalysisResult } from "./vat.js";
 import { getLiveBusinessCaseResult, LIVE_BUSINESS_CASE_EVENT } from "./liveBusinessCaseResult.js";
 import { buildYearOneCustomerValuePhases, customerValueSegments } from "./customerValuePhases.js";
+import { customerReportT } from "./customerReportCopy.js";
 
 const MARKER = "data-vimalux-report-hybrid";
 
@@ -10,7 +11,7 @@ function safe(value) {
 }
 
 function locale(language) {
-  return language === "da" ? "da-DK" : language === "en" ? "en-GB" : "it-IT";
+  return language === "da" ? "da-DK" : language === "en" ? "en-GB" : language === "es" ? "es-ES" : "it-IT";
 }
 
 function formatNumber(value, language, digits = 0) {
@@ -69,7 +70,7 @@ function makeKpi(label, value) {
 function renderHybridSummary(report, project, result) {
   const model = hybridReportDashboardModel(project, result);
   if (!model) return;
-  const it = model.language === "it";
+  const s = (key, ...args) => customerReportT(model.language, key, ...args);
   const anchor = report.querySelector(".customer-summary-card");
   if (!anchor) return;
 
@@ -77,21 +78,19 @@ function renderHybridSummary(report, project, result) {
   section.className = "card customer-summary-card hybrid-report-summary";
   section.setAttribute(MARKER, "summary");
   const title = document.createElement("h2");
-  title.textContent = it ? "Hybrid Solar · contributo incluso nel Business Case" : "Hybrid Solar · contribution included in Business Case";
+  title.textContent = s("hybridTitle");
   const hint = document.createElement("p");
   hint.className = "hint";
-  hint.textContent = it
-    ? `Il beneficio solare riduce esclusivamente il prelievo degli apparecchi Hybrid ed è già incluso nel risparmio netto. ${model.location ? `Profilo solare: ${model.location}. ` : ""}Il dettaglio mensile è riportato nel PDF.`
-    : `Solar benefit only offsets Hybrid-luminaire grid consumption and is already included in the net saving. ${model.location ? `Solar profile: ${model.location}. ` : ""}The monthly detail is included in the PDF.`;
+  hint.textContent = s("hybridHint", model.location);
   const kpis = document.createElement("div");
   kpis.className = "kpis customer-summary-kpis";
   const items = [
-    [it ? "Unità Hybrid" : "Hybrid units", formatNumber(model.units, model.language)],
-    [it ? "PV installato" : "Installed PV", `${formatNumber(model.installedPvKwp, model.language, 2)} kWp`],
-    [it ? "Produzione PV annua" : "Annual PV production", `${formatNumber(model.annualPvKwh, model.language)} kWh`],
-    [it ? "Offset rete incluso BC" : "Grid offset included in BC", `${formatNumber(model.gridOffsetKwh, model.language)} kWh`],
-    [it ? "Beneficio Hybrid annuo" : "Annual Hybrid benefit", formatMoney(model.benefitEur, model.language, model.currency)],
-    [it ? "Copertura solare carico Hybrid" : "Solar coverage of Hybrid load", `${formatNumber(model.contributionPercent, model.language, 1)}%`],
+    [s("hybridUnits"), formatNumber(model.units, model.language)],
+    [s("installedPv"), `${formatNumber(model.installedPvKwp, model.language, 2)} kWp`],
+    [s("annualPv"), `${formatNumber(model.annualPvKwh, model.language)} kWh`],
+    [s("gridOffset"), `${formatNumber(model.gridOffsetKwh, model.language)} kWh`],
+    [s("annualHybridBenefit"), formatMoney(model.benefitEur, model.language, model.currency)],
+    [s("solarCoverage"), `${formatNumber(model.contributionPercent, model.language, 1)}%`],
   ];
   items.forEach(([label, value]) => kpis.appendChild(makeKpi(label, value)));
   section.append(title, hint, kpis);
@@ -132,12 +131,12 @@ function repairCustomerValueChart(report, project, result) {
   const language = project.language || "it";
   const currency = project.project?.currency || "EUR";
   const money = (value) => formatMoney(value, language, currency);
-  const it = language === "it";
+  const s = (key, ...args) => customerReportT(language, key, ...args);
   const labels = {
-    futureOperatingCost: it ? "Energia + manutenzione" : "Energy + maintenance",
+    futureOperatingCost: s("energyMaintenance"),
     servicePayment: "OPEX",
-    investmentPayment: it ? "Investimento" : "Investment",
-    customerSaving: it ? "Risparmio cliente" : "Customer saving",
+    investmentPayment: s("investment"),
+    customerSaving: s("customerSaving"),
   };
   const classes = {
     futureOperatingCost: "value-future",
@@ -153,7 +152,7 @@ function repairCustomerValueChart(report, project, result) {
     const parts = Object.fromEntries(customerValueSegments(phase.display).map((part) => [part.key, part]));
     Object.keys(classes).forEach((key) => setSegment(bar, classes[key], parts[key] || { value: 0, pct: 0 }, labels[key], money));
     const saving = node.querySelector(":scope > b");
-    if (saving) saving.textContent = `${money(phase.display.customerSaving)} / ${it ? "anno" : "year"}`;
+    if (saving) saving.textContent = `${money(phase.display.customerSaving)} / ${s("year")}`;
   });
 
   let note = chart.querySelector(`[${MARKER}="chart-note"]`);
@@ -164,9 +163,7 @@ function repairCustomerValueChart(report, project, result) {
     chart.appendChild(note);
   }
   if (note) {
-    note.textContent = it
-      ? `Hybrid Solar incluso nella curva: ${money(result.hybridSolarSavingEUR)} / anno · ${formatNumber(result.hybridSolarSavingKwh, language)} kWh/anno.`
-      : `Hybrid Solar included in the chart: ${money(result.hybridSolarSavingEUR)} / year · ${formatNumber(result.hybridSolarSavingKwh, language)} kWh/year.`;
+    note.textContent = s("hybridChartNote", money(result.hybridSolarSavingEUR), formatNumber(result.hybridSolarSavingKwh, language));
   }
 }
 
