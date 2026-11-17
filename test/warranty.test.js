@@ -52,3 +52,15 @@ test('an editable warranty term above the standard term uses the saved uplift', 
   assert.equal(priced.catalogue.led[0].salesPrice, 118.19);
   assert.equal(warrantyLabel(project, 'it'), '12 anni');
 });
+
+test('warranty pricing is idempotent across chained report and calculation callers', () => {
+  const project = {
+    solution: { warrantyYears: 10, warrantyUpliftPercentSnapshot: 18.19 },
+    catalogue: { led: [{ id: 'led-1', salesPrice: 100, costPrice: 65 }] },
+  };
+  const once = applyWarrantyPricing(project);
+  const twice = applyWarrantyPricing(once);
+  assert.equal(twice.catalogue.led[0].salesPrice, once.catalogue.led[0].salesPrice);
+  assert.equal(twice.catalogue.led[0].baseSalesPrice, 100);
+  assert.equal(project.catalogue.led[0].salesPrice, 100, 'input snapshot must remain unchanged');
+});
