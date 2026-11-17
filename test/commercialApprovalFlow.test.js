@@ -5,6 +5,7 @@ import fs from "node:fs";
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 const panel = fs.readFileSync(new URL("../src/CommercialApprovalPanel.jsx", import.meta.url), "utf8");
 const preliminary = fs.readFileSync(new URL("../src/preliminaryProposalV2.js", import.meta.url), "utf8");
+const preliminaryCopy = fs.readFileSync(new URL("../src/preliminaryProposalCopy.js", import.meta.url), "utf8");
 const customerReport = fs.readFileSync(new URL("../src/report.js", import.meta.url), "utf8");
 const migration = fs.readFileSync(new URL("../supabase/migrations/20261117060000_commercial_approval_gate.sql", import.meta.url), "utf8");
 
@@ -15,7 +16,9 @@ test("Admin internal report and Agent customer report show the same commercial a
 });
 
 test("both customer-facing PDFs remain explicitly preliminary and non-binding", () => {
-  assert.match(preliminary, /non vincolante/);
+  assert.match(preliminaryCopy, /Genera proposta preliminare \(non vincolante\)/);
+  assert.match(preliminaryCopy, /no constituye una oferta vinculante/);
+  assert.match(preliminary, /preliminaryProposalNarrative\(lang, "disclaimer"/);
   assert.match(preliminary, /autorizzazione commerciale VIMALUX/);
   assert.match(preliminary, /proposal_status: "draft"/);
   assert.match(customerReport, /Non costituisce un'offerta commerciale definitiva/);

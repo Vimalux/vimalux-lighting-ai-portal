@@ -7,7 +7,8 @@ export function proposalSolutionScope(calculated = {}, legacy = {}, language = '
   const nominal = positive(calculated.nominalSystemKwh);
   const existingSaving = positive(calculated.existingDimmingSavingKwh);
   const reduction = nominal ? existingSaving / nominal * 100 : 0;
-  const percent = new Intl.NumberFormat(it ? 'it-IT' : 'en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(reduction);
+  const locale = { it: 'it-IT', en: 'en-GB', es: 'es-ES', da: 'da-DK' }[language] || 'en-GB';
+  const percent = new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(reduction);
   return {
     led: `${upgrades} ${it ? 'punti luce' : 'lighting points'}`,
     connected: `${connected} ${it ? 'punti luce Smart' : 'Smart lighting points'}`,

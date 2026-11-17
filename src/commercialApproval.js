@@ -54,6 +54,16 @@ export function commercialReleaseLabel(state, lang = "it") {
       approved_by_vimalux: "Endeligt tilbud frigivet af VIMALUX",
       pending_admin: "Afventer VIMALUX' kommercielle godkendelse",
     },
+    es: {
+      customer_review: "La viabilidad económica del cliente requiere revisión",
+      blocked: "Oferta definitiva bloqueada: revise el proyecto",
+      approved_by_policy: "Oferta definitiva admisible conforme a los criterios de VIMALUX",
+      pending_sync: "Pendiente de sincronización del proyecto",
+      unverified: "No se pudo verificar la autorización: oferta definitiva no autorizada",
+      approved_exception: "Excepción comercial aprobada por VIMALUX",
+      approved_by_vimalux: "Oferta definitiva autorizada por VIMALUX",
+      pending_admin: "Pendiente de aprobación comercial de VIMALUX",
+    },
   };
   return (labels[lang] || labels.it)[state] || (labels[lang] || labels.it).pending_admin;
 }

@@ -5,7 +5,8 @@ export const PDF_FONT = "helvetica";
 const safeNumber = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 
 export function reportNumber(value, digits = 0, lang = "en") {
-  return new Intl.NumberFormat(lang === "it" ? "it-IT" : "en-GB", {
+  const locale = { it: "it-IT", en: "en-GB", es: "es-ES", da: "da-DK" }[lang] || "en-GB";
+  return new Intl.NumberFormat(locale, {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
     useGrouping: true,
@@ -14,7 +15,7 @@ export function reportNumber(value, digits = 0, lang = "en") {
 
 export function reportMoney(value, lang = "en") {
   const formatted = reportNumber(value, 0, lang);
-  return lang === "it" ? `${formatted} €` : `€${formatted}`;
+  return ["it", "es", "da"].includes(lang) ? `${formatted} €` : `€${formatted}`;
 }
 
 export function pdfSafeText(value) {
