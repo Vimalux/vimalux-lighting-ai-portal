@@ -42,6 +42,7 @@ export function businessCaseActionLabel(linked, language = "en") {
     da: linked ? "Åbn Business Case" : "Opret Business Case i Intelligence",
     it: linked ? "Apri Business Case" : "Crea Business Case in Intelligence",
     en: linked ? "Open Business Case" : "Create Business Case in Intelligence",
+    es: linked ? "Abrir análisis económico" : "Crear análisis económico en Intelligence",
   };
   return labels[language] || labels.en;
 }

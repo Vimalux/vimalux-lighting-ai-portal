@@ -86,7 +86,7 @@ function patchReportHorizon() {
   const project = activeProject(localProjects());
   const serviceYears = serviceYearsFor(project);
   if (!project || !serviceYears) return;
-  const it = project?.language !== "en";
+  const it = project?.language === "it";
   const isNoleggio = isNoleggioProject(project);
   patchChart(document.querySelector(ROOT_SELECTOR), serviceYears, it, isNoleggio);
   patchCashflowTable(serviceYears, it);

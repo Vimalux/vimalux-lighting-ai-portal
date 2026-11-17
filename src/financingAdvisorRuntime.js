@@ -169,7 +169,7 @@ function render() {
   const advisor = financingCashflowAdvisor(project, { safetyMarginPercent: 10 });
   const newMode = advisor?.mode || "cash";
   const isNoleggio = newMode === "noleggio_operativo";
-  const it = project?.language !== "en";
+  const it = project?.language === "it";
 
   syncNoleggioPresentation(projects, index, project, isNoleggio, it);
 

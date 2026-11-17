@@ -27,15 +27,181 @@ const translations = {
   },
 };
 export const useT = (language) => (key) => translations[language]?.[key] ?? translations.en[key] ?? key;
+export const translationMatchesEnglish = (language) => language === "en" ? [] : Object.keys(translations.en).filter((key) => translations[language]?.[key] === translations.en[key]);
 translations.da = Object.fromEntries(Object.entries(translations.en).map(([key,value])=>[key,value]));
 Object.assign(translations.it,{roi:"ROI annuo"});
 Object.assign(translations.en,{roi:"Annual ROI"});
 Object.assign(translations.da,{customer:"Kunde og projekt",existing:"Eksisterende belysning",solution:"Løsning",additionalCosts:"Ekstra projektomkostninger",pricing:"Projektpriser",assumptions:"Forudsætninger",business:"Business case",report:"Kunderapport",projects:"Projekter",catalogue:"Produktkatalog",priceAdmin:"Prisadministration",internalReport:"Intern rapport",reset:"Nulstil lokale data",save:"Gemt automatisk",add:"Tilføj gruppe",remove:"Fjern",generate:"Generér PDF",preliminary:"Foreløbig vurdering",capex:"CAPEX",annualOpex:"Årlig OPEX",monthlyPayment:"Månedlig betaling",annualNet:"Årlig nettogevinst",payback:"Tilbagebetalingstid",roi:"Årligt ROI",npv:"NPV",lifecycle:"Livscyklusresultat",energyReduction:"Energireduktion",co2Reduction:"CO₂-reduktion",baseline:"Referenceforbrug",final:"Slutforbrug",ledSaving:"LED-besparelse",cloSaving:"CLO-besparelse",powerSaving:"Adaptive Dimming-besparelse",maintenanceSaving:"Vedligeholdelsesbesparelse",technical:"Teknisk",savings:"Besparelser",financial:"Finansielt",freight:"Fragt",financingModel:"Projekttype",dealType:"Aftaletype",financeSolution:"Finansieringsløsning",cashDeal:"Kontant handel",noleggioOperativo:"Noleggio Operativo - alt inkluderet",rateProfile:"Renteprofil",financingYears:"Finansieringsår",allInclusiveAnnualPayment:"Årlig betaling - alt inkluderet",operatingHours:"Årlige driftstimer",energyPrice:"Energipris (EUR/kWh)",cloPercent:"CLO-procent",powerAidPercent:"Adaptive Dimming-procent",powerAidShare:"Adaptive Dimming-andel",contractYears:"Kontraktår",interestRate:"Rente (%)",upfrontPayment:"Udbetaling",energyEscalation:"Energiprisstigning (%)",opexEscalation:"Intern OPEX-omkostningsstigning (%)",discountRate:"Diskonteringsrente (%)",analysisPeriod:"Analyseperiode",yes:"Ja",no:"Nej",enabled:"Aktiveret",disabled:"Deaktiveret",years:"år",units:"enheder",notAvailable:"Ikke tilgængelig",GO:"Projektet vurderes økonomisk bæredygtigt ud fra de angivne forudsætninger.",REVIEW:"Projektet kræver kommerciel eller teknisk optimering.",NO_GO:"Projektet er ikke økonomisk bæredygtigt med de aktuelle forudsætninger."});
 Object.assign(translations.da,{serviceAgreementPeriod:"CMS-serviceperiode (år)",powerAidServicePeriod:"Adaptive Dimming-serviceperiode (år)"});
+Object.assign(translations.da, {
+  sapFactor: "SAP-faktor", mhFactor: "MH-faktor", mercuryFactor: "Kviksølvfaktor",
+  powerAidCustomerFee: "Kundegebyr for adaptiv dæmpning (% af merbesparelsen)",
+  powerAidSupplierShare: "Leverandør-/intern omkostning (% af kundegebyret)",
+  existingMaintenance: "Nuværende vedligehold / armatur / år",
+  newMaintenance: "Ny vedligeholdelse / armatur / år",
+  financingPeriod: "Finansieringsperiode (år)",
+  freightCost: "Fragtomkostning / armatur", freightSales: "Fragtpris / armatur",
+});
 Object.assign(translations.it, { orderList: "Lista ordini" });
 Object.assign(translations.en, { orderList: "Order List" });
 Object.assign(translations.da, { orderList: "Ordreliste" });
-export const locale = (language) => language === "it" ? "it-IT" : language === "da" ? "da-DK" : "en-IE";
+Object.assign(translations.it, { crm: "CRM", partners: "Partners", partnerReports: "Report partner", signout: "Esci", saving: "Salvataggio…", syncError: "Errore sincronizzazione", synced: "Supabase sincronizzato" });
+Object.assign(translations.en, { crm: "CRM", partners: "Partners", partnerReports: "Partner reports", signout: "Sign out", saving: "Saving…", syncError: "Sync error", synced: "Supabase synced" });
+Object.assign(translations.da, { crm: "CRM", partners: "Partnere", partnerReports: "Partnerrapporter", signout: "Log ud", saving: "Gemmer…", syncError: "Synkroniseringsfejl", synced: "Supabase synkroniseret" });
+// Spanish is an interface language. Reports and specialist screens that do not
+// yet have Spanish copy deliberately fall back to English, never Italian.
+translations.es = {
+  ...translations.en,
+  app: "VIMALUX Intelligence",
+  projects: "Proyectos",
+  catalogue: "Catálogo de productos",
+  priceAdmin: "Administración de precios",
+  internalReport: "Informe interno",
+  reset: "Restablecer datos locales",
+  customer: "Cliente y proyecto",
+  existing: "Alumbrado existente",
+  solution: "Solución",
+  additionalCosts: "Costos adicionales del proyecto",
+  pricing: "Precios del proyecto",
+  assumptions: "Supuestos",
+  business: "Análisis económico",
+  report: "Informe",
+  save: "Guardado automáticamente",
+  add: "Añadir grupo",
+  remove: "Eliminar",
+  generate: "Generar PDF",
+  italian: "Italiano",
+  english: "English",
+  spanish: "Español",
+  crm: "CRM",
+  partners: "Socios",
+  partnerReports: "Informes para socios",
+  orderList: "Lista de pedidos",
+  signout: "Cerrar sesión",
+  saving: "Guardando…",
+  syncError: "Error de sincronización",
+  synced: "Supabase sincronizado",
+  preliminary: "Evaluación preliminar",
+  annualOpex: "OPEX anual",
+  monthlyPayment: "Pago mensual",
+  annualNet: "Beneficio neto anual",
+  payback: "Plazo de recuperación",
+  npv: "VAN",
+  lifecycle: "Resultado del ciclo de vida",
+  energyReduction: "Reducción del consumo",
+  co2Reduction: "Reducción de CO₂",
+  baseline: "Consumo de referencia",
+  final: "Consumo final",
+  ledSaving: "Ahorro LED",
+  cloSaving: "Ahorro CLO",
+  powerSaving: "Ahorro por regulación adaptativa",
+  maintenanceSaving: "Ahorro de mantenimiento",
+  technical: "Técnica",
+  savings: "Ahorros",
+  financial: "Financiera",
+  freight: "Transporte",
+  financingModel: "Tipo de proyecto",
+  dealType: "Tipo de acuerdo",
+  financeSolution: "Solución de financiación",
+  cashDeal: "Compra directa",
+  noleggioOperativo: "Arrendamiento operativo - todo incluido",
+  rateProfile: "Perfil de tasa de interés",
+  financingYears: "Años de financiación",
+  allInclusiveAnnualPayment: "Pago anual todo incluido",
+  operatingHours: "Horas de operación al año",
+  energyPrice: "Precio de energía (EUR/kWh)",
+  sapFactor: "Factor SAP",
+  mhFactor: "Factor MH",
+  mercuryFactor: "Factor de mercurio",
+  co2Factor: "CO₂ kg/kWh",
+  cloPercent: "Porcentaje CLO",
+  powerAidPercent: "Ahorro por regulación adaptativa (%)",
+  powerAidCustomerFee: "Tarifa al cliente por regulación adaptativa (% del ahorro incremental)",
+  powerAidSupplierShare: "Costo interno/proveedor (% de la tarifa al cliente)",
+  existingMaintenance: "Mantenimiento actual / luminaria / año",
+  newMaintenance: "Mantenimiento nuevo / luminaria / año",
+  contractYears: "Años de contrato",
+  serviceAgreementPeriod: "Duración del servicio CMS (años)",
+  powerAidServicePeriod: "Duración de regulación adaptativa (años)",
+  financingPeriod: "Plazo de financiación (años)",
+  interestRate: "Tasa de interés (%)",
+  upfrontPayment: "Pago inicial",
+  energyEscalation: "Incremento del precio de energía (%)",
+  opexEscalation: "Incremento de costos internos OPEX (%)",
+  discountRate: "Tasa de descuento (%)",
+  analysisPeriod: "Período de análisis",
+  freightCost: "Costo de transporte / luminaria",
+  freightSales: "Precio de transporte / luminaria",
+  yes: "Sí", no: "No", enabled: "Activado", disabled: "Desactivado",
+  units: "unidades", years: "años", notAvailable: "n/d",
+  roi: "ROI anual",
+  GO: "El proyecto parece económicamente viable según los supuestos indicados.",
+  REVIEW: "El proyecto requiere una optimización comercial o técnica.",
+  NO_GO: "El proyecto no es económicamente viable con los supuestos actuales.",
+};
+// Customer and project field labels are shared across customer-facing views.
+// Project names, contacts and other entered values must remain unchanged.
+Object.assign(translations.it, {
+  customerName: "Comune / cliente", province: "Provincia", region: "Regione", country: "Paese",
+  contactPerson: "Referente", contactTitle: "Ruolo", telephone: "Telefono", projectName: "Nome progetto",
+  salesConsultant: "Consulente commerciale", projectDate: "Data", currency: "Valuta", projectLabel: "Progetto", customerLabel: "Cliente",
+  deleteProject: "Eliminare definitivamente il progetto", deleteError: "Impossibile eliminare il progetto dal cloud",
+  resetConfirm: "Eliminare tutti i dati locali e ripristinare i valori iniziali?",
+  retrySave: "Riprova salvataggio", saveHint: "Non chiudere questa pagina finché il salvataggio non è riuscito.",
+  archivedReadOnly: "Business Case archiviato/perso · storico in sola lettura · escluso da pipeline e forecast.",
+  noAssignedCase: "Nessun Business Case assegnato", openAssignedCase: "Apri un'opportunità assegnata a te in VIMALUX CRM e seleziona «Business Case preliminare».",
+  selectBusinessCase: "Seleziona un Business Case per continuare.", languageLabel: "Lingua",
+  archivedProject: "Archiviato", lostProject: "Perso", supersededBy: "sostituito da",
+  lostArchived: "Persi / archiviati", archivedDisclosure: "Conservati come storico e esclusi da pipeline, forecast e report partner.",
+  newProject: "Nuovo progetto", importProjectFile: "Importa file progetto",
+  importProjectHelp: "Riconoscimento automatico: Planner, Noleggio Operativo o file lampade CSV/Excel. Vedrai sempre un'anteprima prima del salvataggio.",
+});
+Object.assign(translations.en, {
+  customerName: "Municipality / customer", province: "Province", region: "Region", country: "Country",
+  contactPerson: "Contact person", contactTitle: "Position / title", telephone: "Telephone", projectName: "Project name",
+  salesConsultant: "Sales consultant", projectDate: "Date", currency: "Currency", projectLabel: "Project", customerLabel: "Customer",
+  deleteProject: "Delete project permanently", deleteError: "The project could not be deleted from the cloud",
+  resetConfirm: "Delete all local data and restore defaults?", retrySave: "Retry saving",
+  saveHint: "Do not close this page until saving succeeds.",
+  archivedReadOnly: "Business Case lost/archived · read-only history · excluded from pipeline and forecasts.",
+  noAssignedCase: "No Business Cases assigned", openAssignedCase: "Open an opportunity assigned to you in VIMALUX CRM and select ‘Preliminary Business Case’.",
+  selectBusinessCase: "Select a Business Case to continue.", languageLabel: "Language",
+  archivedProject: "Archived", lostProject: "Lost", supersededBy: "superseded by",
+  lostArchived: "Lost / archived", archivedDisclosure: "Kept as history and excluded from pipeline, forecasts and partner reports.",
+  newProject: "New project", importProjectFile: "Import project file",
+  importProjectHelp: "Automatic detection: Planner, Noleggio Operativo, or lighting CSV/Excel. A preview is always shown before saving.",
+});
+Object.assign(translations.da, {
+  customerName: "Kommune / kunde", province: "Provins", region: "Region", country: "Land",
+  contactPerson: "Kontaktperson", contactTitle: "Stilling / titel", telephone: "Telefon", projectName: "Projektnavn",
+  salesConsultant: "Salgskonsulent", projectDate: "Dato", currency: "Valuta", projectLabel: "Projekt", customerLabel: "Kunde",
+  deleteProject: "Slet projekt permanent", deleteError: "Projektet kunne ikke slettes fra skyen",
+  resetConfirm: "Slet alle lokale data og gendan standardværdier?", retrySave: "Prøv at gemme igen",
+  saveHint: "Luk ikke siden, før data er gemt.",
+  archivedReadOnly: "Business Case tabt/arkiveret · historik i skrivebeskyttet visning · udeladt fra pipeline og prognoser.",
+  noAssignedCase: "Ingen Business Cases tildelt", openAssignedCase: "Åbn en tildelt salgsmulighed i VIMALUX CRM og vælg ‘Foreløbig Business Case’.",
+  selectBusinessCase: "Vælg en Business Case for at fortsætte.", languageLabel: "Sprog",
+  archivedProject: "Arkiveret", lostProject: "Tabt", supersededBy: "erstattet af",
+  lostArchived: "Tabte / arkiverede", archivedDisclosure: "Bevares som historik og indgår ikke i pipeline, prognoser eller partnerrapporter.",
+  newProject: "Nyt projekt", importProjectFile: "Importér projektfil",
+  importProjectHelp: "Automatisk genkendelse: Planner, Noleggio Operativo eller belysningsdata i CSV/Excel. Du ser altid en forhåndsvisning inden lagring.",
+});
+Object.assign(translations.es, {
+  customerName: "Municipio / cliente", province: "Provincia", region: "Región", country: "País",
+  contactPerson: "Persona de contacto", contactTitle: "Cargo", telephone: "Teléfono", projectName: "Nombre del proyecto",
+  salesConsultant: "Asesor comercial", projectDate: "Fecha", currency: "Moneda", projectLabel: "Proyecto", customerLabel: "Cliente",
+  deleteProject: "Eliminar el proyecto definitivamente", deleteError: "No se pudo eliminar el proyecto de la nube",
+  resetConfirm: "¿Eliminar todos los datos locales y restablecer los valores predeterminados?",
+  retrySave: "Reintentar guardar", saveHint: "No cierre esta página hasta que se guarden los datos.",
+  archivedReadOnly: "Análisis económico perdido/archivado · historial de solo lectura · excluido de la cartera y previsiones.",
+  noAssignedCase: "No hay proyectos asignados", openAssignedCase: "Abra una oportunidad asignada en VIMALUX CRM y seleccione «Análisis preliminar de viabilidad».",
+  selectBusinessCase: "Seleccione un análisis económico para continuar.", languageLabel: "Idioma",
+  archivedProject: "Archivado", lostProject: "Perdido", supersededBy: "sustituido por",
+  lostArchived: "Perdidos / archivados", archivedDisclosure: "Se conservan como historial y no se incluyen en la cartera, las previsiones ni los informes para socios.",
+  newProject: "Nuevo proyecto", importProjectFile: "Importar archivo de proyecto",
+  importProjectHelp: "Detección automática: Planner, arrendamiento operativo o archivo de luminarias CSV/Excel. Siempre se muestra una vista previa antes de guardar.",
+});
+export const locale = (language) => language === "it" ? "it-IT" : language === "da" ? "da-DK" : language === "es" ? "es-BO" : "en-IE";
 const europeanSeparators = (formatted, language) => language === "en" ? formatted.replace(/,/g, "\u0000").replace(/\./g, ",").replace(/\u0000/g, ".") : formatted;
 export const formatMoney = (value, language, currency = "EUR", digits = 0) => europeanSeparators(new Intl.NumberFormat(locale(language), { style: "currency", currency, useGrouping: "always", minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(value) || 0), language);
 export const formatNumber = (value, language, digits = 0) => europeanSeparators(new Intl.NumberFormat(locale(language), { useGrouping: "always", minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(value) || 0), language);

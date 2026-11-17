@@ -227,7 +227,7 @@ export function migrateProject(saved, { reconcileIdentity = false } = {}) {
   const previousUpdatedAt = saved?.updatedAt || saved?.createdAt || "";
   const project = merge(defaultProject({ applyStoredDefaults: false }), saved && typeof saved === "object" ? saved : {});
   project.updatedAt = previousUpdatedAt;
-  project.language = ["it", "en", "da"].includes(project.language) ? project.language : "it";
+  project.language = ["it", "en", "da", "es"].includes(project.language) ? project.language : "it";
   project.groups = (Array.isArray(project.groups) ? project.groups : [])
     .filter((group) => !isImportedTotalGroup(group))
     .map((g) => ({ existingSystemFactor: 0, existingDimmingProfile: "none", existingDimmingMethod: "average", existingDimmingPercent: 0, existingFullPowerHours: 0, existingReducedHours: 0, existingReducedLoadPercent: 100, existingDimmingNote: "", existingDriverType: "non_dimmable", upgradeSelected: true, ...g, projectLedWattage: g.projectLedWattage ?? g.importedProposedWattage ?? null, id: g.id || uid() }));

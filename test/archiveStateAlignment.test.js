@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const app=fs.readFileSync(new URL("../src/App.jsx",import.meta.url),"utf8");
+const i18n=fs.readFileSync(new URL("../src/i18n.js",import.meta.url),"utf8");
 const transport=fs.readFileSync(new URL("../src/businessCaseTransport.js",import.meta.url),"utf8");
 
 test("Intelligence excludes archived/lost cases from active forecasts",()=>{
@@ -13,8 +14,11 @@ test("Intelligence excludes archived/lost cases from active forecasts",()=>{
 });
 
 test("Intelligence keeps archived/lost cases as read-only history",()=>{
-  assert.match(app,/Tabte \/ arkiverede/);
-  assert.match(app,/read-only history/);
+  assert.match(app,/t\("lostArchived"\)/);
+  assert.match(i18n,/Tabte \/ arkiverede/);
+  assert.match(app,/t\("archivedReadOnly"\)/);
+  assert.match(i18n,/read-only history/);
+  assert.match(i18n,/historial de solo lectura/);
   assert.match(app,/if \(isArchivedProject\(currentProject\)\) return all/);
   assert.match(transport,/archiveReason:/);
   assert.match(transport,/archivedAt:/);

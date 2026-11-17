@@ -59,7 +59,7 @@ function labels(language) {
     supplierContract: "Leverandørkost kontrakt",
     contractMargin: "VIMALUX kontraktmargin",
   };
-  if (language === "en") return {
+  if (language === "en" || language === "es") return {
     title: "VIMALUX project profitability",
     subtitle: "Internal economics split into CAPEX/hardware, recurring OPEX, Adaptive Dimming and total project contribution.",
     hardware: "CAPEX / hardware",

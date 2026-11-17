@@ -113,7 +113,7 @@ function render() {
   project = persistAnalysisHorizon(projects, index, cmsYears);
   const powerAidYears = Math.max(1, Math.min(cmsYears, Math.round(Number(project?.assumptions?.powerAidServicePeriod) || Math.min(10, cmsYears))));
   const powerAidEnabled = Boolean(project?.solution?.powerAidEnabled);
-  const it = project?.language !== "en";
+  const it = project?.language === "it";
 
   syncVisibleAnalysisPeriod(cmsYears);
   legacy.style.display = "none";
