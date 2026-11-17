@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { stagingAuthMode } from "./stagingAuthMode.js";
+import { stagingPreviewRpcResponse } from "./stagingPreviewRpcIsolation.js";
 import { projectFromBusinessCaseRow } from "./businessCaseTransport.js";
 import { isStableCloudId, persistIntelligenceProject } from "./businessCasePersistence.js";
 import { activeIntelligenceProjects, isArchivedProject } from "./projectVisibility.js";
@@ -68,18 +69,11 @@ if (stagingPreview && supabase?.rpc && !supabase.__vimaluxPreviewRpcIsolationIns
   const originalRpc = supabase.rpc.bind(supabase);
   supabase.rpc = (name, args, options) => {
     const normalized = normalizePreviewRpcName(name, true);
-    if (normalized === "list_business_cases_v2") {
-      return Promise.resolve({ data: previewBusinessCaseRows(), error: null, count: null, status: 200, statusText: "OK" });
-    }
-    if (normalized === "list_archived_business_cases_v2") {
-      return Promise.resolve({ data: [], error: null, count: 0, status: 200, statusText: "OK" });
-    }
-    if (normalized === "get_proposal_history") {
-      return Promise.resolve({ data: [], error: null, count: 0, status: 200, statusText: "OK" });
-    }
-    if (normalized === "publish_intelligence_preliminary_proposal") {
-      return Promise.resolve({ data: { preview: true }, error: null, count: null, status: 200, statusText: "OK" });
-    }
+    const previewResponse = stagingPreviewRpcResponse(
+      normalized,
+      normalized === "list_business_cases_v2" ? previewBusinessCaseRows() : undefined,
+    );
+    if (previewResponse) return Promise.resolve(previewResponse);
     return originalRpc(normalized, args, options);
   };
   supabase.__vimaluxPreviewRpcIsolationInstalled = true;
