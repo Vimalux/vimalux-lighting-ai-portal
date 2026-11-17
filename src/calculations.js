@@ -4,6 +4,7 @@ import { publishLiveBusinessCaseResult } from "./liveBusinessCaseResult.js";
 import { normalizeNightlyDimmingProject } from "./existingDimming.js";
 import { projectWithPartnerEquipmentCosts } from "./partnerEquipment.js";
 import { applyCustomerVatCashFlow } from "./vat.js";
+import { applyWarrantyPricing } from "./warranty.js";
 
 export { numberValue };
 
@@ -140,7 +141,10 @@ export function calculateBusinessCase(project, options = {}) {
   // Partner equipment is stored as catalogue selections in Solution. For calculation only,
   // convert those selections to virtual Additional Costs so the existing, tested CAPEX/OPEX
   // engine remains authoritative. Stored project data is never rewritten here.
-  const projectWithPartnerCosts = projectWithPartnerEquipmentCosts(project);
+  // Every consumer (internal report, CRM writeback, optimizer, partner reports,
+  // customer PDF) must calculate the same extended-warranty selling prices.
+  // applyWarrantyPricing is idempotent for older callers that apply it first.
+  const projectWithPartnerCosts = projectWithPartnerEquipmentCosts(applyWarrantyPricing(project));
   // LCU quantity defaults to one per upgraded luminaire. A project override changes only
   // LCU/CMS commercial quantities; luminaire counts and energy-saving calculations stay intact.
   const lcuPrepared = projectWithLcuQuantityOverride(projectWithPartnerCosts);

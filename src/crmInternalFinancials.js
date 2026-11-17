@@ -5,6 +5,15 @@ const numberValue = (value) => {
 
 const positive = (value) => Math.max(0, numberValue(value));
 
+function isInstallationAdditionalCost(row = {}) {
+  if (row.costType !== "capex") return false;
+  if (row.category === "lavoro") return true;
+  // Imported project estimates often use "servizi"/"altro" for installation.
+  // These items belong in the installation bucket, not unexplained other costs.
+  return /installazion|montagg|smaltiment|rimozion|posa in opera|installation|dismantl|removal|mounting/i
+    .test(String(row.description || ""));
+}
+
 function escalatingTotal(annualValue, ratePercent, years) {
   const annual = positive(annualValue);
   const rate = numberValue(ratePercent) / 100;
@@ -32,7 +41,10 @@ export function buildCrmInternalFinancials(project, result = {}) {
   const opexEscalation = numberValue(assumptions.opexEscalation);
 
   const luminaireCosts = positive(result.ledCost);
-  const installationCosts = positive(result.implementationCost);
+  const installationAdditionalCosts = (result.additionalCosts?.rows || [])
+    .filter(isInstallationAdditionalCost)
+    .reduce((sum, row) => sum + positive(row.costTotal), 0);
+  const installationCosts = positive(result.implementationCost) + installationAdditionalCosts;
   const freightCosts = positive(result.freightCost);
   const agentCommission = positive(result.commissionCost);
   const financeCosts = positive(result.financingCost);
@@ -62,6 +74,13 @@ export function buildCrmInternalFinancials(project, result = {}) {
     + financeCosts;
   const totalDirectCosts = positive(result.totalDirectCosts);
   const otherDirectCosts = Math.max(0, totalDirectCosts - mappedBeforeOther);
+  // The legacy CRM cost bridge uses nominal assigned receivables, including the
+  // partner discount. The internal report instead shows the present-value
+  // proceeds and excludes that same discount from costs. Persist both explicitly
+  // so they can be reconciled without mixing accounting bases.
+  const internalReportRevenue = positive(result.vimaluxRevenue ?? result.totalContractRevenue);
+  const internalReportDirectCosts = positive(result.vimaluxDirectCosts ?? result.totalDirectCosts);
+  const internalReportContribution = internalReportRevenue - internalReportDirectCosts;
 
   return {
     schema_version: 1,
@@ -75,5 +94,10 @@ export function buildCrmInternalFinancials(project, result = {}) {
     other_direct_costs: otherDirectCosts,
     agent_commission: agentCommission,
     finance_costs: financeCosts,
+    receivables_discount: positive(result.financeReceivablesDiscount),
+    internal_report_revenue: internalReportRevenue,
+    internal_report_direct_costs: internalReportDirectCosts,
+    internal_report_contribution: internalReportContribution,
+    internal_report_margin_percent: internalReportRevenue ? internalReportContribution / internalReportRevenue * 100 : 0,
   };
 }

@@ -45,11 +45,17 @@ export function applyWarrantyPricing(project = {}) {
       ...(project.catalogue || {}),
       led: (project.catalogue?.led || []).map((product) => {
         const uplift = effectiveWarrantyUplift(product, project);
+        // Some callers already pass a calculation-only warranty-priced copy.
+        // Reuse its original catalogue price so a second calculation can never
+        // compound the warranty uplift.
+        const baseSalesPrice = product.baseSalesPrice != null && product.warrantyUpliftAppliedPercent != null
+          ? n(product.baseSalesPrice, 0)
+          : n(product.salesPrice, 0);
         return {
           ...product,
-          baseSalesPrice: n(product.salesPrice, 0),
+          baseSalesPrice,
           warrantyUpliftAppliedPercent: uplift,
-          salesPrice: n(product.salesPrice, 0) * (1 + uplift / 100),
+          salesPrice: baseSalesPrice * (1 + uplift / 100),
         };
       }),
     },
