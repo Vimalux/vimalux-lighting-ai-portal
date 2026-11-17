@@ -11,10 +11,14 @@ export function commercialReleaseState(result, approval = {}, syncState = "saved
     return approval?.phase === "loaded" && approval.approved === true ? "approved_by_vimalux" : "pending_admin";
   }
   if (result?.decisionStatus === "NO_GO") return "blocked";
-  if (result?.decisionStatus === "GO") return "approved_by_policy";
   if (syncState !== "saved") return "pending_sync";
   if (approval?.phase === "error" || approval?.phase === "unavailable") return "unverified";
-  if (result?.decisionStatus === "REVIEW" && approval?.phase === "loaded" && approval?.approved === true) return "approved_exception";
+  // A financially eligible project is not necessarily approved for release.
+  // Once Admin has approved the saved version, the visible status must say so.
+  if (approval?.phase === "loaded" && approval.approved === true) {
+    return result?.decisionStatus === "GO" ? "approved_by_vimalux" : "approved_exception";
+  }
+  if (result?.decisionStatus === "GO") return "approved_by_policy";
   return "pending_admin";
 }
 
@@ -55,5 +59,5 @@ export function commercialReleaseLabel(state, lang = "it") {
 }
 
 export function isFinalCommercialOfferAuthorized(state) {
-  return state === "approved_by_policy" || state === "approved_exception" || state === "approved_by_vimalux";
+  return state === "approved_exception" || state === "approved_by_vimalux";
 }

@@ -28,6 +28,11 @@ test("server unavailable, unsaved updates and negative customer case fail closed
 
 test("internal GO can proceed without exception but customer preliminary GO remains distinct", () => {
   assert.equal(commercialReleaseState({ customerDecisionStatus: "GO", decisionStatus: "GO" }), "approved_by_policy");
+  assert.equal(isFinalCommercialOfferAuthorized("approved_by_policy"), false);
+  assert.equal(commercialReleaseState({ customerDecisionStatus: "GO", decisionStatus: "GO" }, { phase: "loaded", approved: true }), "approved_by_vimalux");
+  assert.equal(isFinalCommercialOfferAuthorized("approved_by_vimalux"), true);
+  assert.equal(commercialReleaseState({ customerDecisionStatus: "GO", decisionStatus: "GO" }, { phase: "loaded", approved: false }), "approved_by_policy");
+  assert.equal(commercialReleaseState({ customerDecisionStatus: "GO", decisionStatus: "GO" }, { phase: "error" }), "unverified");
   assert.match(commercialReleaseLabel("pending_admin", "it"), /approvazione commerciale VIMALUX/);
   assert.match(commercialReleaseLabel("pending_admin", "da"), /VIMALUX/);
 });
